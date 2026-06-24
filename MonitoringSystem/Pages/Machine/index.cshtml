@@ -4,187 +4,1145 @@
     ViewData["Title"] = "Machine";
 }
 
-<link rel="stylesheet" href="~/css/Machine.css" asp-append-version="true" />
+<style>
+    .container-fluid {
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+    }
+
+    /* ── SAMA PERSIS DENGAN LOSSTIME ── */
+    .row.mt-2 {
+        margin-left: -21px !important;
+        margin-right: -21px !important;
+    }
+
+        .row.mt-2:first-of-type {
+            margin-top: 0.25rem !important;
+        }
+
+        .row.mt-2 > div[class*="col-"] {
+            padding-left: 5px !important;
+            padding-right: 5px !important;
+        }
+
+        .row.mt-2 > .col-12 {
+            padding-left: 5px !important;
+            padding-right: 5px !important;
+        }
+
+        .row.mt-2:last-of-type > div {
+            padding-left: 5px !important;
+            padding-right: 5px !important;
+        }
+
+        .row.mt-2 .card {
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            width: 100% !important;
+        }
+
+    /* ── FILTER AREA — SAMA PERSIS LOSSTIME ── */
+    .filter-area-with-lines {
+        position: relative;
+        padding: 1px 0;
+        margin-bottom: 8px;
+        margin-top: -20px;
+        min-height: 10px;
+        width: calc(100% - 14px);
+        margin-left: 7px;
+        margin-right: 7px;
+    }
+
+    .panamon-bottom-line,
+    .panamon-bottomm-line {
+        position: absolute !important;
+        left: -13px !important;
+        right: -13px !important;
+        height: 2px !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        z-index: 999 !important;
+        pointer-events: none !important;
+        display: block !important;
+    }
+
+    .panamon-bottom-line {
+        top: 0 !important;
+        border-top: 2px solid rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .panamon-bottomm-line {
+        bottom: 0 !important;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important;
+    }
+
+    /* FILTER CONTENT */
+    .filter-content {
+        position: relative;
+        z-index: 2;
+        padding: 6px 0;
+        border-radius: 15px;
+        margin-left: -8px;
+        margin-right: 7px;
+    }
+
+        .filter-content .form-select,
+        .filter-content .form-control {
+            height: 28px;
+            padding: 0 22px 0 8px;
+            font-size: 12px;
+            line-height: 20px;
+            border-radius: 999px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: #ffffff;
+            text-align: center;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+        }
+
+        .filter-content .form-select {
+            height: 28px;
+            padding: 0 !important;
+            padding-left: 12px !important;
+            padding-right: 28px !important;
+            font-size: 12px;
+            line-height: 16px;
+            border-radius: 999px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: #ffffff;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 10px 10px;
+        }
+
+            .filter-content .form-select option {
+                background-color: rgba(50, 60, 80, 0.95);
+                color: #ffffff;
+                font-size: 12px;
+                padding: 8px;
+            }
+
+            .filter-content .form-select:focus,
+            .filter-content .form-control:focus {
+                background-color: rgba(255, 255, 255, 0.20);
+                border-color: rgba(255, 255, 255, 0.3);
+                color: #ffffff;
+                box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.1);
+            }
+
+        .filter-content label {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 14px;
+            line-height: 20px;
+            font-weight: 600;
+        }
+
+        .filter-content .btn {
+            height: 28px;
+            min-height: 20px;
+            padding: 0 12px;
+            font-size: 12px;
+            line-height: 20px;
+            border-radius: 999px !important;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .filter-content .btn-primary {
+            background-color: rgba(8, 65, 150, 0.95);
+            border: 2px solid rgba(100, 181, 246, 1);
+            color: rgba(100, 181, 246, 1);
+        }
+
+            .filter-content .btn-primary:hover {
+                background-color: rgba(5, 45, 110, 1);
+                border-color: rgba(144, 202, 249, 1);
+                color: rgba(144, 202, 249, 1);
+            }
+
+    /* ── SLIDER GROUP ── */
+    .slider-group {
+        color: rgba(255,255,255,0.75);
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+        .slider-group b {
+            color: rgba(255,255,255,0.95);
+        }
+
+    body.light-mode .slider-group {
+        color: rgba(26,26,46,0.65);
+    }
+
+        body.light-mode .slider-group b {
+            color: #1a1a2e;
+        }
+
+    /* ── LIGHT MODE — Filter area ── */
+    body.light-mode .filter-content label {
+        color: rgba(26,26,46,0.75);
+    }
+
+    body.light-mode .filter-content .form-select {
+        background-color: rgba(255,255,255,0.75);
+        color: #1a1a2e;
+        border: 2px solid rgba(0,0,0,0.22);
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    }
+
+        body.light-mode .filter-content .form-select option {
+            background-color: #ffffff;
+            color: #1a1a2e;
+        }
+
+    body.light-mode .filter-content .btn-primary {
+        background-color: rgba(61, 121, 176, 0.88) !important;
+        border: 2px solid rgba(61, 121, 176, 0.9) !important;
+        color: #ffffff !important;
+    }
+
+    body.light-mode .panamon-bottom-line {
+        border-top-color: rgba(0, 0, 0, 0.12) !important;
+        background: rgba(0, 0, 0, 0.03) !important;
+    }
+
+    body.light-mode .panamon-bottomm-line {
+        border-bottom-color: rgba(0, 0, 0, 0.12) !important;
+        background: rgba(0, 0, 0, 0.03) !important;
+    }
+
+    /* ── CARD — SAMA PERSIS LOSSTIME ── */
+    .card {
+        background-color: rgba(255, 255, 255, 0.20) !important;
+        border: 2px solid rgba(255, 255, 255, 0.3) !important;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    /* scoped ke dashboard-bottom-row untuk card-title khusus */
+    .dashboard-bottom-row .card-title {
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        font-weight: 700;
+        margin: 0 0 14px 0;
+        line-height: 1;
+        color: rgba(255,255,255,0.55);
+    }
+
+    /* ── LIGHT MODE — Card ── */
+    body.light-mode .card {
+        background: rgba(255,255,255,0.55) !important;
+        border: 1px solid rgba(255,255,255,0.55) !important;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.10) !important;
+    }
+
+    body.light-mode .dashboard-bottom-row .card-title {
+        color: rgba(26,26,46,0.55) !important;
+    }
+
+    /* ── CARD PADDING ── */
+    .dashboard-bottom-row .info-card,
+    .dashboard-bottom-row .shift-card,
+    .dashboard-bottom-row .oee-card,
+    .dashboard-bottom-row .pa-card,
+    .dashboard-bottom-row .gantt-card {
+        padding: 18px 20px !important;
+    }
+
+    /* ── INFO CARD ── */
+    .info-card {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .info-model-lbl {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        font-weight: 700;
+        margin-bottom: 6px;
+        color: rgba(255,255,255,0.45);
+    }
+
+    .info-model-name {
+        font-size: 26px;
+        line-height: 1.3;
+        font-weight: 700;
+        word-break: break-word;
+        margin-bottom: 14px;
+        min-height: 20px;
+        color: #ffffff;
+    }
+
+    .stat-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        padding: 8px 2px;
+        gap: 12px;
+    }
+
+    .stat-lbl {
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .8px;
+        white-space: nowrap;
+        color: rgba(255,255,255,0.45);
+    }
+
+    .stat-val {
+        font-size: 16px;
+        font-weight: 700;
+        text-align: right;
+        white-space: nowrap;
+        color: rgba(255,255,255,0.95);
+    }
+
+        .stat-val.neg {
+            color: #fc8181;
+        }
+
+        .stat-val.pos {
+            color: #68d391;
+        }
+
+    /* ── SHIFT CARD ── */
+    .shift-card {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        height: 100%;
+        overflow-y: auto;
+    }
+
+    .shift-block {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .shift-lbl {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.3px;
+        margin-bottom: 5px;
+        padding-bottom: 5px;
+        color: rgba(100,181,246,0.90);
+    }
+
+    .shift-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        font-size: 15px;
+        padding: 4px 2px;
+        gap: 12px;
+        color: rgba(255,255,255,0.9);
+    }
+
+        .shift-row span:last-child {
+            font-size: 16px;
+            font-weight: 700;
+            text-align: right;
+            color: rgba(255,255,255,0.95);
+        }
+
+    /* ── STATUS BUTTON ── */
+    .shift-status-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 6px;
+    }
+
+    .status-btn {
+        flex: 1;
+        text-align: center;
+        padding: 6px 0;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 1.2px;
+        border: none;
+        cursor: pointer;
+        transition: opacity .2s;
+        background: rgba(255,255,255,0.12);
+        color: rgba(255,255,255,0.90);
+    }
+
+        .status-btn.run {
+            border: 1.5px solid rgba(104,211,145,0.55);
+            color: #68d391;
+        }
+
+        .status-btn.stop {
+            border: 1.5px solid rgba(252,129,129,0.55);
+            color: #fc8181;
+        }
+
+    /* ── OEE ── */
+    .dashboard-bottom-row .oee-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 14px;
+        height: 100%;
+        padding-top: 20px !important;
+    }
+
+        .dashboard-bottom-row .oee-card .card-title {
+            align-self: flex-start;
+            margin-bottom: 2px !important;
+        }
+
+    .dashboard-bottom-row .donut-wrap {
+        position: relative;
+        width: 210px;
+        height: 210px;
+        flex-shrink: 0;
+        margin-top: -4px;
+    }
+
+    .dashboard-bottom-row .donut-center {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: -.3px;
+        color: #ffffff;
+    }
+
+    .dashboard-bottom-row .donut-legend {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 14px;
+        width: 100%;
+        margin-top: 10px;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 15px;
+        min-width: 0;
+        color: rgba(255,255,255,0.75);
+    }
+
+    .legend-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    /* ── DARK MODE: semua teks dalam card putih ── */
+    .dashboard-bottom-row .card,
+    .dashboard-bottom-row .card span,
+    .dashboard-bottom-row .card label,
+    .dashboard-bottom-row .card p,
+    .dashboard-bottom-row .card b {
+        color: rgba(255,255,255,0.90);
+    }
+
+    /* ── PLAN ACTUAL ── */
+    .pa-card {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .pa-canvas-wrap {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+    }
+
+    /* ── GANTT ── */
+    .gantt-card {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .timeline-container {
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .timeline-track {
+        width: 100%;
+        height: 85px;
+        background-color: rgba(255,255,255,0.10);
+        border: 1px solid rgba(255,255,255,0.18);
+        position: relative;
+        overflow: hidden;
+        border-radius: 10px;
+    }
+
+    .timeline-progress {
+        height: 100%;
+        background-color: #4F86F3;
+        width: 0%;
+        transition: width 0.5s linear;
+        position: absolute;
+        left: 0;
+        top: 0;
+    }
+
+    .loss-marker {
+        position: absolute;
+        top: 0;
+        height: 100%;
+        background-color: #d90429;
+    }
+
+    .timeline-hours {
+        display: flex;
+        justify-content: space-between;
+        font-size: 13px;
+        margin-top: 9px;
+        color: rgba(255,255,255,0.65);
+    }
+
+    .loss-line-wrapper {
+        padding: 16px 2px;
+    }
+
+    .loss-line-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 56px;
+        height: 85px;
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.30);
+        font-size: 16px;
+        font-weight: 700;
+        color: rgba(255,255,255,0.90);
+        background: rgba(255,255,255,0.06);
+    }
+
+    .loss-summary-right {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 185px;
+    }
+
+    .loss-summary-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+    }
+
+    .loss-legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        flex-shrink: 0;
+    }
+
+    .loss-legend-label {
+        flex: 1;
+        color: rgba(255,255,255,0.65);
+        font-size: 15px;
+    }
+
+    .loss-legend-value {
+        font-weight: 700;
+        font-size: 17px;
+        color: rgba(255,255,255,0.95);
+    }
+
+    /* ── LIGHT MODE OVERRIDES ── */
+    /* ── LIGHT MODE OVERRIDES — SEMUA HITAM PEKAT ── */
+    body.light-mode .info-model-lbl {
+        color: #000000 !important;
+    }
+
+    body.light-mode .info-model-name {
+        color: #000000 !important;
+    }
+
+    body.light-mode .stat-lbl {
+        color: #000000 !important;
+    }
+
+    body.light-mode .stat-val {
+        color: #000000 !important;
+    }
+
+        body.light-mode .stat-val.neg {
+            color: #c53030 !important;
+        }
+
+        body.light-mode .stat-val.pos {
+            color: #276749 !important;
+        }
+
+    body.light-mode .shift-lbl {
+        color: #185FA5 !important;
+    }
+
+    body.light-mode .shift-row {
+        color: #000000 !important;
+    }
+
+        body.light-mode .shift-row span:last-child {
+            color: #000000 !important;
+        }
+
+    body.light-mode .dashboard-bottom-row .card-title {
+        color: #000000 !important;
+    }
+
+    body.light-mode .dashboard-bottom-row .donut-center {
+        color: #000000 !important;
+    }
+
+    body.light-mode .legend-item {
+        color: #000000 !important;
+    }
+
+        body.light-mode .legend-item b {
+            color: #000000 !important;
+        }
+
+    body.light-mode .loss-legend-label {
+        color: #000000 !important;
+    }
+
+    body.light-mode .loss-legend-value {
+        color: #000000 !important;
+    }
+
+    body.light-mode .timeline-hours {
+        color: #000000 !important;
+    }
+
+    body.light-mode .loss-line-badge {
+        color: #000000 !important;
+        border-color: rgba(0,0,0,0.25) !important;
+        background: rgba(0,0,0,0.05) !important;
+    }
+
+    body.light-mode .status-btn {
+        color: #000000;
+        background: rgba(0,0,0,0.06);
+    }
+
+        body.light-mode .status-btn.run {
+            border: 1.5px solid rgba(39,103,73,0.50);
+            color: #276749;
+        }
+
+        body.light-mode .status-btn.stop {
+            border: 1.5px solid rgba(197,48,48,0.50);
+            color: #c53030;
+        }
+
+    body.light-mode .gantt-card hr {
+        border-top-color: rgba(0,0,0,0.15) !important;
+    }
+
+    body.light-mode .panamon-bottom-line {
+        border-top-color: rgba(0,0,0,0.12) !important;
+        background: rgba(0,0,0,0.03) !important;
+    }
+
+    body.light-mode .panamon-bottomm-line {
+        border-bottom-color: rgba(0,0,0,0.12) !important;
+        background: rgba(0,0,0,0.03) !important;
+    }
+
+    /* Dashboard card — semua teks anak jadi hitam */
+    body.light-mode .dashboard-bottom-row .card,
+    body.light-mode .dashboard-bottom-row .card span,
+    body.light-mode .dashboard-bottom-row .card label,
+    body.light-mode .dashboard-bottom-row .card p,
+    body.light-mode .dashboard-bottom-row .card b {
+        color: #000000 !important;
+    }
+
+    body.light-mode .shift-row,
+    body.light-mode .shift-row span,
+    body.light-mode .shift-row span:first-child,
+    body.light-mode .shift-row span:last-child {
+        color: #000000 !important;
+    }
+
+    body.light-mode .dashboard-bottom-row .card span,
+    body.light-mode .dashboard-bottom-row .card b,
+    body.light-mode .legend-item,
+    body.light-mode .legend-item span,
+    body.light-mode .legend-item b {
+        color: #000000 !important;
+    }
+</style>
+
+@* =====================================================
+     STRUKTUR HTML — PERSIS SEPERTI LOSSTIME:
+     1. filter-area-with-lines  → di LUAR row, langsung di root
+     2. <div class="row mt-2">  → ROW 1 langsung, tidak nested
+     3. <div class="row mt-2">  → ROW 2 langsung, tidak nested
+     Wrapper <div class="dashboard-bottom-row"> BUKAN row,
+     hanya sebagai scoping CSS card/title.
+     ===================================================== *@
+
+<div class="dashboard-bottom-row">
 
 
-<div id="machineContainer">
-    <div class="container-fluid">
+    <div class="filter-area-with-lines">
+        <div class="panamon-bottom-line"></div>
+        <div class="panamon-bottomm-line"></div>
+        <div class="filter-content">
+            <div class="d-flex flex-nowrap align-items-center gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <label class="mb-0">Machine</label>
+                    <select class="form-select" style="width:140px;" id="mdp-machine-select">
+                        <option value="">-- Select --</option>
+                    </select>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <label class="mb-0">Month</label>
+                    <select id="filterMonth" class="form-select" style="width:110px;">
+                        @for (int i = 1; i <= 12; i++)
+                        {
+                            <option value="@i" selected="@(i == DateTime.Now.Month ? "selected" : null)">
+                                @CultureInfo.GetCultureInfo("en-US").DateTimeFormat.GetMonthName(i)
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <label class="mb-0">Year</label>
+                    <select id="filterYear" class="form-select" style="width:80px;">
+                        @for (int i = DateTime.Now.Year; i >= 2020; i--)
+                        {
+                            <option value="@i" selected="@(i == DateTime.Now.Year ? "selected" : null)">@i</option>
+                        }
+                    </select>
+                </div>
+                <button class="btn btn-primary" id="btnSearch">Search</button>
+                <div class="slider-group">
+                    Duration: <b id="lbl-duration">5 hrs</b>
+                    <input type="range" id="sl-duration" min="1" max="12" value="5">
+                </div>
+                <div class="slider-group">
+                    Repeat: <b id="lbl-rep">5 min</b>
+                    <input type="range" id="sl-rep" min="1" max="60" value="5">
+                </div>
+                <button class="btn btn-primary" id="btn-set">Set</button>
+            </div>
+        </div>
+    </div>
 
-        <!-- FILTER AREA -->
-        <div class="filter-area-with-lines">
-            <div class="panamon-bottom-line"></div>
-            <div class="panamon-bottomm-line"></div>
-            <div class="filter-content">
-                <div class="d-flex flex-wrap align-items-center gap-3">
-                    <!-- MONTH -->
-                    <div class="d-flex align-items-center gap-2">
-                        <label class="mb-0">Month</label>
-                        <select id="filterMonth" class="filter-select" style="width:110px;">
-                            @for (int i = 1; i <= 12; i++)
-                            {
-                                    <option value="@i" selected="@(i == DateTime.Now.Month ? "selected" : null)">
-                                    @CultureInfo.GetCultureInfo("en-US").DateTimeFormat.GetMonthName(i)
-                                    </option>
-                            }
-                        </select>
-                    </div>
-                    <!-- YEAR -->
-                    <div class="d-flex align-items-center gap-2">
-                        <label class="mb-0">Year</label>
-                        <select id="filterYear" class="filter-select" style="width:80px;">
-                            @for (int i = DateTime.Now.Year; i >= 2020; i--)
-                            {
-                                    <option value="@i" selected="@(i == DateTime.Now.Year ? "selected" : null)">@i</option>
-                            }
-                        </select>
-                    </div>
-                    <button type="button" id="btnSearch" class="btn btn-sm btn-primary">Search</button>
 
+    <div class="row mt-2">
+        <div class="col-md-2">
+            <div class="card shadow-sm h-100">
+                <div class="card-body p-0 info-card">
+                    <div class="info-model-lbl">Model Name</div>
+                    <div class="info-model-name" id="mdp-model">—</div>
+                    <div class="stat-row"><span class="stat-lbl">Production</span><span class="stat-val" id="mdp-production">—</span></div>
+                    <div class="stat-row"><span class="stat-lbl">Plan</span><span class="stat-val" id="mdp-plan">—</span></div>
+                    <div class="stat-row"><span class="stat-lbl">Actual</span><span class="stat-val" id="mdp-actual">—</span></div>
+                    <div class="stat-row"><span class="stat-lbl">Difference</span><span class="stat-val" id="mdp-diff">—</span></div>
+                    <div class="stat-row"><span class="stat-lbl">Remaining</span><span class="stat-val" id="mdp-remaining">—</span></div>
+                    <div class="stat-row"><span class="stat-lbl">Total NG</span><span class="stat-val" id="mdp-ng">—</span></div>
                 </div>
             </div>
         </div>
 
-        <!-- ROW: DENAH KIRI + TABEL KANAN -->
-        <div class="machine-layout-row">
-            <!-- DENAH PABRIK -->
-            <div class="factory-map-wrapper">
-                <img src="~/assets/denah_pabrik.png" alt="Factory Floor Plan" class="factory-map-img" />
-                <svg id="line-overlay">
-                    <defs>
-                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
-                            <polygon points="0 0, 10 3.5, 0 7" fill="rgba(255,255,255,0.6)" />
-                        </marker>
-                    </defs>
-                </svg>
-                <div class="info-balloon" id="machine-300t-new"><span class="balloon-title">300TN</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-300t"><span class="balloon-title">300T</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-200t"><span class="balloon-title">200T</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-400t"><span class="balloon-title">400T</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-110t-amada"><span class="balloon-title">110T Amada</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-110t-komatsu"><span class="balloon-title">110T Komatsu</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-sf-250"><span class="balloon-title">SF 250</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-fix-80"><span class="balloon-title">FIX 80</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-fix-12"><span class="balloon-title">FIX 12</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-fix-36"><span class="balloon-title">FIX 36</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-kyoshin-ori"><span class="balloon-title">Kyoshin</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-kyoshin"><span class="balloon-title">6.35</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-li-chin"><span class="balloon-title">Li-chin</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-14-row"><span class="balloon-title">14 Row</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="machine-7-row"><span class="balloon-title">7 Row</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="oven"><span class="balloon-title">Oven</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="evap"><span class="balloon-title">Evap</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="cond"><span class="balloon-title">Cond</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="outdoor-unit-marker"><span class="balloon-title">Outdoor Unit Assembly</span><div class="balloon-details"></div></div>
-                <div class="info-balloon" id="indoor-unit-marker"><span class="balloon-title">Indoor Unit Assembly</span><div class="balloon-details"></div></div>
-            </div>
-
-            <!-- TABEL KANAN -->
-            <div class="machine-table-wrapper">
-                <div class="machine-table-box">
-                    <div class="machine-table-header">
-                        <span class="machine-table-title">Machine Efficiency</span>
+        <div class="col-md-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body p-0 oee-card">
+                    <div class="card-title">OEE Overview</div>
+                    <div class="donut-wrap">
+                        <canvas id="donutChart"></canvas>
+                        <div class="donut-center" id="donut-val">—</div>
                     </div>
-                    <div class="machine-table-scroll">
-                        <table class="machine-eff-table">
-                            <thead>
-                                <tr>
-                                    <th>Machine Name</th>
-                                    <th>OEE</th>
-                                    <th>Operating Ratio</th>
-                                    <th>Ability</th>
-                                    <th>Quality</th>
-                                </tr>
-                            </thead>
-                            <tbody id="machineEffTableBody">
-                                <tr><td colspan="5" class="no-data">No data available</td></tr>
-                            </tbody>
-                        </table>
+                    <div class="donut-legend">
+                        <div class="legend-item"><div class="legend-dot" style="background:#38a169"></div><span>OEE: <b id="leg-oee">—</b></span></div>
+                        <div class="legend-item"><div class="legend-dot" style="background:#ed8936"></div><span>Ability: <b id="leg-ability">—</b></span></div>
+                        <div class="legend-item"><div class="legend-dot" style="background:#e53e3e"></div><span>Operating: <b id="leg-op">—</b></span></div>
+                        <div class="legend-item"><div class="legend-dot" style="background:#4299e1"></div><span>Quality: <b id="leg-quality">—</b></span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-body p-0 pa-card">
+                    <div class="card-title">Plan &amp; Actual Chart</div>
+                    <div class="pa-canvas-wrap">
+                        <canvas id="planActualChart"></canvas>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
+
+    <div class="row mt-2" style="margin-bottom: 2px; margin-left: -18px; margin-right: -18px;">
+        <div class="col-md-2">
+            <div class="card shadow-sm h-100">
+                <div class="card-body p-0 shift-card">
+                    <div class="shift-block">
+                        <div class="shift-lbl">Shift #1</div>
+                        <div class="shift-row"><span>Working Time</span><span id="s1-work">—</span></div>
+                        <div class="shift-row"><span>Stop Time</span><span id="s1-stop">—</span></div>
+                        <div class="shift-row"><span>Load Time</span><span id="s1-load">—</span></div>
+                    </div>
+                    <div class="shift-block">
+                        <div class="shift-lbl">Shift #2</div>
+                        <div class="shift-row"><span>Working Time</span><span id="s2-work">—</span></div>
+                        <div class="shift-row"><span>Stop Time</span><span id="s2-stop">—</span></div>
+                        <div class="shift-row"><span>Load Time</span><span id="s2-load">—</span></div>
+                    </div>
+                    <div class="shift-block">
+                        <div class="shift-lbl">Shift #3</div>
+                        <div class="shift-row"><span>Working Time</span><span id="s3-work">—</span></div>
+                        <div class="shift-row"><span>Stop Time</span><span id="s3-stop">—</span></div>
+                        <div class="shift-row"><span>Load Time</span><span id="s3-load">—</span></div>
+                    </div>
+                    <div class="shift-block">
+                        <div class="shift-lbl">Shift Status</div>
+                        <div class="shift-status-row">
+                            <button class="status-btn run">RUN</button>
+                            <button class="status-btn stop">STOP</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-10">
+            <div class="card shadow-sm h-100">
+                <div class="card-body p-0 gantt-card">
+                    <div class="card-title">Shift Timeline</div>
+
+                    <!-- SHIFT 1 -->
+                    <div class="loss-line-wrapper">
+                        <div style="display:flex; flex-direction:row; align-items:center; gap:10px; flex:1 1 0; min-height:0;">
+                            <b class="loss-line-badge">S1</b>
+                            <div class="timeline-container">
+                                <div class="timeline-track-wrapper">
+                                    <div id="timeline-track-s1" class="timeline-track">
+                                        <div id="timeline-progress-s1" class="timeline-progress"></div>
+                                    </div>
+                                    <div class="timeline-minutes" id="timeline-minutes-s1"></div>
+                                </div>
+                                <div class="timeline-hours" id="timeline-hours-s1"></div>
+                            </div>
+                            <div class="loss-summary-right">
+                                <div class="loss-summary-item">
+                                    <span class="loss-legend-dot" style="background:#4F86F3;"></span>
+                                    <span class="loss-legend-label">Load Time</span>
+                                    <span id="s1-load-val" class="loss-legend-value">0</span>
+                                </div>
+                                <div class="loss-summary-item">
+                                    <span class="loss-legend-dot" style="background:#d90429;"></span>
+                                    <span class="loss-legend-label">Stop Time</span>
+                                    <span id="s1-stop-val" class="loss-legend-value">0</span>
+                                </div>
+                                <div class="loss-summary-item">
+                                    <span class="loss-legend-dot" style="visibility:hidden;"></span>
+                                    <span class="loss-legend-label">Working Time</span>
+                                    <span id="s1-work-val" class="loss-legend-value">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.15);margin:2px 0;">
+
+                    <!-- SHIFT 2 -->
+                    <div class="loss-line-wrapper">
+                        <div style="display:flex; flex-direction:row; align-items:center; gap:10px; flex:1 1 0; min-height:0;">
+                            <b class="loss-line-badge">S2</b>
+                            <div class="timeline-container">
+                                <div class="timeline-track-wrapper">
+                                    <div id="timeline-track-s2" class="timeline-track">
+                                        <div id="timeline-progress-s2" class="timeline-progress"></div>
+                                    </div>
+                                    <div class="timeline-minutes" id="timeline-minutes-s2"></div>
+                                </div>
+                                <div class="timeline-hours" id="timeline-hours-s2"></div>
+                            </div>
+                            <div class="loss-summary-right">
+                                <div class="loss-summary-item">
+                                    <span class="loss-legend-dot" style="background:#4F86F3;"></span>
+                                    <span class="loss-legend-label">Load Time</span>
+                                    <span id="s2-load-val" class="loss-legend-value">0</span>
+                                </div>
+                                <div class="loss-summary-item">
+                                    <span class="loss-legend-dot" style="background:#d90429;"></span>
+                                    <span class="loss-legend-label">Stop Time</span>
+                                    <span id="s2-stop-val" class="loss-legend-value">0</span>
+                                </div>
+                                <div class="loss-summary-item">
+                                    <span class="loss-legend-dot" style="visibility:hidden;"></span>
+                                    <span class="loss-legend-label">Working Time</span>
+                                    <span id="s2-work-val" class="loss-legend-value">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.15);margin:2px 0;">
+
+                    <!-- SHIFT 3 -->
+                    <div class="loss-line-wrapper">
+                        <div style="display:flex; flex-direction:row; align-items:center; gap:10px; flex:1 1 0; min-height:0;">
+                            <b class="loss-line-badge">S3</b>
+                            <div class="timeline-container">
+                                <div class="timeline-track-wrapper">
+                                    <div id="timeline-track-s3" class="timeline-track">
+                                        <div id="timeline-progress-s3" class="timeline-progress"></div>
+                                    </div>
+                                    <div class="timeline-minutes" id="timeline-minutes-s3"></div>
+                                </div>
+                                <div class="timeline-hours" id="timeline-hours-s3"></div>
+                            </div>
+                            <div class="loss-summary-right">
+                                <div class="loss-summary-item">
+                                    <span class="loss-legend-dot" style="background:#4F86F3;"></span>
+                                    <span class="loss-legend-label">Load Time</span>
+                                    <span id="s3-load-val" class="loss-legend-value">0</span>
+                                </div>
+                                <div class="loss-summary-item">
+                                    <span class="loss-legend-dot" style="background:#d90429;"></span>
+                                    <span class="loss-legend-label">Stop Time</span>
+                                    <span id="s3-stop-val" class="loss-legend-value">0</span>
+                                </div>
+                                <div class="loss-summary-item">
+                                    <span class="loss-legend-dot" style="visibility:hidden;"></span>
+                                    <span class="loss-legend-label">Working Time</span>
+                                    <span id="s3-work-val" class="loss-legend-value">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
 
 @section Scripts {
     <script>
-        function updateDropdownStyle() {
-            ['filterMonth', 'filterYear'].forEach(id => {
-                const el = document.getElementById(id);
-                if (!el) return;
-                el.classList.toggle('selected', !!el.value);
+        let donutChart = null, paChart = null;
+
+        document.getElementById('sl-duration').addEventListener('input', function () {
+            document.getElementById('lbl-duration').textContent = this.value + ' hrs';
+        });
+        document.getElementById('sl-rep').addEventListener('input', function () {
+            document.getElementById('lbl-rep').textContent = this.value + ' min';
+        });
+        document.getElementById('mdp-machine-select').addEventListener('change', function () {
+            if (this.value) loadDetail(this.value);
+        });
+
+        async function loadMachineData() {
+            const month = document.getElementById('filterMonth').value;
+            const year = document.getElementById('filterYear').value;
+            try {
+                const resList = await fetch('/api/machine/list', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const list = await resList.json();
+                const sel = document.getElementById('mdp-machine-select');
+                sel.innerHTML = '<option value="">-- Select --</option>';
+                if (Array.isArray(list)) {
+                    list.forEach(m => {
+                        const o = document.createElement('option');
+                        o.value = o.textContent = m.machineName;
+                        sel.appendChild(o);
+                    });
+                    if (list.length) { sel.value = list[0].machineName; loadDetail(list[0].machineName); }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadDetail(name) {
+            const month = document.getElementById('filterMonth').value;
+            const year = document.getElementById('filterYear').value;
+            try {
+                const res = await fetch(`/api/machine/efficiency?month=${month}&year=${year}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const data = await res.json();
+                const m = Array.isArray(data) ? data.find(x => x.machineName === name) : null;
+
+                document.getElementById('mdp-model').textContent = m?.modelName || '—';
+                setText('mdp-production', m?.production ?? '0');
+                setText('mdp-plan', m?.plan ?? '—');
+                setText('mdp-actual', m?.actual ?? '—');
+                setText('mdp-ng', m?.totalNg ?? '0');
+
+                const diff = (m?.actual != null && m?.plan != null) ? m.actual - m.plan : null;
+                const diffEl = document.getElementById('mdp-diff');
+                diffEl.textContent = diff != null ? diff : '—';
+                diffEl.className = 'stat-val' + (diff != null && diff < 0 ? ' neg' : diff != null && diff > 0 ? ' pos' : '');
+                setText('mdp-remaining', m?.remaining ?? '—');
+
+                const oee = m?.oee ?? 0, ability = m?.ability ?? 0;
+                const op = m?.operatingRatio ?? 0, quality = m?.quality ?? 0;
+
+                document.getElementById('donut-val').textContent = oee + '%';
+                document.getElementById('leg-oee').textContent = oee + '%';
+                document.getElementById('leg-ability').textContent = ability + '%';
+                document.getElementById('leg-op').textContent = op + '%';
+                document.getElementById('leg-quality').textContent = quality + '%';
+
+                renderDonut(oee, op, ability, quality);
+                renderPA(m);
+                renderShifts(m);
+                renderGantt(m);
+            } catch (e) { console.error(e); }
+        }
+
+        function setText(id, val) { document.getElementById(id).textContent = val; }
+
+        function isLightMode() { return document.body.classList.contains('light-mode'); }
+
+        function getChartColors() {
+            if (isLightMode()) {
+                return {
+                    tickColor: 'rgba(26,26,46,0.9)', gridColor: 'rgba(0,0,0,0.07)',
+                    planLine: 'rgba(26,26,46,0.25)', actualLine: '#185FA5',
+                    actualFill: 'rgba(24,95,165,0.12)', donutBorder: 'rgba(0,0,0,0.06)',
+                    tooltipBg: 'rgba(255,255,255,0.92)', tooltipTitle: '#1a1a2e',
+                    tooltipBody: 'rgba(26,26,46,0.75)', tooltipBorder: 'rgba(0,0,0,0.12)',
+                };
+            } else {
+                return {
+                    tickColor: 'rgba(255,255,255,0.9)', gridColor: 'rgba(255,255,255,0.05)',
+                    planLine: 'rgba(255,255,255,0.3)', actualLine: '#63b3ed',
+                    actualFill: 'rgba(99,179,237,0.15)', donutBorder: 'rgba(255,255,255,0.15)',
+                    tooltipBg: 'rgba(0,0,0,0.75)', tooltipTitle: '#fff',
+                    tooltipBody: 'rgba(255,255,255,0.75)', tooltipBorder: 'rgba(255,255,255,0.1)',
+                };
+            }
+        }
+
+        function renderDonut(oee, op, ability, quality) {
+            const c = getChartColors();
+            const ctx = document.getElementById('donutChart').getContext('2d');
+            if (donutChart) donutChart.destroy();
+            donutChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: { datasets: [{ data: [oee, op, ability, quality], backgroundColor: ['#38a169','#e53e3e','#ed8936','#4299e1'], borderWidth: 3, borderColor: c.donutBorder, circumference: 270, rotation: -135, cutout: '58%' }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false }, tooltip: { enabled: false } }, animation: { duration: 600 } }
             });
         }
 
-        async function loadMachineData() {
-            const tbody = document.getElementById('machineEffTableBody');
-            const month = document.getElementById('filterMonth').value;
-            const year  = document.getElementById('filterYear').value;
-            tbody.innerHTML = '<tr><td colspan="5" class="no-data">Loading...</td></tr>';
-            try {
-                    const response = await fetch(
-        `/api/machine/efficiency?month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}`,
-                    { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } }
-                );
-                if (!response.ok) throw new Error(`Server error: ${response.status}`);
-                const data = await response.json();
-                if (data.error) { tbody.innerHTML = `<tr><td colspan="5" class="no-data" style="color:red;">Error: ${data.error}</td></tr>`; return; }
-                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="no-data">No data available</td></tr>'; return; }
-                tbody.innerHTML = data.map(m => `
-                    <tr>
-                        <td class="td-machine-name">${m.machineName}</td>
-                        <td>${m.oEE !== '-' ? m.oEE + '%' : '-'}</td>
-                            <td>${m.operatingRatio !== '-' ? m.operatingRatio + '%' : '-'}</td>
-                            <td>${m.ability !== '-' ? m.ability + '%' : '-'}</td>
-                            <td>${m.quality !== '-' ? m.quality + '%' : '-'}</td>
-                    </tr>
-                `).join('');
-            } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="5" class="no-data" style="color:red;">Error: ${err.message}</td></tr>`;
+        function renderPA(m) {
+            const c = getChartColors();
+            const ctx = document.getElementById('planActualChart').getContext('2d');
+            const totalPlan = m?.plan ?? 448, totalActual = m?.actual ?? 420;
+            const pts = 30, labels = [], plan = [], actual = [];
+            for (let i = 0; i <= pts; i++) {
+                const t = 7 + i * (9 / pts);
+                labels.push(('0' + Math.floor(t)).slice(-2) + ':' + ('0' + Math.round((t % 1) * 60)).slice(-2));
+                plan.push(Math.round(totalPlan / pts * i));
+                actual.push(Math.max(0, Math.round(totalActual / pts * i + (Math.random() - .45) * 8)));
             }
+            if (paChart) paChart.destroy();
+            paChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets: [
+                    { label: 'Plan', data: plan, borderColor: c.planLine, borderWidth: 1.5, borderDash: [5,4], pointRadius: 0, fill: false, tension: .3 },
+                    { label: 'Actual', data: actual, borderColor: c.actualLine, backgroundColor: c.actualFill, borderWidth: 2.5, pointRadius: 0, fill: true, tension: .4 }
+                ]},
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, backgroundColor: c.tooltipBg, titleColor: c.tooltipTitle, bodyColor: c.tooltipBody, borderColor: c.tooltipBorder, borderWidth: 1 } },
+                    scales: {
+                        x: { ticks: { font: { size: 11 }, color: c.tickColor, maxTicksLimit: 10 }, grid: { color: c.gridColor } },
+                        y: { ticks: { font: { size: 11 }, color: c.tickColor }, grid: { color: c.gridColor } }
+                    },
+                    animation: { duration: 400 }
+                }
+            });
         }
 
-        function drawConnectorLines() {
-            const container = document.querySelector('.factory-map-wrapper');
-            const svg = document.getElementById('line-overlay');
-            svg.innerHTML = svg.querySelector('defs').outerHTML;
-            const machineCoordinates = {
-                'outdoor-unit-marker':  { x: 23, y: 37 }, 'indoor-unit-marker':   { x: 11, y: 53 },
-                'machine-300t-new':     { x: 87, y: 73 }, 'machine-300t':         { x: 86, y: 52 },
-                'machine-200t':         { x: 84, y: 44 }, 'machine-400t':         { x: 88, y: 64 },
-                'machine-110t-amada':   { x: 80, y: 32 }, 'machine-110t-komatsu': { x: 88, y: 32 },
-                'machine-sf-250':       { x: 68, y: 20 }, 'machine-fix-80':       { x: 62, y: 20 },
-                'machine-fix-12':       { x: 57, y: 20 }, 'machine-fix-36':       { x: 50, y: 20 },
-                'machine-kyoshin-ori':  { x: 51, y: 36 }, 'machine-kyoshin':      { x: 63, y: 36 },
-                'machine-li-chin':      { x: 57, y: 36 }, 'machine-14-row':       { x: 83, y: 19 },
-                'machine-7-row':        { x: 86, y: 22 }, 'oven':                 { x: 69, y: 47 },
-                'evap':                 { x: 63, y: 65 }, 'cond':                 { x: 73, y: 65 }
-            };
-            const cw = container.offsetWidth, ch = container.offsetHeight;
-            for (const balloonId in machineCoordinates) {
-                const balloon = document.getElementById(balloonId);
-                if (!balloon) continue;
-                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                const sx = balloon.offsetLeft + balloon.offsetWidth / 2;
-                const sy = balloon.classList.contains('tacked-from-top') ? balloon.offsetTop : balloon.offsetTop + balloon.offsetHeight;
-                line.setAttribute('x1', sx); line.setAttribute('y1', sy);
-                line.setAttribute('x2', (machineCoordinates[balloonId].x / 100) * cw);
-                line.setAttribute('y2', (machineCoordinates[balloonId].y / 100) * ch);
-                line.setAttribute('class', 'connector-line');
-                svg.appendChild(line);
-            }
+        function renderShifts(m) {
+            [['s1', m?.shift1Working??307, m?.shift1Stop??44, m?.shift1Load??263],
+             ['s2', m?.shift2Working??0,   m?.shift2Stop??0,  m?.shift2Load??0],
+             ['s3', m?.shift3Working??0,   m?.shift3Stop??0,  m?.shift3Load??0]
+            ].forEach(([p, w, s, l]) => {
+                document.getElementById(p+'-work').textContent = w;
+                document.getElementById(p+'-stop').textContent = s;
+                document.getElementById(p+'-load').textContent = l;
+            });
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            updateDropdownStyle();
-            document.getElementById('filterMonth').addEventListener('change', updateDropdownStyle);
-            document.getElementById('filterYear').addEventListener('change',  updateDropdownStyle);
-            drawConnectorLines();
-            window.addEventListener('resize', drawConnectorLines);
-            loadMachineData();
+        function renderGantt(m) {
+            const shifts = [
+                { id: 's1', work: m?.shift1Working??307, stop: m?.shift1Stop??44, load: m?.shift1Load??263, hourLabels: ['07','08','09','10','11','12','13','14','15'] },
+                { id: 's2', work: m?.shift2Working??0,   stop: m?.shift2Stop??0,  load: m?.shift2Load??0,   hourLabels: ['15','16','17','18','19','20','21','22','23'] },
+                { id: 's3', work: m?.shift3Working??0,   stop: m?.shift3Stop??0,  load: m?.shift3Load??0,   hourLabels: ['23','00','01','02','03','04','05','06','07'] }
+            ];
+
+            shifts.forEach(s => {
+                document.getElementById(`${s.id}-work-val`).textContent = s.work;
+                document.getElementById(`${s.id}-stop-val`).textContent = s.stop;
+                document.getElementById(`${s.id}-load-val`).textContent = s.load;
+
+                const track = document.getElementById(`timeline-track-${s.id}`);
+                const progress = document.getElementById(`timeline-progress-${s.id}`);
+                track.innerHTML = '';
+                track.appendChild(progress);
+
+                const total = s.work + s.stop;
+                const loadPercent = total > 0 ? (s.work / total) * 100 : 0;
+                const stopPercent = total > 0 ? (s.stop / total) * 100 : 0;
+                progress.style.width = loadPercent + '%';
+
+                const stopDiv = document.createElement('div');
+                stopDiv.className = 'loss-marker';
+                stopDiv.style.left = loadPercent + '%';
+                stopDiv.style.width = stopPercent + '%';
+                track.appendChild(stopDiv);
+
+                const hourWrap = document.getElementById(`timeline-hours-${s.id}`);
+                hourWrap.innerHTML = '';
+                s.hourLabels.forEach(h => {
+                    const span = document.createElement('span');
+                    span.textContent = h + ':00';
+                    hourWrap.appendChild(span);
+                });
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', loadMachineData);
+        document.getElementById('btnSearch').addEventListener('click', loadMachineData);
+        document.getElementById('btn-set').addEventListener('click', () => {
+            const n = document.getElementById('mdp-machine-select').value;
+            if (n) loadDetail(n);
         });
-
-        document.getElementById('btnSearch').addEventListener('click', () => loadMachineData());
     </script>
 }

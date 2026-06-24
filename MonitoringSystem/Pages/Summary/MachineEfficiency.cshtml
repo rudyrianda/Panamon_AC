@@ -808,7 +808,7 @@
         try {
             const res = await fetch('?handler=MachineList', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
             const machines = await res.json();
-            const machines = await res.json();
+            
             sel.innerHTML = '<option value="" disabled selected>-- Pilih Machine --</option>'
                 + machines.map(m => `<option value="${m.machineName}">${m.machineName}</option>`).join('');
         } catch { sel.innerHTML = '<option value="" disabled selected>Gagal load data mesin</option>'; }

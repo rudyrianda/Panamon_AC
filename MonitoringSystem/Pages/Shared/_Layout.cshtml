@@ -13,9 +13,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - MonitoringSystem</title>
 
-    <!-- ✅ ANTI-FLASH: Harus PERTAMA, sebelum semua CSS -->
-    <!-- Baca cookie themeMode atau layoutType, langsung apply ke <html> -->
-    <!-- Tanpa ini, light mode akan flash gelap dulu setiap pindah halaman -->
     <script>
         (function () {
             var m = document.cookie.match(/(?:^|; )(?:themeMode|layoutType)=([^;]*)/);
@@ -44,9 +41,10 @@
     <link href="~/lib/flatpickr/flatpickr.min.css" rel="stylesheet">
     <link href="~/lib/flatpickr/dark.css" rel="stylesheet">
 
+    <link rel="stylesheet" href="~/css/fonts.css" asp-append-version="true" />
+
 </head>
 
-<!-- ✅ ANTI-FLASH BODY: Apply light-mode ke <body> sebelum konten dirender -->
 <body class="reusable-bg">
     <script>
         (function () {
@@ -64,7 +62,7 @@
                 <img src="~/assets/PanasonicIcon.png" alt="Panasonic" />
             </div>
             <div class="header-center">
-                <span>PANAM</span><span class="brand-o"></span><span>N</span>
+                <img src="~/assets/Panamon.png" alt="Panamon" class="logo-panamon" style="height: 15px;" />
             </div>
             <div class="header-right">
                 <p id="current-date"></p>
@@ -74,18 +72,19 @@
     </header>
 
     <!-- Main Container -->
+    @* <div class="container-fluid p-0 d-flex" style="height: calc(100vh - 45px); margin-top:45px;"> *@
     <div class="container-fluid p-0 d-flex" style="height: calc(100vh - 45px); margin-top:45px;">
 
         <!-- Sidebar -->
         <div id="bdSidebar" class="d-flex flex-column flex-shrink-0 text-white offcanvas-md offcanvas-start">
             <ul class="mynav nav nav-pills flex-column">
-               <li class="nav-item">
-    <a href="http://10.83.33.103:1111/">
-        <i class="fa-solid fa-house"></i>
-        <span class="nav-label">Home</span>
-    </a>
-</li>
-                 <li class="nav-item">
+                <li class="nav-item">
+                    <a href="http://10.83.33.103:5009/">
+                        <i class="fa-solid fa-house"></i>
+                        <span class="nav-label">Home</span>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="/ProductionReport/index">
                         <i class="fa-solid fa-industry"></i>
                         <span class="nav-label">Production<br>Achievement</span>
@@ -101,20 +100,6 @@
                     <a href="/LossTime/index">
                         <i class="fa-solid  fa-file-lines"></i>
                         <span class="nav-label">Detail Loss<br>Time</span>
-                    </a>
-                </li>
-                
-                @*<li class="nav-item">
-                    <a href="#" data-bs-toggle="modal" data-bs-target="#breakTimeFilterModal">
-                        <i class="fa-solid fa-clock"></i>
-                        <span class="nav-label">Break Time</span>
-                    </a>
-                </li> *@
-
-                <li class="nav-item">
-                    <a href="/Summary/index">
-                        <i class="fa-solid fa-chart-pie"></i>
-                        <span class="nav-label">Summary</span>
                     </a>
                 </li>
                 <li class="nav-item">
@@ -135,32 +120,44 @@
                         <span class="nav-label">Machine</span>
                     </a>
                 </li>
+              @*   <li class="nav-item">
+    <a href="/Inventory/index">
+        <i class="fa-solid fa-boxes-stacked"></i>
+        <span class="nav-label">Inventory</span>
+    </a>
+</li> *@
                 <!-- MORE MENU -->
                 <li class="nav-item" style="position: relative;">
                     <a href="#" id="moreMenuBtn">
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                         <span class="nav-label">More</span>
                     </a>
-
-                   <!-- POPUP MENU -->
-<div id="moreMenuPopup">
-    <a href="/Summary/ProductionPlan">
-        <i class="fa-solid fa-clipboard-list"></i>
-        <span>Production<br>Plan</span>
-    </a>
-    <a href="/Summary/MachineEfficiency">
-    <i class="fa-solid fa-microchip"></i>
-    <span>Machine<br>Efficiency</span>
-</a>
-    <a href="#" data-bs-toggle="modal" data-bs-target="#breakTimeFilterModal">
-        <i class="fa-solid fa-clock"></i>
-        <span>Break<br>Time</span>
-    </a>
-</div>
+                    <div id="moreMenuPopup">
+                        <a href="/Summary/ProductionPlan">
+                            <i class="fa-solid fa-clipboard-list"></i>
+                            <span>Production<br>Plan</span>
+                        </a>
+                        <a href="/Summary/MachineEfficiency">
+                            <i class="fa-solid fa-microchip"></i>
+                            <span>Machine<br>Efficiency</span>
+                        </a>
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#breakTimeFilterModal">
+                            <i class="fa-solid fa-clock"></i>
+                            <span>Break<br>Time</span>
+                        </a>
+                        <a href="/Summary/Sut">
+                            <i class="fa-solid fa-table-list"></i>
+                            <span>SUT</span>
+                        </a>
+                        <a href="/Summary/Pwk">
+                            <i class="fa-solid fa-square-poll-vertical"></i>
+                            <span>PWK</span>
+                        </a>
+                    </div>
                 </li>
             </ul>
             <div class="align-items-center center">
-    <button id="themeToggle" title="Toggle Theme" style="
+                <button id="themeToggle" title="Toggle Theme" style="
         background: transparent;
         border: none;
         cursor: pointer;
@@ -169,10 +166,10 @@
         padding: 4px 8px;
         width: 100%;
     ">
-        <i id="themeIcon" class="fa-solid fa-sun"></i>
-        <span class="nav-label">Theme</span>
-    </button>
-</div>
+                    <i id="themeIcon" class="fa-solid fa-sun"></i>
+                    <span class="nav-label">Theme</span>
+                </button>
+            </div>
 
             <!-- Logout Section -->
             <div class="align-items-center center">
@@ -190,15 +187,34 @@
 
         <!-- Main Content -->
         <div class="main-content-wrapper">
+            @* @if (title == "Machine")
+            {
+                <div class="p-0">
+                    <main role="main">
+                        @RenderBody()
+                    </main>
+                </div>
+            }
+            else
+            {
+                <div class="p-4">
+                    <main role="main" class="pb-2">
+                        @RenderBody()
+                    </main>
+                    <div class="footer-copyright text-white text-center">
+                        <p class="m-0 opacity-75">&copy; 2026 - Panasonic Manufacturing Indonesia (PMI) - AC BU</p>
+                    </div>
+                </div>
+            } *@
+
             <div class="p-4">
                 <main role="main" class="pb-2">
                     @RenderBody()
                 </main>
 
-    <!-- Footer -->
-    <div class="footer-copyright text-white text-center">
-        <p class="m-0 opacity-75">&copy; 2026 - Panasonic Manufacturing Indonesia (PMI) - AC BU</p>
-    </div>
+                <div class="footer-copyright text-white text-center">
+                    <p class="m-0 opacity-75">&copy; 2026 - Panasonic Manufacturing Indonesia (PMI) - AC BU</p>
+                </div>
             </div>
         </div>
     </div>
@@ -217,7 +233,7 @@
                 <div class="modal-body">
                     @{
                         var models = new MonitoringSystem.Pages.Shared.ApplyBreakFilterModel(
-                            (ApplicationDbContext)Context.RequestServices.GetService(typeof(ApplicationDbContext)));
+                        (ApplicationDbContext)Context.RequestServices.GetService(typeof(ApplicationDbContext)));
                         await models.LoadBreakTimesAsync();
                         await Html.RenderPartialAsync("_BreakTimeFilterPartial", models);
                     }
@@ -239,7 +255,7 @@
     <!-- 3. Layout script -->
     <script src="~/js/layout.js" asp-append-version="true"></script>
 
-    <!-- 4. Page-specific scripts (harus paling bawah, butuh jQuery & Bootstrap sudah loaded) -->
+    <!-- 4. Page-specific scripts -->
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

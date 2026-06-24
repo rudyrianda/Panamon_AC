@@ -1,32 +1,27 @@
 ﻿using System;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
 
-namespace MonitoringSystem.Models
+namespace MonitoringSystem.Models;
+
+public partial class LossTimeActual
 {
-    public class LossTimeActual
-    {
-        [Key]
-        public int Id { get; set; }
+    public int Id { get; set; }
 
-        [Required]
-        public string Category { get; set; } = string.Empty;
+    public string Category { get; set; } = null!;
 
-        [Required]
-        public string MachineLine { get; set; } = string.Empty;
+    public string MachineLine { get; set; } = null!;
 
-        [Required]
-        public int Day { get; set; } // Kolom Day yang Anda minta
+    public int Day { get; set; }
 
-        [Required]
-        public int Month { get; set; }
+    public int Month { get; set; }
 
-        [Required]
-        public int Year { get; set; }
+    public int Year { get; set; }
 
-        [Required]
-        public double Minutes { get; set; }
+    public double Minutes { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
-    }
+    public string? Shift { get; set; }
+
+    public string? DetailedReason { get; set; }
+
+    public DateTime CreatedAt { get; set; }
 }

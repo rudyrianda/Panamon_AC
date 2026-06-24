@@ -33,23 +33,23 @@
         <div class="row g-3">
             <div class="col-md-2">
                 <div class="grid-border">
-                    <div class="btn-custom-group">
-                        <button type="submit" onclick="document.getElementById('selectedMachineCode').value='MCH1-01'"
-                                class="@(Model.MachineCode == "MCH1-01" ? "btn-blue-active" : "btn-outline-inactive")">
-                            LINE CU
-                        </button>
-
-                        <button type="submit" onclick="document.getElementById('selectedMachineCode').value='MCH1-02'"
-                                class="@(Model.MachineCode == "MCH1-02" ? "btn-blue-active" : "btn-outline-inactive")">
-                            LINE CS
-                        </button>
-                    </div>
+                    <label class="fw-semibold" style="font-size: 0.9rem; color: var(--panasonic-blue); margin-bottom: 8px; display: block;">SELECT LINE</label>
+                    <select class="form-control" id="machineDropdown" style="background-color: white; border: 2px solid var(--panasonic-blue); color: var(--text-dark); padding: 8px; border-radius: 5px; margin-bottom: 10px;" onchange="document.getElementById('selectedMachineCode').value = this.value; this.form.submit();">
+                        <option value="">-- Choose Line --</option>
+                        <option value="Line1" selected="@(Model.MachineCode == "Line1")">Line 1</option>
+                        <option value="Line2" selected="@(Model.MachineCode == "Line2")">Line 2</option>
+                        <option value="Line3" selected="@(Model.MachineCode == "Line3")">Line 3</option>
+                        <option value="Line4" selected="@(Model.MachineCode == "Line4")">Line 4</option>
+                        <option value="Line5" selected="@(Model.MachineCode == "Line5")">Line 5</option>
+                        <option value="Line6" selected="@(Model.MachineCode == "Line6")">Line 6</option>
+                        <option value="Line7" selected="@(Model.MachineCode == "Line7")">Line 7</option>
+                    </select>
                 </div>
 
                 <div class="grid-border">
                     <div class="section-title" style="font-size:1rem;">STATION</div>
                     <div class="btn-custom-group">
-                        @if (Model.MachineCode == "MCH1-01")
+                        @if (Model.MachineCode == "Line1" || Model.MachineCode == "Line2" || Model.MachineCode == "Line3")
                         {
                             <button type="submit" name="Station" value="" class="@(string.IsNullOrEmpty(Model.Station) ? "btn-blue-active" : "btn-outline-inactive")">ALL STATION</button>
                             <button type="submit" name="Station" value="PREPARING" class="@(Model.Station == "PREPARING" ? "btn-blue-active" : "btn-outline-inactive")">PREPARING</button>
@@ -178,126 +178,28 @@
     const yearlyDefectsRaw = @Html.Raw(Json.Serialize(Model.YearlyDefects));
 
     const colorPalette = [
-         'rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)',
-         'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)',
-         'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)',
-         'rgba(255, 99, 255, 0.7)', 'rgba(99, 255, 132, 0.7)',
-         'rgba(132, 99, 255, 0.7)', 'rgba(235, 162, 54, 0.7)'
+        'rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)',
+        'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)',
+        'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)',
+        'rgba(255, 99, 255, 0.7)', 'rgba(99, 255, 132, 0.7)',
+        'rgba(132, 99, 255, 0.7)', 'rgba(235, 162, 54, 0.7)'
     ];
 
     const allCauses = [...new Set([...defectProblemLabels, ...yearlyDefectsRaw.map(d => d.cause)])];
     const colorMap = {};
     allCauses.forEach((cause, index) => {
-         colorMap[cause] = colorPalette[index % colorPalette.length];
+        colorMap[cause] = colorPalette[index % colorPalette.length];
     });
-
-    Chart.defaults.color = '#666';
-    Chart.defaults.borderColor = '#ddd';
-
-    const ctxBar = document.getElementById('bar');
-    new Chart(ctxBar, {
-        type: 'bar',
-        data: {
-            labels: dailyDefectLabels,
-            datasets: [{
-                label: 'Qty',
-                data: dailyDefectData,
-                backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                borderWidth: 1
-            }]
-        },
-            options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { display: false },
-            tooltip: {
-                callbacks: {
-                    label: ctx => `Qty: ${ctx.parsed.x}`
-                }
-            }
-        },
-        scales: {
-            x: {
-                beginAtZero: true,
-                ticks: {
-                    precision: 0,
-                    stepSize: 1
-                }
-            }
-        }
-    }
-
-    });
-
-    const ctxPieB = document.getElementById('pieb');
-    new Chart(ctxPieB, {
-        type: 'pie',
-        data: {
-            labels: defectByModelLabels,
-            datasets: [{
-                data: defectByModelData,
-                backgroundColor: colorPalette,
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'right' } }
-        }
-    });
-
-    // const monthlyLabels = [];
-    // const today = new Date();
-    // const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-    // for (let i = 1; i <= daysInMonth; i++) { monthlyLabels.push(i); }
-
-    // const monthlyDefectCauses = [...new Set(monthlyDefectsRaw.map(d => d.cause))];
-    // const monthlyDatasets = monthlyDefectCauses.map(cause => {
-    //     const dataForCause = monthlyLabels.map(day => {
-    //         const entry = monthlyDefectsRaw.find(d => d.day === day && d.cause === cause);
-    //         return entry ? entry.quantity : 0;
-    //     });
-    //     return {
-    //         label: cause,
-    //         data: dataForCause,
-    //         backgroundColor: colorMap[cause] || '#CCCCCC',
-    //     };
-    // });
-
-    // const ctxBarA = document.getElementById('bara');
-    // new Chart(ctxBarA, {
-    //     type: 'bar',
-    //     data: {
-    //         labels: monthlyLabels,
-    //         datasets: monthlyDatasets
-    //     },
-    //     options: {
-    //         responsive: true,
-    //         maintainAspectRatio: false,
-    //         plugins: { legend: { display: false } },
-    //         scales: {
-    //             x: { stacked: true },
-    //             y: { stacked: true, beginAtZero: true }
-    //         }
-    //     }
-    // });
 
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
     const yearlyDefectCauses = [...new Set(yearlyDefectsRaw.map(d => d.cause))];
-
     const yearlyDatasets = yearlyDefectCauses.map(cause => {
-
         const dataForCause = monthNames.map((monthName, index) => {
             const monthNumber = index + 1;
-
             const entry = yearlyDefectsRaw.find(d => d.month === monthNumber && d.cause === cause);
             return entry ? entry.quantity : 0;
         });
-
         return {
             label: cause,
             data: dataForCause,
@@ -305,35 +207,87 @@
         };
     });
 
-    const ctxBarA = document.getElementById('bara');
-    new Chart(ctxBarA, {
-        type: 'bar',
-        data: {
-            labels: monthNames,
-            datasets: yearlyDatasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false
-                }
-            },
-            scales: {
-                x: { stacked: true },
-                y: { stacked: true, beginAtZero: true }
-            }
-        }
-    });
-
     document.addEventListener("DOMContentLoaded", function () {
+
+        const isLight = document.body.classList.contains('light-mode');
+        const chartTextColor = isLight ? '#1a1a2e' : '#ffffff';
+        const chartGridColor = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)';
+        Chart.defaults.color = chartTextColor;
+        Chart.defaults.borderColor = chartGridColor;
+
+        new Chart(document.getElementById('bar'), {
+            type: 'bar',
+            data: {
+                labels: dailyDefectLabels,
+                datasets: [{
+                    label: 'Qty',
+                    data: dailyDefectData,
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => `Qty: ${ctx.parsed.x}` } }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: { precision: 0, stepSize: 1, color: chartTextColor }
+                    }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('pieb'), {
+            type: 'pie',
+            data: {
+                labels: defectByModelLabels,
+                datasets: [{
+                    data: defectByModelData,
+                    backgroundColor: colorPalette,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: { color: chartTextColor, font: { size: 12 } }
+                    }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('bara'), {
+            type: 'bar',
+            data: {
+                labels: monthNames,
+                datasets: yearlyDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: { stacked: true, ticks: { color: chartTextColor } },
+                    y: { stacked: true, beginAtZero: true, ticks: { color: chartTextColor } }
+                }
+            }
+        });
+
         var modal = document.getElementById('targetModal');
         var openModalButton = document.getElementById('openModalButton');
         var closeButton = document.getElementsByClassName('close-button')[0];
-
         openModalButton.onclick = function () { modal.style.display = 'block'; }
         closeButton.onclick = function () { modal.style.display = 'none'; }
         window.onclick = function (event) {

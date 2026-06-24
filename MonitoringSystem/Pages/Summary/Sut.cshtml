@@ -1,0 +1,937 @@
+﻿@page
+@model MonitoringSystem.Pages.Shared.SutModel
+@{
+    ViewData["Title"] = "SUT";
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link href="~/css/Sidebar.css" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/sweetalert2.css" />
+
+    <style>
+        /* ============================================================
+                   FILTER AREA
+                   ============================================================ */
+        .filter-area-with-lines {
+            position: relative;
+            padding: 1px 0;
+            margin-bottom: -63px !important;
+            margin-top: -20px;
+            min-height: 10px;
+            width: calc(100% - 14px);
+            margin-left: 7px;
+            margin-right: 7px;
+        }
+
+        .panamon-bottom-line,
+        .panamon-bottomm-line {
+            position: absolute !important;
+            left: -13px !important;
+            right: -13px !important;
+            height: 2px !important;
+            background: rgba(255,255,255,0.04) !important;
+            z-index: 999 !important;
+            pointer-events: none !important;
+            display: block !important;
+        }
+
+        .panamon-bottom-line {
+            top: 0 !important;
+            border-top: 2px solid rgba(255,255,255,0.08) !important;
+        }
+
+        .panamon-bottomm-line {
+            bottom: 0 !important;
+            border-bottom: 2px solid rgba(255,255,255,0.08) !important;
+        }
+
+        body.light-mode .panamon-bottom-line {
+            border-top-color: rgba(0,0,0,0.10) !important;
+            background: rgba(0,0,0,0.03) !important;
+        }
+
+        body.light-mode .panamon-bottomm-line {
+            border-bottom-color: rgba(0,0,0,0.10) !important;
+            background: rgba(0,0,0,0.03) !important;
+        }
+
+        .filter-content {
+            position: relative;
+            z-index: 2;
+            padding: 6px 0;
+            border-radius: 15px;
+            margin-left: -8px;
+            margin-right: 7px;
+        }
+
+            .filter-content .form-select,
+            .filter-content .form-control {
+                height: 28px;
+                padding: 0 22px 0 8px;
+                font-size: 12px;
+                line-height: 20px;
+                border-radius: 999px;
+                background-color: rgba(255,255,255,0.05);
+                border: 2px solid rgba(255,255,255,0.5);
+                color: #ffffff;
+                text-align: center;
+                appearance: none;
+                -webkit-appearance: none;
+                -moz-appearance: none;
+            }
+
+            .filter-content .form-select {
+                padding: 0 !important;
+                padding-left: 12px !important;
+                padding-right: 28px !important;
+                line-height: 16px;
+                background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+                background-repeat: no-repeat;
+                background-position: right 8px center;
+                background-size: 10px 10px;
+            }
+
+                .filter-content .form-select option {
+                    background-color: rgb(30,40,60);
+                    color: #ffffff;
+                    font-size: 12px;
+                }
+
+                .filter-content .form-select.selected {
+                    font-weight: 700 !important;
+                }
+
+            .filter-content label {
+                color: rgba(255,255,255,0.85);
+                font-size: 12px;
+                line-height: 20px;
+            }
+
+            .filter-content .btn {
+                height: 28px;
+                min-height: 20px;
+                padding: 0 12px;
+                font-size: 12px;
+                line-height: 20px;
+                border-radius: 999px !important;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .filter-content .btn-primary {
+                background-color: rgba(8,65,150,0.95);
+                border: 2px solid rgba(100,181,246,1);
+                color: rgba(100,181,246,1);
+            }
+
+                .filter-content .btn-primary:hover {
+                    background-color: rgba(5,45,110,1);
+                    border-color: rgba(144,202,249,1);
+                    color: rgba(144,202,249,1);
+                }
+
+            .filter-content .btn-danger {
+                background-color: rgba(140,30,40,0.95);
+                border: 2px solid rgba(239,154,154,1);
+                color: rgba(239,154,154,1);
+            }
+
+                .filter-content .btn-danger:hover {
+                    background-color: rgba(110,20,30,1);
+                    border-color: rgba(244,143,177,1);
+                    color: rgba(244,143,177,1);
+                }
+
+        body.light-mode .filter-content label {
+            color: #1a1a2e !important;
+        }
+
+        body.light-mode .filter-content .form-select {
+            background-color: rgba(255,255,255,0.5) !important;
+            border-color: rgba(0,0,0,0.2) !important;
+            color: #1a1a2e !important;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+        }
+
+            body.light-mode .filter-content .form-select option {
+                background-color: #ffffff !important;
+                color: #1a1a2e !important;
+            }
+
+        body.light-mode .filter-content .btn-primary {
+            background-color: rgba(61,121,176,0.85) !important;
+            border-color: rgba(61,121,176,0.9) !important;
+            color: #ffffff !important;
+        }
+
+        body.light-mode .filter-content .btn-danger {
+            background-color: rgba(180,40,50,0.85) !important;
+            border-color: rgba(200,60,70,0.9) !important;
+            color: #ffffff !important;
+        }
+
+        /* ============================================================
+                   CARD WRAPPER
+                   ============================================================ */
+        .sut-card {
+            margin: 75px 12px 8px;
+            background: rgba(255,255,255,0.20) !important;
+            border-radius: 12px;
+            border: 2px solid rgba(255,255,255,0.3) !important;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+
+        body.light-mode .sut-card {
+            background: rgba(255,255,255,0.55) !important;
+            border: 2px solid rgba(200,215,235,0.80) !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.10) !important;
+        }
+
+        .sut-table-container {
+            overflow: hidden;
+        }
+
+      
+
+        .sut-body-wrap {
+            overflow: auto;
+            overflow-x: auto;
+            max-height: calc(100vh - 330px);
+            padding : 8px;
+        }
+
+            .sut-header-wrap table,
+            .sut-body-wrap table {
+                width: 100%;
+                table-layout: fixed;
+            }
+
+            .sut-body-wrap td,
+            .sut-body-wrap th {
+                overflow: hidden;
+            }
+
+            .sut-body-wrap input.form-control {
+                width: 100% !important;
+                min-width: 0 !important;
+                box-sizing: border-box;
+            }
+        .sut-header-wrap th {
+            background: rgba(30,40,60,1) !important;
+            color: #fff !important;
+        }
+        /* ============================================================
+                   SUT TABLE
+                   ============================================================ */
+
+        /* ── SCROLL WRAPPER ─────────────────────────────────────── */
+       /*  .sut-tbl-wrap {
+            overflow-x: auto !important;
+            overflow-y: auto !important;
+            max-height: calc(100vh - 250px) !important;
+            position: relative !important;
+            display: block !important;
+        }
+ */
+            /* ── TABLE BASE ─────────────────────────────────────────── */
+            .sut-tbl-wrap table.sut-tbl {
+                --bs-table-bg: transparent;
+                --bs-table-striped-bg: transparent;
+                --bs-table-hover-bg: transparent;
+                --bs-table-active-bg: transparent;
+                --bs-table-color: #ffffff;
+                border-collapse: separate !important;
+                border-spacing: 0 !important;
+                width: 100%;
+                margin: 0;
+            }
+
+        /* ── THEAD STICKY ───────────────────────────────────────── */
+       /*  .sut-tbl thead th {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 100 !important;
+            background: rgba(30,40,60,1) !important;
+        }
+ */
+        /* ── TBODY CELLS ────────────────────────────────────────── */
+        .sut-tbl tbody td,
+        .sut-tbl tbody th {
+            background-color: rgba(255,255,255,0.08) !important;
+            color: #ffffff !important;
+            border-color: rgba(255,255,255,0.3) !important;
+            padding: 3px 5px;
+            vertical-align: middle;
+        }
+
+        
+
+       
+
+       
+
+        .sut-tbl tbody tr td:nth-child(2) {
+            position: sticky !important;
+            left: 40px !important;
+            z-index: 40 !important;
+            background-color: rgba(255,255,255,0.08) !important;
+        }
+
+        /* ── INPUT DI DALAM TABEL ───────────────────────────────── */
+        .sut-tbl td input.form-control {
+            background-color: rgba(255,255,255,0.1) !important;
+            border: 1px solid rgba(255,255,255,0.3) !important;
+            color: #ffffff !important;
+            padding: 4px 8px;
+            font-size: 13px;
+        }
+
+            .sut-tbl td input.form-control:focus {
+                background-color: rgba(255,255,255,0.15) !important;
+                border-color: rgba(100,181,246,0.5) !important;
+                color: #ffffff !important;
+                box-shadow: none !important;
+            }
+
+            .sut-tbl td input.form-control::placeholder {
+                color: rgba(255,255,255,0.4) !important;
+            }
+       
+
+        /* btn-warning teks hitam (khusus tabel) */
+        .sut-tbl .btn-warning,
+        .sut-tbl .btn-warning * {
+            color: #000000 !important;
+        }
+
+        /* ── LIGHT MODE OVERRIDE ────────────────────────────────── */
+        body.light-mode .sut-tbl thead th {
+            background: rgba(25,35,58,0.92) !important;
+            color: #ffffff !important;
+            border-color: rgba(255,255,255,0.25) !important;
+        }
+
+        body.light-mode .sut-tbl tbody td,
+        body.light-mode .sut-tbl tbody th {
+            background-color: rgba(255,255,255,0.50) !important;
+            color: #1a1a2e !important;
+            border-color: rgba(0,0,0,0.07) !important;
+        }
+
+        body.light-mode .sut-tbl tbody tr th:nth-child(1),
+        body.light-mode .sut-tbl tbody tr td:nth-child(2) {
+            background-color: rgba(255,255,255,0.50) !important;
+        }
+
+        body.light-mode .sut-tbl td input.form-control {
+            background-color: rgba(255,255,255,0.85) !important;
+            border: 1px solid rgba(0,0,0,0.18) !important;
+            color: #1a1a2e !important;
+        }
+
+            body.light-mode .sut-tbl td input.form-control::placeholder {
+                color: rgba(26,26,46,0.38) !important;
+            }
+
+        /* ============================================================
+                   SUBMIT BAR
+                   ============================================================ */
+        #submitCounter,
+        #submitCounter span {
+            color: #ffffff !important;
+        }
+
+        body.light-mode #submitCounter,
+        body.light-mode #submitCounter span {
+            color: #1a1a2e !important;
+        }
+
+        body.light-mode #btn-validate-submit {
+            background-color: rgba(61,121,176,0.90) !important;
+            border: 1.5px solid rgba(61,121,176,0.75) !important;
+            color: #ffffff !important;
+            border-radius: 999px !important;
+        }
+
+        body.light-mode .sut-bottom-bar .btn-danger {
+            background-color: rgba(180,40,50,0.88) !important;
+            border-color: rgba(180,40,50,0.75) !important;
+            color: #ffffff !important;
+            border-radius: 999px !important;
+        }
+
+        /* ============================================================
+                   MODAL
+                   ============================================================ */
+        /* ganti semua selector modal yang ada dengan versi ini */
+
+        #edit-sut-modal .modal-content,
+        #delete-sut-modal .modal-content,
+        #create-sut-modal .modal-content {
+            background-color: rgba(20,30,50,0.98) !important;
+            border: 1px solid rgba(255,255,255,0.2) !important;
+        }
+
+        #edit-sut-modal .modal-header,
+        #delete-sut-modal .modal-header,
+        #create-sut-modal .modal-header {
+            border-bottom: 1px solid rgba(255,255,255,0.15) !important;
+        }
+
+        #edit-sut-modal .modal-footer,
+        #delete-sut-modal .modal-footer,
+        #create-sut-modal .modal-footer {
+            border-top: 1px solid rgba(255,255,255,0.15) !important;
+        }
+
+        #edit-sut-modal .modal-title,
+        #delete-sut-modal .modal-title,
+        #create-sut-modal .modal-title,
+        #edit-sut-modal .modal-body label,
+        #delete-sut-modal .modal-body label,
+        #create-sut-modal .modal-body label,
+        #edit-sut-modal .modal-body p,
+        #delete-sut-modal .modal-body p,
+        #create-sut-modal .modal-body p {
+            color: #ffffff !important;
+        }
+
+        #edit-sut-modal .modal-body .form-control,
+        #delete-sut-modal .modal-body .form-control,
+        #create-sut-modal .modal-body .form-control {
+            background-color: rgba(255,255,255,0.1) !important;
+            border: 1px solid rgba(255,255,255,0.3) !important;
+            color: #ffffff !important;
+        }
+
+            #edit-sut-modal .modal-body .form-control::placeholder,
+            #delete-sut-modal .modal-body .form-control::placeholder,
+            #create-sut-modal .modal-body .form-control::placeholder {
+                color: rgba(255,255,255,0.4) !important;
+            }
+
+        #edit-sut-modal .btn-close,
+        #delete-sut-modal .btn-close,
+        #create-sut-modal .btn-close {
+            filter: invert(1);
+        }
+
+
+        body.light-mode #edit-sut-modal .modal-content,
+        body.light-mode #delete-sut-modal .modal-content {
+            background-color: #ffffff !important;
+        }
+
+        body.light-mode #edit-sut-modal .modal-title,
+        body.light-mode #delete-sut-modal .modal-title,
+        body.light-mode #edit-sut-modal .modal-body label,
+        body.light-mode #delete-sut-modal .modal-body label,
+        body.light-mode #edit-sut-modal .modal-body p,
+        body.light-mode #delete-sut-modal .modal-body p {
+            color: #1a1a2e !important;
+        }
+
+        body.light-mode #edit-sut-modal .modal-body .form-control,
+        body.light-mode #delete-sut-modal .modal-body .form-control {
+            background-color: #ffffff !important;
+            border: 1px solid rgba(0,0,0,0.2) !important;
+            color: #1a1a2e !important;
+        }
+
+        body.light-mode #edit-sut-modal .btn-close,
+        body.light-mode #delete-sut-modal .btn-close {
+            filter: none;
+        }
+        /* ============================================================
+                          FORCE TABLE STRUCTURE (KODE BARU)
+                   ============================================================ */
+        .sut-header-wrap table,
+        .sut-body-wrap table,
+        .sut-tbl {
+            table-layout: fixed !important;
+            width: 100% !important;
+            border-collapse: collapse !important;
+        }
+
+            /* ── COLUMN WIDTHS (KODE BARU) ─────────────────────────── */
+            .sut-tbl .col-no {
+                width: 50px !important;
+                min-width: 50px !important;
+                max-width: 50px !important;
+            }
+
+            .sut-tbl .col-sm {
+                width: 130px !important;
+                min-width: 130px !important;
+            }
+
+            .sut-tbl .col-md {
+                width: 160px !important;
+                min-width: 160px !important;
+            }
+
+            .sut-tbl .col-lg {
+                width: 220px !important;
+                min-width: 220px !important;
+            }
+
+            .sut-tbl .col-action {
+                width: 110px !important;
+                min-width: 110px !important;
+            }
+
+        /* ── HEADER SCROLL FIX (KODE BARU) ─────────────────────── */
+        .sut-header-wrap {
+            overflow: hidden;
+            overflow-y: scroll !important;
+            background: rgba(30,40,60,1) !important;
+        }
+
+            .sut-header-wrap::-webkit-scrollbar {
+                width: 8px;
+                background: transparent !important;
+            }
+
+            .sut-header-wrap::-webkit-scrollbar-thumb {
+                background: transparent !important;
+            }
+        /* FORCE dark modal create */
+        #create-sut-modal .modal-content {
+            background-color: rgba(20,30,50,0.98) !important;
+            border: 1px solid rgba(255,255,255,0.2) !important;
+        }
+
+        #create-sut-modal .modal-header {
+            border-bottom: 1px solid rgba(255,255,255,0.15) !important;
+            background-color: transparent !important;
+        }
+
+        #create-sut-modal .modal-footer {
+            border-top: 1px solid rgba(255,255,255,0.15) !important;
+            background-color: transparent !important;
+        }
+
+        #create-sut-modal .modal-title,
+        #create-sut-modal .modal-body label {
+            color: #ffffff !important;
+        }
+
+        #create-sut-modal .modal-body .form-control {
+            background-color: rgba(255,255,255,0.1) !important;
+            border: 1px solid rgba(255,255,255,0.3) !important;
+            color: #ffffff !important;
+        }
+
+            #create-sut-modal .modal-body .form-control::placeholder {
+                color: rgba(255,255,255,0.4) !important;
+            }
+
+        #create-sut-modal .btn-close {
+            filter: invert(1);
+        }
+
+        body.light-mode #create-sut-modal .modal-content {
+            background-color: #ffffff !important;
+        }
+
+        body.light-mode #create-sut-modal .modal-title,
+        body.light-mode #create-sut-modal .modal-body label {
+            color: #1a1a2e !important;
+        }
+
+        body.light-mode #create-sut-modal .modal-body .form-control {
+            background-color: #ffffff !important;
+            border: 1px solid rgba(0,0,0,0.2) !important;
+            color: #1a1a2e !important;
+        }
+
+        body.light-mode #create-sut-modal .btn-close {
+            filter: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="filter-area-with-lines">
+        <div class="panamon-bottom-line"></div>
+        <div class="panamon-bottomm-line"></div>
+        <div class="filter-content">
+            <div class="row g-3 align-items-center justify-content-between flex-wrap">
+                <div class="col-auto">
+                    <form method="get" class="d-flex flex-wrap align-items-center gap-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="mb-0">Machine</label>
+                            <select class="form-select" style="width: 80px;" name="FilterMachineCode" asp-for="FilterMachineCode">
+                                <option value="">All</option>
+                                <option value="MCH1-01">CU</option>
+                                <option value="MCH1-02">CS</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Search</button>
+                        <a href="/Summary/Sut" class="btn btn-danger">Reset</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="sut-card">
+        <form id="form-sut" method="post" asp-page-handler="SaveSut">
+            <input type="hidden" name="FilterMachineCode" value="@Model.FilterMachineCode" />
+
+            <div class="sut-table-container">
+
+                <!-- HEADER -->
+                <div class="sut-header-wrap">
+                    <table class="table table-bordered mb-0 sut-tbl">
+                        <thead>
+                            <tr>
+                                <th class="col-no">No</th>
+                                <th class="col-lg">Product Name</th>
+                                <th class="col-md">Machine Code</th>
+                                <th class="col-md">Description</th>
+                                <th class="col-sm">Prod Plan</th>
+                                <th class="col-sm">SUT</th>
+                                <th class="col-sm">No of Operator</th>
+                                <th class="col-sm">Qty/Hour</th>
+                                <th class="col-sm">Prod Head Hour</th>
+                                <th class="col-sm">Cycle Time Vacum</th>
+                                <th class="col-sm">Work Hour</th>
+                                <th class="col-action">Action</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+
+                <div class="sut-body-wrap">
+                    <table class="table table-bordered mb-0 sut-tbl">
+                        <tbody id="sut-table-body">
+                            @{
+                                int minRows = 15;
+                                int dataCount = Model.listProducts?.Count ?? 0;
+                                int totalRows = Math.Max(dataCount, minRows);
+                            }
+
+                            @for (int i = 0; i < totalRows; i++)
+                            {
+                                var product = dataCount > i ? Model.listProducts[i] : null;
+
+                                <tr>
+                                    <th scope="row" class="text-center align-middle row-number col-no">@(i + 1)</th>
+
+                                    <td class="col-lg">
+                                        <input type="hidden" name="ProductId[@i]" value="@(product?.Product_Id ?? "")" />
+                                        <input type="text" class="form-control" name="ProductName[@i]"
+                                               value="@(product?.ProductName ?? "")" placeholder="Product Name" />
+                                    </td>
+
+                                    <td class="col-md">
+                                        <input type="text" class="form-control" name="MachineCode[@i]"
+                                               value="@(product?.MachineCode ?? "")" />
+                                    </td>
+
+                                    <td class="col-md">
+                                        <input type="text" class="form-control" name="Description[@i]"
+                                               value="@(product?.Description ?? "")" />
+                                    </td>
+
+                                    <td class="col-sm">
+                                        <input type="text" class="form-control" name="ProdPlan[@i]"
+                                               value="@(product?.ProdPlan?.ToString() ?? "")" />
+                                    </td>
+                                    <td class="col-sm">
+                                        <input type="text" class="form-control" name="SUT[@i]"
+                                               value="@(product?.SUT?.ToString() ?? "")" />
+                                    </td>
+                                    <td class="col-sm">
+                                        <input type="text" class="form-control" name="NoOfOperator[@i]"
+                                               value="@(product?.NoOfOperator?.ToString() ?? "")" />
+                                    </td>
+                                    <td class="col-sm">
+                                        <input type="text" class="form-control" name="QtyHour[@i]"
+                                               value="@(product?.QtyHour?.ToString() ?? "")" />
+                                    </td>
+                                    <td class="col-sm">
+                                        <input type="text" class="form-control" name="ProdHeadHour[@i]"
+                                               value="@(product?.ProdHeadHour?.ToString() ?? "")" />
+                                    </td>
+                                    <td class="col-sm">
+                                        <input type="text" class="form-control" name="CycleTimeVacum[@i]"
+                                               value="@(product?.CycleTimeVacum?.ToString() ?? "")" />
+                                    </td>
+                                    <td class="col-sm">
+                                        <input type="text" class="form-control" name="WorkHour[@i]"
+                                               value="@(product?.WorkHour?.ToString() ?? "")" />
+                                    </td>
+
+                                    <td class="col-action text-center">
+                                        @if (product != null)
+                                        {
+                                            <button type="button" class="btn btn-warning btn-sm"
+                                                    onclick="openEditModal(@i, this)">
+                                                Edit
+                                            </button>
+                                            <button type="button" class="btn btn-danger btn-sm ms-1"
+                                                    onclick="openDeleteModal('@product.Product_Id')">
+                                                Del
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+            </div> <!-- sut-table-container -->
+
+            <div class="sut-bottom-bar d-flex justify-content-center align-items-center py-3 gap-3">
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#create-sut-modal">+ Create</button>
+            </div>
+
+        </form> <!-- form-sut -->
+    </div> <!-- sut-card -->
+    <!-- MODAL EDIT -->
+    <div class="modal fade" id="edit-sut-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Data</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" asp-page-handler="Update">
+                    <input type="hidden" name="FilterMachineCode" value="@Model.FilterMachineCode" />
+                    <input type="hidden" id="edit-product-id" name="ProductId" />
+                    <div class="modal-body">
+                        <div class="mb-2">
+                            <label class="form-label">Product Name</label>
+                            <input type="text" class="form-control" id="edit-product-name" name="ProductName" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Machine Code</label>
+                            <input type="text" class="form-control" id="edit-machine-code" name="MachineCode" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Description</label>
+                            <input type="text" class="form-control" id="edit-description" name="Description" />
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-2">
+                                <label class="form-label">Prod Plan</label>
+                                <input type="number" class="form-control" id="edit-prod-plan" name="ProdPlan" />
+                            </div>
+                            <div class="col-6 mb-2">
+                                <label class="form-label">SUT</label>
+                                <input type="number" class="form-control" id="edit-sut-val" name="SUT" />
+                            </div>
+                            <div class="col-6 mb-2">
+                                <label class="form-label">No of Operator</label>
+                                <input type="number" class="form-control" id="edit-no-of-operator" name="NoOfOperator" />
+                            </div>
+                            <div class="col-6 mb-2">
+                                <label class="form-label">Qty/Hour</label>
+                                <input type="number" class="form-control" id="edit-qty-hour" name="QtyHour" />
+                            </div>
+                            <div class="col-6 mb-2">
+                                <label class="form-label">Prod Head Hour</label>
+                                <input type="number" class="form-control" id="edit-prod-head-hour" name="ProdHeadHour" />
+                            </div>
+                            <div class="col-6 mb-2">
+                                <label class="form-label">Cycle Time Vacum</label>
+                                <input type="number" class="form-control" id="edit-cycle-time" name="CycleTimeVacum" />
+                            </div>
+                            <div class="col-6 mb-2">
+                                <label class="form-label">Work Hour</label>
+                                <input type="number" class="form-control" id="edit-work-hour" name="WorkHour" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DELETE -->
+    <div class="modal fade" id="delete-sut-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Hapus Data</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" asp-page-handler="Delete">
+                    <input type="hidden" name="FilterMachineCode" value="@Model.FilterMachineCode" />
+                    <input type="hidden" id="delete-product-id" name="ProductId" />
+                    <div class="modal-body">
+                        <p>Apakah anda yakin ingin menghapus data ini?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- MODAL CREATE -->
+    <div class="modal fade" id="create-sut-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Tambah Data</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" asp-page-handler="Insert">
+                    <input type="hidden" name="FilterMachineCode" value="@Model.FilterMachineCode" />
+                    <div class="modal-body">
+                        <div class="mb-2">
+                            <label class="form-label">Product Name</label>
+                            <input type="text" class="form-control" name="ProductName" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Machine Code</label>
+                            <input type="text" class="form-control" name="MachineCode" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Description</label>
+                            <input type="text" class="form-control" name="Description" />
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-2">
+                                <label class="form-label">Prod Plan</label>
+                                <input type="number" class="form-control" name="ProdPlan" />
+                            </div>
+                            <div class="col-6 mb-2">
+                                <label class="form-label">SUT</label>
+                                <input type="number" class="form-control" name="SUT" />
+                            </div>
+                            <div class="col-6 mb-2">
+                                <label class="form-label">No of Operator</label>
+                                <input type="number" class="form-control" name="NoOfOperator" />
+                            </div>
+                            <div class="col-6 mb-2">
+                                <label class="form-label">Qty/Hour</label>
+                                <input type="number" class="form-control" name="QtyHour" />
+                            </div>
+                            <div class="col-6 mb-2">
+                                <label class="form-label">Prod Head Hour</label>
+                                <input type="number" class="form-control" name="ProdHeadHour" />
+                            </div>
+                            <div class="col-6 mb-2">
+                                <label class="form-label">Cycle Time Vacum</label>
+                                <input type="number" class="form-control" name="CycleTimeVacum" />
+                            </div>
+                            <div class="col-6 mb-2">
+                                <label class="form-label">Work Hour</label>
+                                <input type="number" class="form-control" name="WorkHour" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/sweetalert2.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            var statusMessage = '@TempData["StatusMessage"]';
+            var message = '@TempData["Message"]';
+            if (statusMessage === 'success') {
+                Swal.fire({ icon: 'success', title: 'Success', text: message, confirmButtonText: 'OK' });
+            } else if (statusMessage === 'error') {
+                Swal.fire({ icon: 'error', title: 'Error', text: message, confirmButtonText: 'OK' });
+            }
+        });
+
+        let submitCount = 0;
+
+        function validateAndSubmit() {
+            const rows = document.querySelectorAll('#sut-table-body tr');
+            let hasData = false;
+            rows.forEach(row => {
+                const productName = row.querySelector('input[name^="ProductName"]')?.value.trim();
+                if (productName && productName !== '') hasData = true;
+            });
+            if (!hasData) {
+                Swal.fire({ icon: 'warning', title: 'Data Kosong', text: 'Silakan isi minimal satu baris Product Name sebelum submit.', confirmButtonText: 'OK' });
+                return;
+            }
+            Swal.fire({ title: 'Menyimpan Data...', text: 'Mohon tunggu sebentar', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+            submitCount++;
+            document.getElementById('counter').textContent = submitCount;
+            document.getElementById('form-sut').submit();
+        }
+
+              function openEditModal(i, btn) {
+            const row = btn.closest('tr');
+            const get = name => row.querySelector(`input[name="${name}[${i}]"]`)?.value ?? '';
+
+            const productId = row.querySelector(`input[name="ProductId[${i}]"]`)?.value ?? '';
+            console.log('=== OPEN EDIT MODAL ===');
+            console.log('index i:', i);
+            console.log('ProductId:', productId);
+            console.log('ProductName:', get('ProductName'));
+            console.log('MachineCode:', get('MachineCode'));
+            console.log('ProdPlan:', get('ProdPlan'));
+            console.log('SUT:', get('SUT'));
+
+            document.getElementById('edit-product-id').value     = productId;
+            document.getElementById('edit-product-name').value   = get('ProductName');
+            document.getElementById('edit-machine-code').value   = get('MachineCode');
+            document.getElementById('edit-description').value    = get('Description');
+            document.getElementById('edit-prod-plan').value      = get('ProdPlan');
+            document.getElementById('edit-sut-val').value        = get('SUT');
+            document.getElementById('edit-no-of-operator').value = get('NoOfOperator');
+            document.getElementById('edit-qty-hour').value       = get('QtyHour');
+            document.getElementById('edit-prod-head-hour').value = get('ProdHeadHour');
+            document.getElementById('edit-cycle-time').value     = get('CycleTimeVacum');
+            document.getElementById('edit-work-hour').value      = get('WorkHour');
+
+            console.log('=== AFTER SET ===');
+            console.log('edit-product-id value:', document.getElementById('edit-product-id').value);
+
+            new bootstrap.Modal(document.getElementById('edit-sut-modal')).show();
+        }
+        function openDeleteModal(productId) {
+            document.getElementById('delete-product-id').value = productId;
+            new bootstrap.Modal(document.getElementById('delete-sut-modal')).show();
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const sel = document.querySelector('.filter-content select[name="FilterMachineCode"]');
+            if (sel && sel.value) sel.classList.add('selected');
+            if (sel) sel.addEventListener('change', function () {
+                this.value ? this.classList.add('selected') : this.classList.remove('selected');
+            });
+        });
+                document.querySelector('#edit-sut-modal form').addEventListener('submit', function(e) {
+            console.log('=== SUBMIT EDIT FORM ===');
+            const fd = new FormData(this);
+            for (let [k, v] of fd.entries()) {
+                console.log(k, ':', v);
+            }
+        });
+    </script>
+</body>
+</html>

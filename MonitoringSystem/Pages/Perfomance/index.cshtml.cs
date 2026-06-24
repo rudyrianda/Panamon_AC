@@ -7,15 +7,33 @@ using static MonitoringSystem.Pages.Summary.SummaryModel;
 
 namespace MonitoringSystem.Pages.Performance
 {
-	public class PerformanceModel : PageModel
-	{
-		public string connectionString = "Server=10.83.33.103;User Id=sa;Password=sa;Database=PROMOSYS;Trusted_Connection=False;TrustServerCertificate=True;Encrypt=False";
-		//public string connectionString = "Data Source=DESKTOP-NBPATD6\\MSSQLSERVERR;trusted_connection=true;trustservercertificate=True;Database=PROMOSYS;Integrated Security=True;Encrypt=False";
-		public string errorMessage = "";
+    public class PerformanceModel : PageModel
+    {
+        public string connectionString = "Server=10.83.33.103;User Id=sa;Password=sa;Database=PROMOSYS;Trusted_Connection=False;TrustServerCertificate=True;Encrypt=False";
+        //public string connectionString = "Data Source=DESKTOP-NBPATD6\\MSSQLSERVERR;trusted_connection=true;trustservercertificate=True;Database=PROMOSYS;Integrated Security=True;Encrypt=False";
+        public string errorMessage = "";
 
         private readonly ApplicationDbContext _context;
         private readonly IServiceProvider _serviceProvider;
         public List<PlanQty> plansQty = new List<PlanQty>();
+
+        // ✅ CACHE: Hindari query DB berulang untuk data yang sama
+        private readonly Dictionary<string, TimeSpan> _firstTimeCache = new();
+        private readonly Dictionary<string, TimeSpan> _lastTimeCache = new();
+        private readonly Dictionary<string, int> _modelPlanCache = new();
+
+        // ✅ CACHE: GetRestTime — query RestTime hanya 1x per dayType per request
+        private readonly Dictionary<string, List<RestTime>> _restTimeCache = new();
+
+        // ✅ CACHE: GetActualPerHour — hanya query 1x per request
+        private List<ActualData>? _cachedActualPerHour = null;
+
+        // ✅ CACHE: GetLastWorkingTime — hanya query 1x per request
+        private readonly Dictionary<string, TimeSpan> _lastWorkingTimeCache = new();
+
+        // ✅ FLAG: Pastikan LoadBreakTimes hanya dipanggil sekali per request
+        private bool _breakTimesLoaded = false;
+
         public PerformanceModel(ApplicationDbContext context, IServiceProvider serviceProvider)
         {
             _context = context;
@@ -26,33 +44,71 @@ namespace MonitoringSystem.Pages.Performance
         public int TotalPlanForSummaryCS { get; set; }
 
         [BindProperty]
-		public DateTime SelectedDate { get; set; } = DateTime.Now.Date;
+        public DateTime SelectedDate { get; set; } = DateTime.Now.Date;
 
-		[BindProperty]
-		public string MachineCode { get; set; } = "MCH1-01";
+        [BindProperty]
+        public string MachineCode { get; set; } = "MCH1-01";
 
+        // ✅ COMMENTED: Tabel AdditionalBreakTime belum ada di database
+        // Uncomment jika tabel sudah dibuat dengan script:
+        // CREATE TABLE AdditionalBreakTime (Id INT IDENTITY PRIMARY KEY, Date DATE, BreakTime1Start TIME, BreakTime1End TIME, BreakTime2Start TIME, BreakTime2End TIME, CreatedAt DATETIME DEFAULT GETDATE())
         public TimeSpan? BreakTime1Start { get; set; }
         public TimeSpan? BreakTime1End { get; set; }
         public TimeSpan? BreakTime2Start { get; set; }
         public TimeSpan? BreakTime2End { get; set; }
 
+        // ✅ CACHE PROPERTIES: Hasil query disimpan sekali, dipakai berkali-kali di view
+        public int CachedPlan { get; set; }
+        public int CachedTarget { get; set; }
+        public int CachedActual { get; set; }
+        public int CachedPlanTaktTime { get; set; }
+        public int CachedEfficiency { get; set; }
+        public int CachedWorkingTime { get; set; }
+        public int CachedLossTime { get; set; }
+        public int CachedDefect { get; set; }
 
         public List<ProductionAchievement> listProdAchieve = new List<ProductionAchievement>();
-		public List<AssemblyTime> assemblyTimes = new List<AssemblyTime>();
+        public List<AssemblyTime> assemblyTimes = new List<AssemblyTime>();
 
-		public int Plan { get; set; }
-		public int Actual { get; set; }
+        public int Plan { get; set; }
+        public int Actual { get; set; }
+
+        // ✅ OPTIMASI: Semua data diload sekali di sini, tidak ada query duplikat
+        private void LoadAllData()
+        {
+            LoadBreakTimesFromDb(); // Aman: sudah di-comment isinya, return langsung
+            GetHourlyAchievement();
+            GetAssemblyTime();
+
+            CachedPlan = GetProductionPlan();
+            CachedActual = GetActualProduction();
+            CachedTarget = GetTargetFromOEESN();
+            CachedPlanTaktTime = GetPlanTaktTime();
+            CachedEfficiency = GetEfficiencyFromOEESN();
+            CachedWorkingTime = GetWorkingTimeBySummaryLogic();
+            CachedLossTime = GetLossTimeBySummaryLogic();
+            CachedDefect = GetTotalDefectBySummaryLogic();
+
+            Plan = CachedPlan;
+            Actual = CachedActual;
+        }
 
         public void OnGet()
         {
             SelectedDate = DateTime.Today;
             MachineCode = MachineCode;
+            LoadAllData();
+        }
 
-            Plan = GetProductionPlan();
-            Actual = GetActualProduction();
+        public void OnPost()
+        {
+            if (string.IsNullOrEmpty(MachineCode))
+                MachineCode = "MCH1-01";
 
-            GetHourlyAchievement();
-            GetAssemblyTime();
+            if (SelectedDate == default)
+                SelectedDate = DateTime.Today;
+
+            LoadAllData();
         }
 
         public void GetProductionPlanDaily()
@@ -96,25 +152,18 @@ namespace MonitoringSystem.Pages.Performance
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     connection.Open();
-
                     string query = @"
-                    SELECT 
-                        TOP 1 TargetUnit 
-                    FROM 
-                        OEESN 
-                    WHERE 
-                        MachineCode = @MachineCode 
-                        ORDER BY SDate DESC;";
+                    SELECT TOP 1 TargetUnit 
+                    FROM OEESN 
+                    WHERE MachineCode = @MachineCode 
+                    ORDER BY SDate DESC;";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@MachineCode", MachineCode);
-
                         var result = command.ExecuteScalar();
                         if (result != null && result != DBNull.Value)
-                        {
                             target = Convert.ToInt32(result);
-                        }
                     }
                 }
             }
@@ -122,39 +171,21 @@ namespace MonitoringSystem.Pages.Performance
             {
                 Console.WriteLine("Error in GetTargetFromOEESN: " + ex.Message);
             }
-
             return target;
         }
-
-
-        public void OnPost()
-        {
-            // Razor Page otomatis akan isi MachineCode & SelectedDate dari form POST
-            if (string.IsNullOrEmpty(MachineCode))
-                MachineCode = "MCH1-01";
-
-            if (SelectedDate == default)
-                SelectedDate = DateTime.Today;
-
-            Plan = GetProductionPlan();
-            Actual = GetActualProduction();
-
-            LoadBreakTimesFromDb();
-            GetHourlyAchievement();
-            GetAssemblyTime();
-        }
-
-
 
         public int GetPlanForSummary(DateTime selectedDate, string machineCode)
         {
             return _context.HourlyPlanData
                 .Where(x => x.SelectedDate == selectedDate && x.MachineCode == machineCode)
-                .Sum(x => x.TotalPlan);  // Mengambil total Plan untuk machineCode tertentu
+                .Sum(x => x.TotalPlan);
         }
 
         public void SavePlanToDatabase(int plan, string machineCode)
         {
+            // ✅ OPTIMASI: Hanya simpan ke DB jika hari ini (tidak perlu update data historis)
+            if (SelectedDate.Date != DateTime.Today) return;
+
             using (var scope = _serviceProvider.CreateScope())
             {
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -164,14 +195,15 @@ namespace MonitoringSystem.Pages.Performance
 
                 if (existingRecord != null)
                 {
-                    // Update data jika sudah ada
+                    // ✅ OPTIMASI: Skip update jika nilai tidak berubah
+                    if (existingRecord.TotalPlan == plan) return;
+
                     existingRecord.TotalPlan = plan;
                     existingRecord.UpdatedAt = DateTime.Now;
                     context.Update(existingRecord);
                 }
                 else
                 {
-                    // Insert data baru jika belum ada
                     context.HourlyPlanData.Add(new HourlyPlanData
                     {
                         MachineCode = machineCode,
@@ -224,93 +256,91 @@ namespace MonitoringSystem.Pages.Performance
                     : CalculatePlan(firstTimeModel, lastTimeModel, sut, listRestTime);
             }
 
-            // Ensure plan doesn't exceed quantity plan
             planPerHour = Math.Min(planPerHour, qtyPlan);
-
             return planPerHour > 0 ? planPerHour : 1;
         }
 
+        // ✅ COMMENTED: Tabel AdditionalBreakTime belum ada di database PROMOSYS
+        // Untuk mengaktifkan kembali: buat tabel dulu, lalu hapus comment di bawah
         private void LoadBreakTimesFromDb()
         {
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    connection.Open();
-                    string query = @"SELECT TOP 1 BreakTime1Start, BreakTime1End, BreakTime2Start, BreakTime2End 
-                                 FROM AdditionalBreakTime 
-                                 WHERE Date = @Date
-                                 ORDER BY CreatedAt DESC";
-                    using (SqlCommand command = new SqlCommand(query, connection))
-                    {
-                        command.Parameters.AddWithValue("@Date", SelectedDate.Date);
-                        using (SqlDataReader reader = command.ExecuteReader())
-                        {
-                            if (reader.Read())
-                            {
-                                BreakTime1Start = reader.IsDBNull(0) ? (TimeSpan?)null : reader.GetTimeSpan(0);
-                                BreakTime1End = reader.IsDBNull(1) ? (TimeSpan?)null : reader.GetTimeSpan(1);
-                                BreakTime2Start = reader.IsDBNull(2) ? (TimeSpan?)null : reader.GetTimeSpan(2);
-                                BreakTime2End = reader.IsDBNull(3) ? (TimeSpan?)null : reader.GetTimeSpan(3);
-                            }
-                            else
-                            {
-                                BreakTime1Start = null;
-                                BreakTime1End = null;
-                                BreakTime2Start = null;
-                                BreakTime2End = null;
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error loading break times: " + ex.Message);
-            }
+            // Guard: hanya load sekali per request
+            if (_breakTimesLoaded) return;
+            _breakTimesLoaded = true;
+
+            // Set semua null — fitur AdditionalBreakTime belum aktif
+            BreakTime1Start = null;
+            BreakTime1End = null;
+            BreakTime2Start = null;
+            BreakTime2End = null;
+
+            // ============================================================
+            // UNCOMMENT BLOK INI JIKA TABEL AdditionalBreakTime SUDAH ADA
+            // ============================================================
+            // try
+            // {
+            //     using (SqlConnection connection = new SqlConnection(connectionString))
+            //     {
+            //         connection.Open();
+            //         string query = @"SELECT TOP 1 BreakTime1Start, BreakTime1End, BreakTime2Start, BreakTime2End 
+            //                      FROM AdditionalBreakTime 
+            //                      WHERE Date = @Date
+            //                      ORDER BY CreatedAt DESC";
+            //         using (SqlCommand command = new SqlCommand(query, connection))
+            //         {
+            //             command.Parameters.AddWithValue("@Date", SelectedDate.Date);
+            //             using (SqlDataReader reader = command.ExecuteReader())
+            //             {
+            //                 if (reader.Read())
+            //                 {
+            //                     BreakTime1Start = reader.IsDBNull(0) ? (TimeSpan?)null : reader.GetTimeSpan(0);
+            //                     BreakTime1End   = reader.IsDBNull(1) ? (TimeSpan?)null : reader.GetTimeSpan(1);
+            //                     BreakTime2Start = reader.IsDBNull(2) ? (TimeSpan?)null : reader.GetTimeSpan(2);
+            //                     BreakTime2End   = reader.IsDBNull(3) ? (TimeSpan?)null : reader.GetTimeSpan(3);
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }
+            // catch (Exception ex)
+            // {
+            //     Console.WriteLine("Error loading break times: " + ex.Message);
+            // }
         }
 
+        // ✅ COMMENTED: Selalu return false karena AdditionalBreakTime belum ada
         private bool IsOverlappingWithBreakTime(TimeSpan start, TimeSpan end, int toleranceSeconds = 60)
         {
-            // tambah toleransi 1 menit (60 detik)
-            TimeSpan tolerance = TimeSpan.FromSeconds(toleranceSeconds);
+            // Selalu false sampai tabel AdditionalBreakTime tersedia
+            return false;
 
-            bool Overlaps(TimeSpan bStart, TimeSpan bEnd)
-            {
-                if (bStart == null || bEnd == null) return false;
-
-                // Check overlap dengan toleransi
-                return start < (bEnd + tolerance) && (end + tolerance) > bStart;
-            }
-
-            return (BreakTime1Start != null && BreakTime1End != null && Overlaps(BreakTime1Start.Value, BreakTime1End.Value))
-                || (BreakTime2Start != null && BreakTime2End != null && Overlaps(BreakTime2Start.Value, BreakTime2End.Value));
+            // ============================================================
+            // UNCOMMENT BLOK INI JIKA TABEL AdditionalBreakTime SUDAH ADA
+            // ============================================================
+            // TimeSpan tolerance = TimeSpan.FromSeconds(toleranceSeconds);
+            // bool Overlaps(TimeSpan bStart, TimeSpan bEnd)
+            // {
+            //     return start < (bEnd + tolerance) && (end + tolerance) > bStart;
+            // }
+            // return (BreakTime1Start != null && BreakTime1End != null && Overlaps(BreakTime1Start.Value, BreakTime1End.Value))
+            //     || (BreakTime2Start != null && BreakTime2End != null && Overlaps(BreakTime2Start.Value, BreakTime2End.Value));
         }
-
 
         [HttpGet]
         public IActionResult OnGetUpdatedData(string machineCode, DateTime selectedDate)
         {
             try
             {
-                if (!string.IsNullOrEmpty(machineCode))
-                    MachineCode = machineCode;
-                else
-                    MachineCode = "MCH1-01"; // default fallback
+                MachineCode = !string.IsNullOrEmpty(machineCode) ? machineCode : "MCH1-01";
+                SelectedDate = selectedDate != default ? selectedDate : DateTime.Today;
 
-                if (selectedDate != default)
-                    SelectedDate = selectedDate;
-                else
-                    SelectedDate = DateTime.Today;
+                // ✅ OPTIMASI: Load achievement dulu baru hitung chart — tidak query ulang
+                LoadBreakTimesFromDb();
+                GetHourlyAchievement();
 
                 var actualData = GetActualPerHour();
                 var labels = actualData.Select(data => data.EndTime).ToList();
                 var efficiencyData = CalculateCumulativeEfficiencyForChart(actualData);
-
-                System.Diagnostics.Debug.WriteLine("=== OnGetUpdatedData Triggered ===");
-                System.Diagnostics.Debug.WriteLine($"Received MachineCode: {machineCode}");
-                System.Diagnostics.Debug.WriteLine($"Received SelectedDate: {selectedDate}");
-                System.Diagnostics.Debug.WriteLine($"Before assignment -> Model MachineCode: {MachineCode}");
 
                 return new JsonResult(new
                 {
@@ -325,10 +355,9 @@ namespace MonitoringSystem.Pages.Performance
             }
         }
 
-
         public List<double> CalculateCumulativeEfficiencyForChart(List<ActualData> actualData)
         {
-            List<double> efficiencyData = new List<double> { 0 }; // Start with 0 at 07:00
+            List<double> efficiencyData = new List<double> { 0 };
 
             var cumulativeActual = 0;
             var cumulativePlan = 0;
@@ -337,32 +366,16 @@ namespace MonitoringSystem.Pages.Performance
             {
                 cumulativeActual += actualData[i].Actual;
 
-                // Calculate cumulative plan based on hourly achievement data
                 var matchingAchievement = listProdAchieve
                     .Where(achievement => achievement.EndTime.ToString(@"hh\:mm") == actualData[i].EndTime)
                     .ToList();
 
-                // Di dalam CalculateCumulativeEfficiencyForChart
-                if (matchingAchievement.Any())
-                {
-                    foreach (var achievement in matchingAchievement)
-                    {
-                        cumulativePlan += CalculateHourlyPlan(achievement);
-                    }
-                }
-                else
-                {
-                    // Jika jam tersebut belum ada di list achievement, 
-                    // gunakan asumsi plan 0 (agar efisiensi tidak turun drastis secara salah)
-                    cumulativePlan += 0;
-                }
+                foreach (var achievement in matchingAchievement)
+                    cumulativePlan += CalculateHourlyPlan(achievement);
 
-                // Calculate efficiency
-                double efficiency = 0;
-                if (cumulativePlan > 0)
-                {
-                    efficiency = Math.Round((double)cumulativeActual / cumulativePlan * 100, 2);
-                }
+                double efficiency = cumulativePlan > 0
+                    ? Math.Round((double)cumulativeActual / cumulativePlan * 100, 2)
+                    : 0;
 
                 efficiencyData.Add(efficiency);
             }
@@ -373,28 +386,23 @@ namespace MonitoringSystem.Pages.Performance
         public int GetEfficiencyFromOEESN()
         {
             int efficiency = 0;
-
             try
             {
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     connection.Open();
-
                     string query = @"
                 SELECT TOP 1 Performance
                 FROM OEESN
                 WHERE MachineCode = @MachineCode
-                ORDER BY SDate DESC;"; // Ambil nilai terbaru berdasarkan waktu input
+                ORDER BY SDate DESC;";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@MachineCode", MachineCode);
-
                         var result = command.ExecuteScalar();
                         if (result != null && result != DBNull.Value)
-                        {
                             efficiency = Convert.ToInt32(result);
-                        }
                     }
                 }
             }
@@ -402,29 +410,15 @@ namespace MonitoringSystem.Pages.Performance
             {
                 Console.WriteLine("Error in GetEfficiencyFromOEESN: " + ex.Message);
             }
-
             return efficiency;
         }
 
-        private double CalculateRealtimeEfficiency(
-        int cumulativeActual,
-        int workingTime,
-        double lossTime,
-        int planTaktTime)
-            {
-                double netOperatingTimeSeconds = (workingTime - lossTime) * 60;
-
-                if (netOperatingTimeSeconds <= 0 || cumulativeActual <= 0 || planTaktTime <= 0)
-                    return 0;
-
-                double efficiency =
-                    (cumulativeActual * planTaktTime) / netOperatingTimeSeconds * 100;
-
-                // SAFETY CAP (industrial practice)
-                return Math.Round(Math.Min(efficiency, 120), 2);
-            }
-
-
+        private double CalculateRealtimeEfficiency(int cumulativeActual, int workingTime, double lossTime, int planTaktTime)
+        {
+            double netOperatingTimeSeconds = (workingTime - lossTime) * 60;
+            if (netOperatingTimeSeconds <= 0 || cumulativeActual <= 0 || planTaktTime <= 0) return 0;
+            return Math.Round(Math.Min((cumulativeActual * planTaktTime) / netOperatingTimeSeconds * 100, 120), 2);
+        }
 
         private int CalculateHourlyPlan(ProductionAchievement achievement)
         {
@@ -473,144 +467,178 @@ namespace MonitoringSystem.Pages.Performance
         }
 
         public List<int> CalculateCumulativePlan()
-		{
-			List<int> cumulativePlan = new List<int> { 0 };
-
-			foreach (var achievement in listProdAchieve)
-			{
-				int plan = CalculateSinglePlan(
-					achievement.StartTime,
-					achievement.EndTime,
-					achievement.SUT,
-					GetRestTime("REGULAR")
-				);
-				cumulativePlan.Add(plan + cumulativePlan.Last());
-			}
-
-			return cumulativePlan;
-		}
-
-		public int CalculateSinglePlan(TimeSpan startTime, TimeSpan endTime, int SUT, List<RestTime> restTimes)
-		{
-			TimeSpan effectiveTime = endTime - startTime;
-
-			foreach (var rest in restTimes)
-			{
-				if (startTime < rest.EndTime && endTime > rest.StartTime)
-				{
-					TimeSpan overlapStart = TimeSpan.FromTicks(Math.Max(startTime.Ticks, rest.StartTime.Ticks));
-					TimeSpan overlapEnd = TimeSpan.FromTicks(Math.Min(endTime.Ticks, rest.EndTime.Ticks));
-					effectiveTime -= (overlapEnd - overlapStart);
-				}
-			}
-
-			return Convert.ToInt32(effectiveTime.TotalSeconds / SUT);
-		}
-
-        public int GetProductionPlan()
         {
-            int totalPlan = 0;
-
-            try
+            List<int> cumulativePlan = new List<int> { 0 };
+            foreach (var achievement in listProdAchieve)
             {
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    connection.Open();
-
-                    string query = @"
-                SELECT SUM(Quantity)
-                FROM ProductionRecords
-                WHERE PlanId = (SELECT MAX(PlanId) FROM ProductionRecords)
-                  AND MachineCode = @MachineCode;";
-
-                    using (SqlCommand command = new SqlCommand(query, connection))
-                    {
-                        command.Parameters.AddWithValue("@MachineCode", MachineCode);
-                        command.Parameters.AddWithValue("@SelectedDate", SelectedDate.Date);
-                        var result = command.ExecuteScalar();
-                        totalPlan = result != DBNull.Value ? Convert.ToInt32(result) : 0;
-                    }
-                }
+                int plan = CalculateSinglePlan(achievement.StartTime, achievement.EndTime, achievement.SUT, GetRestTime("REGULAR"));
+                cumulativePlan.Add(plan + cumulativePlan.Last());
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error in GetProductionPlan: " + ex.Message);
-            }
-
-            return totalPlan;
+            return cumulativePlan;
         }
 
+        public int CalculateSinglePlan(TimeSpan startTime, TimeSpan endTime, int SUT, List<RestTime> restTimes)
+        {
+            TimeSpan effectiveTime = endTime - startTime;
+            foreach (var rest in restTimes)
+            {
+                if (startTime < rest.EndTime && endTime > rest.StartTime)
+                {
+                    TimeSpan overlapStart = TimeSpan.FromTicks(Math.Max(startTime.Ticks, rest.StartTime.Ticks));
+                    TimeSpan overlapEnd = TimeSpan.FromTicks(Math.Min(endTime.Ticks, rest.EndTime.Ticks));
+                    effectiveTime -= (overlapEnd - overlapStart);
+                }
+            }
+            return Convert.ToInt32(effectiveTime.TotalSeconds / SUT);
+        }
 
+        public (int EffectivePlan, int EffectivePlanOvertime) GetEffectiveDailyPlan()
+        {
+            int productionRecordsPlan = 0;
+            int productionRecordsOt = 0;
+            int sapPlanNormal = 0;
+            int sapPlanOt = 0;
 
-
-        public int GetActualProduction()
-		{
-			int actual = 0;
             try
             {
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     connection.Open();
 
-                     string query = @"
-                SELECT TOP 1 TotalUnit
-                FROM OEESN
-                WHERE MachineCode = @MachineCode
-                ORDER BY SDate DESC;"; // Ambil nilai terbaru berdasarkan waktu input
+                    string planSql = @"
+                        SELECT
+                            SUM(ISNULL(pr.Quantity, 0))  AS TotalPlanQuantity,
+                            SUM(ISNULL(pr.Overtime, 0))  AS TotalPlanOvertime
+                        FROM ProductionPlan pp
+                        INNER JOIN ProductionRecords pr ON pp.Id = pr.PlanId
+                        WHERE CAST(pp.CurrentDate AS DATE) = @SelectedDate
+                          AND pr.MachineCode = @MachineCode;";
 
-                    using (SqlCommand command = new SqlCommand(query, connection))
+                    using (SqlCommand cmd = new SqlCommand(planSql, connection))
                     {
-                        command.Parameters.AddWithValue("@MachineCode", MachineCode);
-
-                        var result = command.ExecuteScalar();
-                        if (result != null && result != DBNull.Value)
+                        cmd.Parameters.AddWithValue("@SelectedDate", SelectedDate.Date);
+                        cmd.Parameters.AddWithValue("@MachineCode", MachineCode);
+                        using (SqlDataReader reader = cmd.ExecuteReader())
                         {
-                            actual = Convert.ToInt32(result);
+                            if (reader.Read())
+                            {
+                                productionRecordsPlan = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader[0]);
+                                productionRecordsOt = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader[1]);
+                            }
+                        }
+                    }
+
+                    string sapSql = @"
+                        SELECT
+                            SUM(ISNULL(sp.SapPlanNormal,   0)) AS TotalSapNormal,
+                            SUM(ISNULL(sp.SapPlanOvertime, 0)) AS TotalSapOvertime
+                        FROM ProductionPlan pp
+                        INNER JOIN SapPlan sp ON pp.Id = sp.PlanId
+                        WHERE CAST(pp.CurrentDate AS DATE) = @SelectedDate
+                          AND sp.MachineCode = @MachineCode;";
+
+                    using (SqlCommand cmd = new SqlCommand(sapSql, connection))
+                    {
+                        cmd.Parameters.AddWithValue("@SelectedDate", SelectedDate.Date);
+                        cmd.Parameters.AddWithValue("@MachineCode", MachineCode);
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                sapPlanNormal = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader[0]);
+                                sapPlanOt = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader[1]);
+                            }
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error in GetTotalUnitFromOEESN: " + ex.Message);
+                Console.WriteLine("Error in GetEffectiveDailyPlan: " + ex.Message);
+            }
+
+            int effectivePlan = productionRecordsPlan > 0 ? productionRecordsPlan : sapPlanNormal;
+            int effectivePlanOt = productionRecordsOt > 0 ? productionRecordsOt : sapPlanOt;
+            return (effectivePlan, effectivePlanOt);
+        }
+
+        public int GetProductionPlan()
+        {
+            var (effectivePlan, _) = GetEffectiveDailyPlan();
+            return effectivePlan;
+        }
+
+        public int GetActualProduction()
+        {
+            int actual = 0;
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    string query = @"
+                WITH ShiftData AS (
+                    SELECT ShiftMode, TotalUnit
+                    FROM OEESN
+                    WHERE MachineCode = @MachineCode
+                      AND (
+                            (CAST(SDate AS DATE) = @SelectedDate AND CAST(SDate AS TIME) >= '07:00:00')
+                            OR
+                            (CAST(SDate AS DATE) = DATEADD(DAY, 1, @SelectedDate) AND CAST(SDate AS TIME) < '07:00:00')
+                          )
+                )
+                SELECT
+                    ISNULL(MAX(CASE WHEN ShiftMode = 'SHIFT 1'   THEN TotalUnit END), 0)
+                  + ISNULL(MAX(CASE WHEN ShiftMode = 'SHIFT 2'   THEN TotalUnit END), 0)
+                  + ISNULL(MAX(CASE WHEN ShiftMode = 'SHIFT 3'   THEN TotalUnit END), 0)
+                  + ISNULL(MAX(CASE WHEN ShiftMode = 'NON-SHIFT' THEN TotalUnit END), 0)
+                  + ISNULL(MAX(CASE WHEN ShiftMode = 'OVERTIME'  THEN TotalUnit END), 0)
+                FROM ShiftData;";
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.AddWithValue("@MachineCode", MachineCode);
+                        command.Parameters.AddWithValue("@SelectedDate", SelectedDate.Date);
+                        var result = command.ExecuteScalar();
+                        if (result != null && result != DBNull.Value)
+                            actual = Convert.ToInt32(result);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error in GetActualProduction: " + ex.Message);
             }
             return actual;
-		}
+        }
 
-		public int GetPlanTaktTime()
-		{
-			int planTaktTime = 0;
-			try
-			{
-				using (SqlConnection connection = new SqlConnection(connectionString))
-				{
-					connection.Open();
-					string getPlanTaktTime = @"SELECT TOP 1 MasterData.SUT FROM OEESN
-	                                                  JOIN MasterData ON OEESN.Product_Id = MasterData.Product_Id
+        public int GetPlanTaktTime()
+        {
+            int planTaktTime = 0;
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    string getPlanTaktTime = @"SELECT TOP 1 MasterData.SUT FROM OEESN
+                                                  JOIN MasterData ON OEESN.Product_Id = MasterData.Product_Id
                                                WHERE CAST(OEESN.SDate AS DATE) = @SelectedDate AND OEESN.MachineCode = @MachineCode
                                                ORDER BY SDate DESC;";
-					using (SqlCommand command = new SqlCommand(getPlanTaktTime, connection))
-					{
-						command.Parameters.AddWithValue("@SelectedDate", SelectedDate);
-						command.Parameters.AddWithValue("@MachineCode", MachineCode);
-						var Result = command.ExecuteScalar();
-						if (Result != null)
-						{
-							planTaktTime = (int)Result;
-						}
-						else
-						{
-							planTaktTime = 0;
-						}
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine("Exception: " + ex.ToString());
-			}
-			return planTaktTime;
-		}
+                    using (SqlCommand command = new SqlCommand(getPlanTaktTime, connection))
+                    {
+                        command.Parameters.AddWithValue("@SelectedDate", SelectedDate);
+                        command.Parameters.AddWithValue("@MachineCode", MachineCode);
+                        var Result = command.ExecuteScalar();
+                        planTaktTime = Result != null ? (int)Result : 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Exception: " + ex.ToString());
+            }
+            return planTaktTime;
+        }
 
         public void GetHourlyAchievement()
         {
@@ -647,12 +675,9 @@ namespace MonitoringSystem.Pages.Performance
                                 var startTime = reader.GetTimeSpan(1);
                                 var endTime = reader.GetTimeSpan(2);
 
-                                // cek overlap dengan break time
+                                // ✅ IsOverlappingWithBreakTime selalu return false — tidak ada filtering
                                 if (IsOverlappingWithBreakTime(startTime, endTime))
-                                {
-                                    // skip data ini karena masuk break time
                                     continue;
-                                }
 
                                 listProdAchieve.Add(new ProductionAchievement
                                 {
@@ -676,225 +701,170 @@ namespace MonitoringSystem.Pages.Performance
             }
         }
 
+        // ✅ CACHE: GetFirstTimeModel — cek cache dulu sebelum query DB
         public TimeSpan GetFirstTimeModel(TimeSpan StartTime, TimeSpan EndTime, string model)
-		{
-			TimeSpan FirstTime = TimeSpan.Zero;
-            try
-			{
-				using (SqlConnection connection = new SqlConnection(connectionString))
-				{
-					connection.Open();
-					string getFirstTime = @"SELECT CAST(MIN(OEESN.SDate) AS Time) FROM OEESN 
-                                            JOIN MasterData ON OEESN.Product_Id = MasterData.Product_Id 
-                                            WHERE MasterData.ProductName = @Model AND CAST(OEESN.SDate AS Time) >= @StartTime 
-                                            AND CAST(OEESN.SDate AS Time) <= @EndTime AND CAST(OEESN.SDate AS DATE) = @CurrentDate";
-
-					using (SqlCommand command = new SqlCommand(getFirstTime, connection))
-					{
-						command.Parameters.AddWithValue("@Model", model);
-						command.Parameters.AddWithValue("@StartTime", StartTime);
-						command.Parameters.AddWithValue("@EndTime", EndTime);
-						command.Parameters.AddWithValue("@CurrentDate", SelectedDate);
-						var Result = command.ExecuteScalar();
-						if (Result != null)
-						{
-							FirstTime = (TimeSpan)Result;
-						}
-						else
-						{
-							FirstTime = TimeSpan.Zero;
-						}
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine("Exception: " + ex.ToString());
-			}
-			return FirstTime;
-		}
-
-		public TimeSpan GetLastTimeModel(TimeSpan StartTime, TimeSpan EndTime, string model)
-		{
-			TimeSpan LastTime = TimeSpan.Zero;
-			try
-			{
-				using (SqlConnection connection = new SqlConnection(connectionString))
-				{
-					connection.Open();
-					string getLastTime = @"SELECT CAST(MAX(OEESN.SDate) AS Time) FROM OEESN 
-                                            JOIN MasterData ON OEESN.Product_Id = MasterData.Product_Id 
-                                            WHERE MasterData.ProductName = @Model AND CAST(OEESN.SDate AS Time) >= @StartTime 
-                                            AND CAST(OEESN.SDate AS Time) <= @EndTime AND CAST(OEESN.SDate AS DATE) = @CurrentDate";
-
-					using (SqlCommand command = new SqlCommand(getLastTime, connection))
-					{
-						command.Parameters.AddWithValue("@Model", model);
-						command.Parameters.AddWithValue("@StartTime", StartTime);
-						command.Parameters.AddWithValue("@EndTime", EndTime);
-						command.Parameters.AddWithValue("@CurrentDate", SelectedDate);
-						var Result = command.ExecuteScalar();
-						if (Result != null)
-						{
-							LastTime = (TimeSpan)Result;
-						}
-						else
-						{
-							LastTime = TimeSpan.Zero;
-						}
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine("Exception: " + ex.ToString());
-			}
-			return LastTime;
-		}
-
-		public int CalculatePlan(
-			TimeSpan startTime,
-			TimeSpan endTime,
-			int SUT,
-			List<RestTime> restTime
-		)
-		{
-			TimeSpan effectiveTime = endTime - startTime;
-			foreach (var rest in restTime)
-			{
-				if (startTime < rest.EndTime && endTime > rest.StartTime)
-				{
-					TimeSpan overlapStart = TimeSpan.FromTicks(Math.Max(startTime.Ticks, rest.StartTime.Ticks));
-					TimeSpan overlapEnd = TimeSpan.FromTicks(Math.Min(endTime.Ticks, rest.EndTime.Ticks));
-					effectiveTime -= (overlapEnd - overlapStart);
-				}
-			}
-			return Convert.ToInt32(effectiveTime.TotalSeconds / SUT);
-		}
-
-		public int CalculateTotalPlanPerSUT(
-			int DailyPlan,
-			List<ProductionAchievement> ProdAchievement,
-			List<RestTime> listRestTime
-		)
-		{
-			int TotalPlanPerSUT = 0;
-			int PlanPerSUT = 0;
-			var PreviousModel = "";
-			var CurrentDate = DateTime.Now.Date;
-			var CurrentWorkingTime = DateTime.Now.TimeOfDay;
-
-			if (ProdAchievement.Count > 0)
-			{
-				for (int i = 0; i < ProdAchievement.Count; i++)
-				{
-					var CurrentModel = ProdAchievement[i].Model;
-					var SUT = ProdAchievement[i].SUT;
-					var StartTime = ProdAchievement[i].StartTime;
-					var EndTime = ProdAchievement[i].EndTime;
-
-					var FirstTime_Model = TimeSpan.Zero;
-					var LastTime_Model = TimeSpan.Zero;
-					var QuantityPlan = 0;
-
-					if (CurrentModel != null)
-					{
-						FirstTime_Model = GetFirstTimeModel(StartTime, EndTime, CurrentModel);
-						LastTime_Model = GetLastTimeModel(StartTime, EndTime, CurrentModel);
-						QuantityPlan = GetModelPlan(CurrentModel);
-					}
-
-					if (SelectedDate == CurrentDate)
-					{
-						if (CurrentWorkingTime >= StartTime && CurrentWorkingTime <= EndTime)
-						{
-							if (CurrentModel == PreviousModel)
-							{
-								PlanPerSUT = CalculatePlan(StartTime, CurrentWorkingTime, SUT, listRestTime);
-							}
-							else
-							{
-								PlanPerSUT = 0;
-								PlanPerSUT = CalculatePlan(FirstTime_Model, EndTime, SUT, listRestTime);
-							}
-						}
-						else
-						{
-							if (CurrentModel == PreviousModel)
-							{
-								PlanPerSUT = CalculatePlan(StartTime, EndTime, SUT, listRestTime);
-							}
-							else
-							{
-								PlanPerSUT = 0;
-								PlanPerSUT = CalculatePlan(FirstTime_Model, EndTime, SUT, listRestTime);
-							}
-						}
-					}
-					else
-					{
-						PlanPerSUT = 0;
-						if (CurrentModel == PreviousModel)
-						{
-							PlanPerSUT = CalculatePlan(StartTime, EndTime, SUT, listRestTime);
-						}
-						else
-						{
-							PlanPerSUT = 0;
-							PlanPerSUT = CalculatePlan(FirstTime_Model, EndTime, SUT, listRestTime);
-						}
-					}
-					PlanPerSUT = Math.Min(PlanPerSUT, QuantityPlan);
-					PreviousModel = CurrentModel;
-					TotalPlanPerSUT += PlanPerSUT;
-					TotalPlanPerSUT = Math.Min(TotalPlanPerSUT, DailyPlan);
-				}
-			}
-			return TotalPlanPerSUT;
-		}
-
-        public int GetModelPlan(string model)
         {
-            int totalQuantityPlan = 0;
+            var cacheKey = $"first_{model}_{StartTime}_{EndTime}_{SelectedDate:yyyyMMdd}";
+            if (_firstTimeCache.TryGetValue(cacheKey, out var cached)) return cached;
 
+            TimeSpan FirstTime = TimeSpan.Zero;
             try
             {
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     connection.Open();
-
-                    // 1️⃣ Ambil PlanId terbaru dari ProductionRecords (Id terbesar)
-                    string getLatestPlanIdQuery = @"
-                SELECT MAX(PlanId)
-                FROM ProductionRecords;";
-
-                    int latestPlanId = 0;
-                    using (SqlCommand cmdLatestPlan = new SqlCommand(getLatestPlanIdQuery, connection))
+                    string getFirstTime = @"SELECT CAST(MIN(OEESN.SDate) AS Time) FROM OEESN 
+                                            JOIN MasterData ON OEESN.Product_Id = MasterData.Product_Id 
+                                            WHERE MasterData.ProductName = @Model AND CAST(OEESN.SDate AS Time) >= @StartTime 
+                                            AND CAST(OEESN.SDate AS Time) <= @EndTime AND CAST(OEESN.SDate AS DATE) = @CurrentDate";
+                    using (SqlCommand command = new SqlCommand(getFirstTime, connection))
                     {
-                        var result = cmdLatestPlan.ExecuteScalar();
-                        latestPlanId = result != null ? Convert.ToInt32(result) : 0;
+                        command.Parameters.AddWithValue("@Model", model);
+                        command.Parameters.AddWithValue("@StartTime", StartTime);
+                        command.Parameters.AddWithValue("@EndTime", EndTime);
+                        command.Parameters.AddWithValue("@CurrentDate", SelectedDate);
+                        var Result = command.ExecuteScalar();
+                        FirstTime = Result != null ? (TimeSpan)Result : TimeSpan.Zero;
                     }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Exception: " + ex.ToString());
+            }
 
-                    // Jika tidak ada PlanId, langsung return 0
-                    if (latestPlanId == 0)
+            _firstTimeCache[cacheKey] = FirstTime;
+            return FirstTime;
+        }
+
+        // ✅ CACHE: GetLastTimeModel — cek cache dulu sebelum query DB
+        public TimeSpan GetLastTimeModel(TimeSpan StartTime, TimeSpan EndTime, string model)
+        {
+            var cacheKey = $"last_{model}_{StartTime}_{EndTime}_{SelectedDate:yyyyMMdd}";
+            if (_lastTimeCache.TryGetValue(cacheKey, out var cached)) return cached;
+
+            TimeSpan LastTime = TimeSpan.Zero;
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    string getLastTime = @"SELECT CAST(MAX(OEESN.SDate) AS Time) FROM OEESN 
+                                            JOIN MasterData ON OEESN.Product_Id = MasterData.Product_Id 
+                                            WHERE MasterData.ProductName = @Model AND CAST(OEESN.SDate AS Time) >= @StartTime 
+                                            AND CAST(OEESN.SDate AS Time) <= @EndTime AND CAST(OEESN.SDate AS DATE) = @CurrentDate";
+                    using (SqlCommand command = new SqlCommand(getLastTime, connection))
                     {
-                        return 0;
+                        command.Parameters.AddWithValue("@Model", model);
+                        command.Parameters.AddWithValue("@StartTime", StartTime);
+                        command.Parameters.AddWithValue("@EndTime", EndTime);
+                        command.Parameters.AddWithValue("@CurrentDate", SelectedDate);
+                        var Result = command.ExecuteScalar();
+                        LastTime = Result != null ? (TimeSpan)Result : TimeSpan.Zero;
                     }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Exception: " + ex.ToString());
+            }
 
-                    // 2️⃣ Hitung total Quantity untuk PlanId tersebut berdasarkan MachineCode
-                    string getTotalQuantityQuery = @"
-                SELECT SUM(Quantity)
-                FROM ProductionRecords
-                WHERE PlanId = @PlanId
-                  AND MachineCode = @MachineCode;";
+            _lastTimeCache[cacheKey] = LastTime;
+            return LastTime;
+        }
 
-                    using (SqlCommand cmdTotal = new SqlCommand(getTotalQuantityQuery, connection))
+        public int CalculatePlan(TimeSpan startTime, TimeSpan endTime, int SUT, List<RestTime> restTime)
+        {
+            TimeSpan effectiveTime = endTime - startTime;
+            foreach (var rest in restTime)
+            {
+                if (startTime < rest.EndTime && endTime > rest.StartTime)
+                {
+                    TimeSpan overlapStart = TimeSpan.FromTicks(Math.Max(startTime.Ticks, rest.StartTime.Ticks));
+                    TimeSpan overlapEnd = TimeSpan.FromTicks(Math.Min(endTime.Ticks, rest.EndTime.Ticks));
+                    effectiveTime -= (overlapEnd - overlapStart);
+                }
+            }
+            return Convert.ToInt32(effectiveTime.TotalSeconds / SUT);
+        }
+
+        public int CalculateTotalPlanPerSUT(int DailyPlan, List<ProductionAchievement> ProdAchievement, List<RestTime> listRestTime)
+        {
+            int TotalPlanPerSUT = 0;
+            int PlanPerSUT = 0;
+            var PreviousModel = "";
+            var CurrentDate = DateTime.Now.Date;
+            var CurrentWorkingTime = DateTime.Now.TimeOfDay;
+
+            foreach (var item in ProdAchievement)
+            {
+                var CurrentModel = item.Model;
+                var SUT = item.SUT;
+                var StartTime = item.StartTime;
+                var EndTime = item.EndTime;
+                var FirstTime_Model = TimeSpan.Zero;
+                var LastTime_Model = TimeSpan.Zero;
+                var QuantityPlan = 0;
+
+                if (CurrentModel != null)
+                {
+                    FirstTime_Model = GetFirstTimeModel(StartTime, EndTime, CurrentModel);
+                    LastTime_Model = GetLastTimeModel(StartTime, EndTime, CurrentModel);
+                    QuantityPlan = GetModelPlan(CurrentModel);
+                }
+
+                if (SelectedDate == CurrentDate)
+                {
+                    if (CurrentWorkingTime >= StartTime && CurrentWorkingTime <= EndTime)
+                        PlanPerSUT = CurrentModel == PreviousModel
+                            ? CalculatePlan(StartTime, CurrentWorkingTime, SUT, listRestTime)
+                            : CalculatePlan(FirstTime_Model, EndTime, SUT, listRestTime);
+                    else
+                        PlanPerSUT = CurrentModel == PreviousModel
+                            ? CalculatePlan(StartTime, EndTime, SUT, listRestTime)
+                            : CalculatePlan(FirstTime_Model, EndTime, SUT, listRestTime);
+                }
+                else
+                {
+                    PlanPerSUT = CurrentModel == PreviousModel
+                        ? CalculatePlan(StartTime, EndTime, SUT, listRestTime)
+                        : CalculatePlan(FirstTime_Model, EndTime, SUT, listRestTime);
+                }
+
+                PlanPerSUT = Math.Min(PlanPerSUT, QuantityPlan);
+                PreviousModel = CurrentModel;
+                TotalPlanPerSUT = Math.Min(TotalPlanPerSUT + PlanPerSUT, DailyPlan);
+            }
+
+            return TotalPlanPerSUT;
+        }
+
+        // ✅ CACHE: GetModelPlan — cek cache dulu sebelum query DB
+        public int GetModelPlan(string model)
+        {
+            var cacheKey = $"modelplan_{model}_{MachineCode}_{SelectedDate:yyyyMMdd}";
+            if (_modelPlanCache.TryGetValue(cacheKey, out var cached)) return cached;
+
+            int totalQuantityPlan = 0;
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    string query = @"
+                SELECT SUM(pr.Quantity)
+                FROM ProductionRecords pr
+                JOIN ProductionPlan pp ON pr.PlanId = pp.Id
+                WHERE CAST(pp.CurrentDate AS DATE) = @SelectedDate
+                  AND pr.MachineCode = @MachineCode;";
+
+                    using (SqlCommand cmd = new SqlCommand(query, connection))
                     {
-                        cmdTotal.Parameters.AddWithValue("@PlanId", latestPlanId);
-                        cmdTotal.Parameters.AddWithValue("@MachineCode", MachineCode);
-
-                        var totalResult = cmdTotal.ExecuteScalar();
-                        totalQuantityPlan = totalResult != DBNull.Value ? Convert.ToInt32(totalResult) : 0;
+                        cmd.Parameters.AddWithValue("@SelectedDate", SelectedDate.Date);
+                        cmd.Parameters.AddWithValue("@MachineCode", MachineCode);
+                        var result = cmd.ExecuteScalar();
+                        totalQuantityPlan = (result != null && result != DBNull.Value)
+                            ? Convert.ToInt32(result) : 0;
                     }
                 }
             }
@@ -903,6 +873,7 @@ namespace MonitoringSystem.Pages.Performance
                 Console.WriteLine("Error in GetModelPlan: " + ex.Message);
             }
 
+            _modelPlanCache[cacheKey] = totalQuantityPlan;
             return totalQuantityPlan;
         }
 
@@ -917,8 +888,7 @@ namespace MonitoringSystem.Pages.Performance
                     string query = @"
                 SELECT COUNT(*) 
                 FROM NG_RPTS 
-                WHERE CAST(SDate AS DATE) = @SelectedDate
-                AND MachineCode = @MachineCode;";
+                WHERE CAST(SDate AS DATE) = @SelectedDate AND MachineCode = @MachineCode;";
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@SelectedDate", SelectedDate);
@@ -940,7 +910,7 @@ namespace MonitoringSystem.Pages.Performance
         {
             int totalMinutes = 0;
             TimeSpan shiftStart = new TimeSpan(7, 05, 0);
-            TimeSpan shiftEnd = new TimeSpan(23, 15, 0); // kamu bisa ubah sesuai shift
+            TimeSpan shiftEnd = new TimeSpan(23, 15, 0);
 
             try
             {
@@ -948,7 +918,6 @@ namespace MonitoringSystem.Pages.Performance
                 {
                     connection.Open();
 
-                    // Ambil semua waktu istirahat
                     var listRestTime = new List<(TimeSpan StartTime, TimeSpan EndTime)>();
                     string restQuery = "SELECT StartTime, EndTime FROM RestTime WHERE DayType = @DayType;";
                     using (SqlCommand cmd = new SqlCommand(restQuery, connection))
@@ -957,13 +926,10 @@ namespace MonitoringSystem.Pages.Performance
                         using (SqlDataReader reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
-                            {
                                 listRestTime.Add((reader.GetTimeSpan(0), reader.GetTimeSpan(1)));
-                            }
                         }
                     }
 
-                    // Hitung working time total (durasi shift - total break)
                     double totalShiftMinutes = (shiftEnd - shiftStart).TotalMinutes;
                     double totalRestMinutes = 0;
                     foreach (var rest in listRestTime)
@@ -974,7 +940,6 @@ namespace MonitoringSystem.Pages.Performance
                             totalRestMinutes += (overlapEnd - overlapStart).TotalMinutes;
                     }
 
-                    // Jika hari ini, hitung sampai jam sekarang
                     if (SelectedDate.Date == DateTime.Today)
                     {
                         TimeSpan now = DateTime.Now.TimeOfDay;
@@ -986,9 +951,9 @@ namespace MonitoringSystem.Pages.Performance
                                 .Where(r => r.StartTime < effectiveEnd)
                                 .Sum(r =>
                                 {
-                                    var overlapStart = new TimeSpan(Math.Max(shiftStart.Ticks, r.StartTime.Ticks));
-                                    var overlapEnd = new TimeSpan(Math.Min(effectiveEnd.Ticks, r.EndTime.Ticks));
-                                    return overlapEnd > overlapStart ? (overlapEnd - overlapStart).TotalMinutes : 0;
+                                    var oStart = new TimeSpan(Math.Max(shiftStart.Ticks, r.StartTime.Ticks));
+                                    var oEnd = new TimeSpan(Math.Min(effectiveEnd.Ticks, r.EndTime.Ticks));
+                                    return oEnd > oStart ? (oEnd - oStart).TotalMinutes : 0;
                                 });
                             totalMinutes = (int)Math.Max(0, elapsed - restElapsed);
                         }
@@ -1010,8 +975,6 @@ namespace MonitoringSystem.Pages.Performance
         public int GetLossTimeBySummaryLogic()
         {
             int totalLossMinutes = 0;
-            TimeSpan shiftStart = new TimeSpan(7, 0, 0);
-            TimeSpan shiftEnd = new TimeSpan(23, 15, 0);
 
             try
             {
@@ -1019,11 +982,44 @@ namespace MonitoringSystem.Pages.Performance
                 {
                     connection.Open();
 
-                    string lossQuery = @"
-                SELECT Time, EndDateTime 
-                FROM AssemblyLossTime
-                WHERE CAST(Date AS DATE) = @SelectedDate
-                AND MachineCode = @MachineCode;";
+                    // Cek dulu apakah ada data di LossTimeActuals untuk hari ini
+                    string checkSql = @"SELECT COUNT(1) FROM LossTimeActuals 
+                                WHERE Month = @Month AND Year = @Year AND MachineLine = @MachineCode";
+                    bool hasActuals = false;
+                    using (SqlCommand cmd = new SqlCommand(checkSql, connection))
+                    {
+                        cmd.Parameters.AddWithValue("@Month", SelectedDate.Month);
+                        cmd.Parameters.AddWithValue("@Year", SelectedDate.Year);
+                        cmd.Parameters.AddWithValue("@MachineCode", MachineCode);
+                        hasActuals = (int)cmd.ExecuteScalar() > 0;
+                    }
+
+                    if (hasActuals)
+                    {
+                        // Pakai LossTimeActuals
+                        string actualsSql = @"SELECT SUM(Minutes) FROM LossTimeActuals
+                                      WHERE Month = @Month AND Year = @Year 
+                                      AND Day = @Day AND MachineLine = @MachineCode AND Minutes > 0";
+                        using (SqlCommand cmd = new SqlCommand(actualsSql, connection))
+                        {
+                            cmd.Parameters.AddWithValue("@Month", SelectedDate.Month);
+                            cmd.Parameters.AddWithValue("@Year", SelectedDate.Year);
+                            cmd.Parameters.AddWithValue("@Day", SelectedDate.Day);
+                            cmd.Parameters.AddWithValue("@MachineCode", MachineCode);
+                            var result = cmd.ExecuteScalar();
+                            if (result != null && result != DBNull.Value)
+                                totalLossMinutes = (int)Convert.ToDouble(result);
+                        }
+                        return totalLossMinutes;
+                    }
+
+                    // Fallback: pakai AssemblyLossTime (kode lama)
+                    TimeSpan shiftStart = new TimeSpan(7, 0, 0);
+                    TimeSpan shiftEnd = new TimeSpan(23, 15, 0);
+
+                    string lossQuery = @"SELECT Time, EndDateTime 
+                                 FROM AssemblyLossTime
+                                 WHERE CAST(Date AS DATE) = @SelectedDate AND MachineCode = @MachineCode;";
 
                     var lossList = new List<(TimeSpan Start, TimeSpan End)>();
                     using (SqlCommand cmd = new SqlCommand(lossQuery, connection))
@@ -1036,13 +1032,12 @@ namespace MonitoringSystem.Pages.Performance
                             {
                                 var start = reader.GetTimeSpan(0);
                                 var end = reader.GetTimeSpan(1);
-                                if (end < start) end = end.Add(TimeSpan.FromDays(1)); // handle overnight
+                                if (end < start) end = end.Add(TimeSpan.FromDays(1));
                                 lossList.Add((start, end));
                             }
                         }
                     }
 
-                    // Ambil jadwal break
                     var breaks = new List<(TimeSpan Start, TimeSpan End)>();
                     string restQuery = "SELECT StartTime, EndTime FROM RestTime WHERE DayType = @DayType;";
                     using (SqlCommand cmd = new SqlCommand(restQuery, connection))
@@ -1055,7 +1050,6 @@ namespace MonitoringSystem.Pages.Performance
                         }
                     }
 
-                    // Filter loss yang tidak overlap dengan break
                     var validLoss = lossList
                         .Where(l => l.Start >= shiftStart && l.End <= shiftEnd &&
                                     !breaks.Any(b => l.Start < b.End && l.End > b.Start))
@@ -1072,282 +1066,224 @@ namespace MonitoringSystem.Pages.Performance
             return totalLossMinutes;
         }
 
-
-        //      public int GetTotalDefect()
-        //{
-        //	int TotalDefect = 0;
-        //	try
-        //	{
-        //		using (SqlConnection connection = new SqlConnection(connectionString))
-        //		{
-        //			connection.Open();
-        //			string getTotalDefect = @"SELECT COUNT(*) AS TotalDefect FROM NG_RPTS WHERE CAST(SDate AS DATE) = @SelectedDate AND MachineCode = @MachineCode";
-        //			using (SqlCommand command = new SqlCommand(getTotalDefect, connection))
-        //			{
-        //				command.Parameters.AddWithValue("@SelectedDate", SelectedDate);
-        //				command.Parameters.AddWithValue("@MachineCode", MachineCode);
-        //				var Result = command.ExecuteScalar();
-        //				if (Result != null)
-        //				{
-        //					TotalDefect = (int)Result;
-        //				}
-        //				else
-        //				{
-        //					TotalDefect = 0;
-        //				}
-        //			}
-        //		}
-        //	}
-        //	catch (Exception ex)
-        //	{
-        //		Console.WriteLine("Exception: " + ex.ToString());
-        //	}
-        //	return TotalDefect;
-        //}
-
         public int GetCurrentSUT()
-		{
-			int SUT = 0;
-			try
-			{
-				using (SqlConnection connection = new SqlConnection(connectionString))
-				{
-					connection.Open();
-					string getTotalDefect = @"SELECT TOP 1 MasterData.SUT FROM OEESN 
-										      JOIN MasterData ON OEESN.Product_Id = MasterData.Product_Id 
-											  WHERE CAST(OEESN.SDate AS DATE) = @SelectedDate AND OEESN.MachineCode = @MachineCode
-											  ORDER BY SDate DESC;";
-					using (SqlCommand command = new SqlCommand(getTotalDefect, connection))
-					{
-						command.Parameters.AddWithValue("@SelectedDate", SelectedDate);
-						command.Parameters.AddWithValue("@MachineCode", MachineCode);
-						var Result = command.ExecuteScalar();
-						if (Result != null)
-						{
-							SUT = (int)Result;
-						}
-						else
-						{
-							SUT = 0;
-						};
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine("Exception: " + ex.ToString());
-			}
-			return SUT;
-		}
+        {
+            int SUT = 0;
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    string getTotalDefect = @"SELECT TOP 1 MasterData.SUT FROM OEESN 
+                                              JOIN MasterData ON OEESN.Product_Id = MasterData.Product_Id 
+                                              WHERE CAST(OEESN.SDate AS DATE) = @SelectedDate AND OEESN.MachineCode = @MachineCode
+                                              ORDER BY SDate DESC;";
+                    using (SqlCommand command = new SqlCommand(getTotalDefect, connection))
+                    {
+                        command.Parameters.AddWithValue("@SelectedDate", SelectedDate);
+                        command.Parameters.AddWithValue("@MachineCode", MachineCode);
+                        var Result = command.ExecuteScalar();
+                        SUT = Result != null ? (int)Result : 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Exception: " + ex.ToString());
+            }
+            return SUT;
+        }
 
-		public List<RestTime> GetRestTime(string dayTipe)
-		{
-			List<RestTime> listRestTime = new List<RestTime>();
-			try
-			{
-				using (SqlConnection connection = new SqlConnection(connectionString))
-				{
-					connection.Open();
-					string getRestTime = @"SELECT Duration, StartTime, EndTime FROM RestTime WHERE DayType = @DayTipe";
-					using (SqlCommand command = new SqlCommand(getRestTime, connection))
-					{
-						command.Parameters.AddWithValue("@DayTipe", dayTipe);
-						using (SqlDataReader dataReader = command.ExecuteReader())
-						{
-							while (dataReader.Read())
-							{
-								if (!dataReader.IsDBNull(0))
-								{
-									RestTime restTime = new RestTime();
-									restTime.Duration = dataReader.GetInt32(0);
-									restTime.StartTime = dataReader.GetTimeSpan(1);
-									restTime.EndTime = dataReader.GetTimeSpan(2);
-									listRestTime.Add(restTime);
-								}
-							}
-						}
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine("Exception: " + ex.ToString());
-			}
-			return listRestTime;
-		}
+        public List<RestTime> GetRestTime(string dayTipe)
+        {
+            // ✅ CACHE: Cek cache dulu — hindari query DB berulang per request
+            if (_restTimeCache.TryGetValue(dayTipe, out var cachedList)) return cachedList;
 
-		public string DetermineTypeOfDay(DayOfWeek day)
-		{
-			return day switch
-			{
-				DayOfWeek.Monday or DayOfWeek.Tuesday or DayOfWeek.Wednesday or DayOfWeek.Thursday => "REGULAR",
-				DayOfWeek.Friday => "FRIDAY",
-				DayOfWeek.Saturday or DayOfWeek.Sunday => "WEEKEND",
-				_ => throw new NotImplementedException()
-			};
-		}
+            List<RestTime> listRestTime = new List<RestTime>();
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    string getRestTime = @"SELECT Duration, StartTime, EndTime FROM RestTime WHERE DayType = @DayTipe";
+                    using (SqlCommand command = new SqlCommand(getRestTime, connection))
+                    {
+                        command.Parameters.AddWithValue("@DayTipe", dayTipe);
+                        using (SqlDataReader dataReader = command.ExecuteReader())
+                        {
+                            while (dataReader.Read())
+                            {
+                                if (!dataReader.IsDBNull(0))
+                                {
+                                    listRestTime.Add(new RestTime
+                                    {
+                                        Duration = dataReader.GetInt32(0),
+                                        StartTime = dataReader.GetTimeSpan(1),
+                                        EndTime = dataReader.GetTimeSpan(2)
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Exception: " + ex.ToString());
+            }
 
-		public void GetAssemblyTime()
-		{
-			try
-			{
-				using (SqlConnection connection = new SqlConnection(connectionString))
-				{
-					connection.Open();
-					string getAssemblyProductionTime = @"SELECT MasterData.ProductName As Model, OEESN.MachineCode As MachineCode, 
+            _restTimeCache[dayTipe] = listRestTime;
+            return listRestTime;
+        }
+
+        public string DetermineTypeOfDay(DayOfWeek day)
+        {
+            return day switch
+            {
+                DayOfWeek.Monday or DayOfWeek.Tuesday or DayOfWeek.Wednesday or DayOfWeek.Thursday => "REGULAR",
+                DayOfWeek.Friday => "FRIDAY",
+                DayOfWeek.Saturday or DayOfWeek.Sunday => "WEEKEND",
+                _ => throw new NotImplementedException()
+            };
+        }
+
+        public void GetAssemblyTime()
+        {
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    string getAssemblyProductionTime = @"SELECT MasterData.ProductName As Model, OEESN.MachineCode As MachineCode, 
                                                                 MasterData.SUT As SUT, CAST(OEESN.SDate AS Time) As ProductionTime
                                                         FROM OEESN JOIN Masterdata ON OEESN.Product_Id = MasterData.Product_Id
                                                         WHERE CAST(OEESN.SDate AS DATE) = @Date AND OEESN.MachineCode = @MachineCode
                                                         ORDER BY CAST(OEESN.SDate AS TIME) ASC";
-					using (SqlCommand command = new SqlCommand(getAssemblyProductionTime, connection))
-					{
-						command.Parameters.AddWithValue("@Date", SelectedDate);
-						command.Parameters.AddWithValue("@MachineCode", MachineCode);
-						using (SqlDataReader reader = command.ExecuteReader())
-						{
-							while (reader.Read())
-							{
-								AssemblyTime assemblyTime = new AssemblyTime();
-								assemblyTime.Model = reader.GetString(0);
-								assemblyTime.MachineCode = reader.GetString(1);
-								assemblyTime.SUT = reader.GetInt32(2);
-								assemblyTime.ProductionTime = reader.GetTimeSpan(3);
-								assemblyTimes.Add(assemblyTime);
-							}
-						}
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine(ex.ToString());
-			}
-		}
+                    using (SqlCommand command = new SqlCommand(getAssemblyProductionTime, connection))
+                    {
+                        command.Parameters.AddWithValue("@Date", SelectedDate);
+                        command.Parameters.AddWithValue("@MachineCode", MachineCode);
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                assemblyTimes.Add(new AssemblyTime
+                                {
+                                    Model = reader.GetString(0),
+                                    MachineCode = reader.GetString(1),
+                                    SUT = reader.GetInt32(2),
+                                    ProductionTime = reader.GetTimeSpan(3)
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+        }
 
-		public int CalculateTotalLossTime(List<AssemblyTime> assemblyTimes, List<RestTime> restTimes)
-		{
-			int totalLossTime = 0;
-			var sortedAssemblyTimes = assemblyTimes.OrderBy(p => p.ProductionTime).ToList();
+        public int CalculateTotalLossTime(List<AssemblyTime> assemblyTimes, List<RestTime> restTimes)
+        {
+            int totalLossTime = 0;
+            var sortedAssemblyTimes = assemblyTimes.OrderBy(p => p.ProductionTime).ToList();
 
-			for (int i = 0; i < sortedAssemblyTimes.Count; i++)
-			{
-				var current = sortedAssemblyTimes[i];
-				var expectedEndTime = current.ProductionTime.Add(TimeSpan.FromSeconds(current.SUT * 3));
-				var actualEndTime = i < sortedAssemblyTimes.Count - 1 ? sortedAssemblyTimes[i + 1].ProductionTime : expectedEndTime;
+            for (int i = 0; i < sortedAssemblyTimes.Count; i++)
+            {
+                var current = sortedAssemblyTimes[i];
+                var expectedEndTime = current.ProductionTime.Add(TimeSpan.FromSeconds(current.SUT * 3));
+                var actualEndTime = i < sortedAssemblyTimes.Count - 1 ? sortedAssemblyTimes[i + 1].ProductionTime : expectedEndTime;
 
-				foreach (var rest in restTimes)
-				{
-					if (current.ProductionTime < rest.EndTime && actualEndTime > rest.StartTime)
-					{
-						if (current.ProductionTime >= rest.StartTime && current.ProductionTime < rest.EndTime)
-						{
-							current.ProductionTime = rest.EndTime;
-							expectedEndTime = current.ProductionTime.Add(TimeSpan.FromSeconds(current.SUT * 3));
-						}
+                foreach (var rest in restTimes)
+                {
+                    if (current.ProductionTime < rest.EndTime && actualEndTime > rest.StartTime)
+                    {
+                        if (current.ProductionTime >= rest.StartTime && current.ProductionTime < rest.EndTime)
+                        {
+                            current.ProductionTime = rest.EndTime;
+                            expectedEndTime = current.ProductionTime.Add(TimeSpan.FromSeconds(current.SUT * 3));
+                        }
+                        if (actualEndTime > rest.EndTime && current.ProductionTime <= rest.StartTime)
+                            actualEndTime = rest.StartTime;
+                        if (actualEndTime > rest.StartTime && actualEndTime <= rest.EndTime)
+                            actualEndTime = rest.StartTime;
+                    }
+                }
 
-						if (actualEndTime > rest.EndTime && current.ProductionTime <= rest.StartTime)
-						{
-							actualEndTime = rest.StartTime;
-						}
+                if (expectedEndTime < actualEndTime)
+                    totalLossTime += Math.Max(0, (int)(actualEndTime - current.ProductionTime).TotalSeconds);
+            }
+            return totalLossTime;
+        }
 
-						if (actualEndTime > rest.StartTime && actualEndTime <= rest.EndTime)
-						{
-							actualEndTime = rest.StartTime;
-						}
-					}
-				}
-				int lossTime = 0;
-				if (expectedEndTime < actualEndTime)
-				{
-					lossTime = Math.Max(0, (int)(actualEndTime - current.ProductionTime).TotalSeconds);
-					Console.WriteLine(lossTime.ToString());
-				}
+        public int GetManPower()
+        {
+            int NoOfOperator = 0;
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    string getManPower = @"SELECT DISTINCT TOP 1 NoOfOperator FROM OEESN WHERE CAST(SDate AS DATE) = @SelectedDate AND MachineCode = @MachineCode;";
+                    using (SqlCommand command = new SqlCommand(getManPower, connection))
+                    {
+                        command.Parameters.AddWithValue("@SelectedDate", SelectedDate);
+                        command.Parameters.AddWithValue("@MachineCode", MachineCode);
+                        var Result = command.ExecuteScalar();
+                        NoOfOperator = Result != null ? (int)Result : 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            return NoOfOperator;
+        }
 
-				totalLossTime += lossTime;
-			}
-			return totalLossTime;
-		}
+        public TimeSpan GetLastWorkingTime(string MachineCode)
+        {
+            // ✅ CACHE: Cek cache dulu
+            if (_lastWorkingTimeCache.TryGetValue(MachineCode, out var cachedTime)) return cachedTime;
 
-		public int GetManPower()
-		{
-			int NoOfOperator = 0;
-			try
-			{
-				using (SqlConnection connection = new SqlConnection(connectionString))
-				{
-					connection.Open();
-					string getManPower = @"SELECT DISTINCT TOP 1 NoOfOperator FROM OEESN WHERE CAST(SDate AS DATE) = @SelectedDate AND MachineCode = @MachineCode;";
-					using (SqlCommand command = new SqlCommand(getManPower, connection))
-					{
-						command.Parameters.AddWithValue("@SelectedDate", SelectedDate);
-						command.Parameters.AddWithValue("@MachineCode", MachineCode);
-						var Result = command.ExecuteScalar();
-						if (Result != null)
-						{
-							NoOfOperator = (int)Result;
-						}
-						else
-						{
-							NoOfOperator = 0;
-						}
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine(ex.Message);
-			}
-			return NoOfOperator;
-		}
+            TimeSpan lastWorkingTime = TimeSpan.Zero;
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    string getLastWorkingTime = @"SELECT MAX(CAST(SDate AS Time)) FROM OEESN 
+                                                  WHERE CAST(SDate AS Date) = @SelectedDate AND MachineCode = @MachineCode";
+                    using (SqlCommand command = new SqlCommand(getLastWorkingTime, connection))
+                    {
+                        command.Parameters.AddWithValue("@SelectedDate", SelectedDate);
+                        command.Parameters.AddWithValue("@MachineCode", MachineCode);
+                        var Result = command.ExecuteScalar();
+                        lastWorkingTime = Result != null ? (TimeSpan)Result : TimeSpan.Zero;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
 
-		public TimeSpan GetLastWorkingTime(string MachineCode)
-		{
-			TimeSpan lastWorkingTime = TimeSpan.Zero;
-			try
-			{
-				using (SqlConnection connection = new SqlConnection(connectionString))
-				{
-					connection.Open();
-					string getLastWorkingTime = @"SELECT MAX(CAST(SDate AS Time)) FROM OEESN 
-                                                  WHERE CAST (SDate AS Date) = @SelectedDate AND MachineCode = @MachineCode";
-					using (SqlCommand command = new SqlCommand(getLastWorkingTime, connection))
-					{
-						command.Parameters.AddWithValue("@SelectedDate", SelectedDate);
-						command.Parameters.AddWithValue("@MachineCode", MachineCode);
-						var Result = command.ExecuteScalar();
-						if (Result != null)
-						{
-							lastWorkingTime = (TimeSpan)Result;
-						}
-						else
-						{
-							lastWorkingTime = TimeSpan.Zero;
-						}
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine(ex.Message);
-			}
-			return lastWorkingTime;
-		}
+            _lastWorkingTimeCache[MachineCode] = lastWorkingTime;
+            return lastWorkingTime;
+        }
 
         public List<ActualData> GetActualPerHour()
         {
-            List<ActualData> actualData = new List<ActualData>();
+            // ✅ CACHE: Cek cache dulu — method ini dipanggil 2x (view + OnGetUpdatedData)
+            if (_cachedActualPerHour != null) return _cachedActualPerHour;
 
-            // Selalu mulai dengan titik awal jam 07:00 (Efficiency 0)
-            actualData.Add(new ActualData
-            {
-                StartTime = "07:00",
-                EndTime = "07:00",
-                Actual = 0
-            });
+            List<ActualData> actualData = new List<ActualData>();
+            actualData.Add(new ActualData { StartTime = "07:00", EndTime = "07:00", Actual = 0 });
 
             try
             {
-                // 1. Ambil data aktual dari database dan masukkan ke Dictionary untuk akses cepat
                 var dbActuals = new Dictionary<string, int>();
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
@@ -1375,28 +1311,13 @@ namespace MonitoringSystem.Pages.Performance
                     }
                 }
 
-                // 2. Tentukan rentang jam yang akan ditampilkan
                 DateTime now = DateTime.Now;
                 int startHour = 7;
-                int endHour;
+                int endHour = SelectedDate.Date == now.Date ? now.Hour + 1 : 24;
 
-                if (SelectedDate.Date == now.Date)
-                {
-                    // Jika hari ini, tampilkan sampai jam sekarang (Logic Reset: jika < 07:00 maka list akan kosong/hanya 07:00)
-                    endHour = now.Hour;
-                    if (now.Minute >= 0) endHour++; // Tampilkan slot jam yang sedang berjalan
-                }
-                else
-                {
-                    // Jika melihat tanggal lampau, tampilkan sampai akhir shift (misal jam 23:00)
-                    endHour = 24;
-                }
-
-                // 3. Generate label jam secara berurutan
                 for (int h = startHour + 1; h <= endHour; h++)
                 {
-                    if (h > 23 && SelectedDate.Date != now.Date) break; // Batasi jam dalam satu hari
-
+                    if (h > 23 && SelectedDate.Date != now.Date) break;
                     int displayHour = h % 24;
                     string label = $"{displayHour:D2}:00";
 
@@ -1413,45 +1334,47 @@ namespace MonitoringSystem.Pages.Performance
                 Console.WriteLine("Error in GetActualPerHour: " + ex.Message);
             }
 
+            _cachedActualPerHour = actualData;
             return actualData;
         }
 
-
         public class ProductionAchievement
-		{
-			public DateTime FirstTime { get; set; }
-			public TimeSpan StartTime { get; set; }
-			public TimeSpan EndTime { get; set; }
-			public string? Time { get; set; }
-			public string? Model { get; set; }
-			public int Plan { get; set; }
-			public int SUT { get; set; }
-			public int Actual { get; set; }
-		}
+        {
+            public string MachineCode { get; set; }
+            public DateTime FirstTime { get; set; }
+            public TimeSpan StartTime { get; set; }
+            public TimeSpan EndTime { get; set; }
+            public string? Time { get; set; }
+            public string? Model { get; set; }
+            public int Plan { get; set; }
+            public int SUT { get; set; }
+            public int Actual { get; set; }
+        }
 
-		public class RestTime
-		{
-			public int Duration { get; set; }
-			public TimeSpan StartTime { get; set; }
-			public TimeSpan EndTime { get; set; }
-		}
+        public class RestTime
+        {
+            public int Duration { get; set; }
+            public TimeSpan StartTime { get; set; }
+            public TimeSpan EndTime { get; set; }
+        }
 
-		public class AssemblyTime
-		{
-			public string? Model { get; set; }
-			public string? MachineCode { get; set; }
-			public int SUT { get; set; }
-			public TimeSpan ProductionTime { get; set; }
-		}
+        public class AssemblyTime
+        {
+            public string? Model { get; set; }
+            public string? MachineCode { get; set; }
+            public int SUT { get; set; }
+            public TimeSpan ProductionTime { get; set; }
+        }
 
-		public class ActualData
-		{
-			public string StartTime { get; set; }
-			public string EndTime { get; set; }
-			public int Actual { get; set; }
-		}
-	}
+        public class ActualData
+        {
+            public string StartTime { get; set; }
+            public string EndTime { get; set; }
+            public int Actual { get; set; }
+        }
+    }
 }
+
 public class PlanQty
 {
     public int Quantity { get; set; }

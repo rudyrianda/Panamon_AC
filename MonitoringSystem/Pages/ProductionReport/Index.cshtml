@@ -8,535 +8,535 @@
 }
 
 <style>
-/* FILTER AREA WITH LINES - SUPER COMPACT */
-.filter-area-with-lines {
-    position: relative;
-    padding: 1px 0;
-    margin-bottom: 8px;
-    margin-top: -20px;
-    min-height: 10px;
-     width: calc(100% - 14px);
-    margin-left: 7px;
-    margin-right: 7px;
+    /* FILTER AREA WITH LINES - SUPER COMPACT */
+    .filter-area-with-lines {
+        position: relative;
+        padding: 1px 0;
+        margin-bottom: 8px;
+        margin-top: -20px;
+        min-height: 10px;
+         width: calc(100% - 14px);
+        margin-left: 7px;
+        margin-right: 7px;
 
-}
-.panamon-bottom-line,
-.panamon-bottomm-line {
-    position: absolute !important;
-    left: 7px !important;
-    right: 7px !important;
-    width: width: calc(100% - 14px) !important; 
-    height: 2px !important;
-    background: rgba(255, 255, 255, 0.04) !important;
-    z-index: 999 !important;
-    pointer-events: none !important;
-    display: block !important;
-}
+    }
+    .panamon-bottom-line,
+    .panamon-bottomm-line {
+        position: absolute !important;
+        left: 7px !important;
+        right: 7px !important;
+        width: width: calc(100% - 14px) !important;
+        height: 2px !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        z-index: 999 !important;
+        pointer-events: none !important;
+        display: block !important;
+    }
 
-.panamon-bottom-line {
-    top: 0 !important;
-    border-top: 2px solid rgba(255, 255, 255, 0.08) !important;
-}
+    .panamon-bottom-line {
+        top: 0 !important;
+        border-top: 2px solid rgba(255, 255, 255, 0.08) !important;
+    }
 
-.panamon-bottomm-line {
-    bottom: 0 !important;
-    border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important;
-}
+    .panamon-bottomm-line {
+        bottom: 0 !important;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important;
+    }
 
-/* FILTER CONTENT - SUPER COMPACT */
-.filter-content {
-    position: relative;
-    z-index: 2;
-    padding: 6px 0;
-    border-radius: 15px;
-    margin-left: 7px;
-    margin-right: 7px;
+    /* FILTER CONTENT - SUPER COMPACT */
+    .filter-content {
+        position: relative;
+        z-index: 2;
+        padding: 6px 0;
+        border-radius: 15px;
+        margin-left: 7px;
+        margin-right: 7px;
 
-}
-.filter-content .form-select-sm.selected {
-    font-weight: 700 !important;
-}
+    }
+    .filter-content .form-select-sm.selected {
+        font-weight: 700 !important;
+    }
 
-.filter-content .form-select-sm {
-    height: 28px;
-    padding: 0 22px 0 8px;
-    font-size: 12px;
-    line-height: 20px;
-    border-radius: 999px;
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 2px solid rgba(255, 255, 255, 0.5);
-    color: #ffffff;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 0.5rem center;
-    background-size: 12px 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding-top: 0;
-    padding-bottom: 0;
-    text-align: center;
-    padding-left: 8px;
-    padding-right: 22px;
-}
-.filter-content .form-select-sm option {
-    background-color: rgba(50, 60, 80, 0.95);
-    color: #ffffff;
-    font-size: 12px;
-    padding: 8px;
-}
+    .filter-content .form-select-sm {
+        height: 28px;
+        padding: 0 22px 0 8px;
+        font-size: 12px;
+        line-height: 20px;
+        border-radius: 999px;
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        color: #ffffff;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 0.5rem center;
+        background-size: 12px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-top: 0;
+        padding-bottom: 0;
+        text-align: center;
+        padding-left: 8px;
+        padding-right: 22px;
+    }
+    .filter-content .form-select-sm option {
+        background-color: rgba(50, 60, 80, 0.95);
+        color: #ffffff;
+        font-size: 12px;
+        padding: 8px;
+    }
 
-.filter-content .form-select-sm option:hover {
-    background-color: rgba(70, 85, 110, 0.95);
-}
+    .filter-content .form-select-sm option:hover {
+        background-color: rgba(70, 85, 110, 0.95);
+    }
 
-.filter-content .form-select:focus {
-    background-color: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.3);
-    color: #ffffff;
-    box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.1);
-}
-.filter-content label {
-    color: rgba(255, 255, 255, 0.85);
-}
+    .filter-content .form-select:focus {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.3);
+        color: #ffffff;
+        box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.1);
+    }
+    .filter-content label {
+        color: rgba(255, 255, 255, 0.85);
+    }
 
-.filter-content .form-check-input {
-    background-color: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.4);
-    border-radius: 8px;
-}
+    .filter-content .form-check-input {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.4);
+        border-radius: 8px;
+    }
 
-.filter-content .form-check-input:checked {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
-}
+    .filter-content .form-check-input:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
 
-.filter-content .btn-primary {
-    background-color: rgba(8, 65, 150, 0.95);
-    border: 2px solid rgba(100, 181, 246, 1);
-    color: rgba(100, 181, 246, 1);
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+    .filter-content .btn-primary {
+        background-color: rgba(8, 65, 150, 0.95);
+        border: 2px solid rgba(100, 181, 246, 1);
+        color: rgba(100, 181, 246, 1);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 
-.filter-content .btn-primary:hover {
-    background-color: rgba(5, 45, 110, 1);
-    border-color: rgba(144, 202, 249, 1);
-    color: rgba(144, 202, 249, 1);
-}
+    .filter-content .btn-primary:hover {
+        background-color: rgba(5, 45, 110, 1);
+        border-color: rgba(144, 202, 249, 1);
+        color: rgba(144, 202, 249, 1);
+    }
 
-.filter-content .btn-danger {
-    background-color: rgba(140, 30, 40, 0.95);
-    border: 2px solid rgba(239, 154, 154, 1);
-    color: rgba(239, 154, 154, 1);
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+    .filter-content .btn-danger {
+        background-color: rgba(140, 30, 40, 0.95);
+        border: 2px solid rgba(239, 154, 154, 1);
+        color: rgba(239, 154, 154, 1);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 
-.filter-content .btn-danger:hover {
-    background-color: rgba(110, 20, 30, 1);
-    border-color: rgba(244, 143, 177, 1);
-    color: rgba(244, 143, 177, 1);
-}
+    .filter-content .btn-danger:hover {
+        background-color: rgba(110, 20, 30, 1);
+        border-color: rgba(244, 143, 177, 1);
+        color: rgba(244, 143, 177, 1);
+    }
 
-/* TOMBOL UPLOAD & DOWNLOAD - MIRIP CHART BOX */
-/* TOMBOL UPLOAD & DOWNLOAD - MIRIP CHART BOX */
-.ms-auto .btn-primary {
-    background-color: rgba(255, 255, 255, 0.05) !important;
-    border: 2px solid rgba(255, 255, 255, 0.5) !important;
-    color: #ffffff !important;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+    /* TOMBOL UPLOAD & DOWNLOAD - MIRIP CHART BOX */
+    /* TOMBOL UPLOAD & DOWNLOAD - MIRIP CHART BOX */
+    .ms-auto .btn-primary {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 2px solid rgba(255, 255, 255, 0.5) !important;
+        color: #ffffff !important;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 
-.ms-auto .btn-primary:hover {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-    border-color: rgba(255, 255, 255, 0.7) !important;
-}
+    .ms-auto .btn-primary:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        border-color: rgba(255, 255, 255, 0.7) !important;
+    }
 
-.ms-auto .btn-danger {
-    background-color: rgba(255, 255, 255, 0.05) !important;
-    border: 2px solid rgba(255, 255, 255, 0.5) !important;
-    color: #ffffff !important;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+    .ms-auto .btn-danger {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 2px solid rgba(255, 255, 255, 0.5) !important;
+        color: #ffffff !important;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 
-.ms-auto .btn-danger:hover {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-    border-color: rgba(255, 255, 255, 0.7) !important;
-}
+    .ms-auto .btn-danger:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        border-color: rgba(255, 255, 255, 0.7) !important;
+    }
 
-.filter-content .btn {
-    border-radius: 999px !important;
-}
-/* TABLE STYLING - COMPACT */
-.table th,  
-.table td {
-    font-size: 12px;
-    padding: 0.1rem;
-    white-space: nowrap;
-    word-wrap: break-word;
-    vertical-align: middle;
-     font-weight: 700 !important;
-}
+    .filter-content .btn {
+        border-radius: 999px !important;
+    }
+    /* TABLE STYLING - COMPACT */
+    .table th,
+    .table td {
+        font-size: 12px;
+        padding: 0.1rem;
+        white-space: nowrap;
+        word-wrap: break-word;
+        vertical-align: middle;
+         font-weight: 700 !important;
+    }
 
-/* STICKY HEADER - HEADER TETAP SAAT SCROLL */
-.table thead th {
-    position: sticky;
-    top: 0;
-    background-color: rgba(0, 0, 0, 0.7) !important;
-    color: #ffffff !important;
-    z-index: 20;
-    border-bottom: 2px solid rgba(255, 255, 255, 0.4) !important;
-}
+    /* STICKY HEADER - HEADER TETAP SAAT SCROLL */
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: rgba(0, 0, 0, 0.7) !important;
+        color: #ffffff !important;
+        z-index: 20;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.4) !important;
+    }
 
-/* Kolom pertama header - STICKY HORIZONTAL DAN VERTIKAL */
-.table thead th:first-child {
-    position: sticky;
-    left: 0;
-    top: 0;
-    z-index: 21 !important;
-    background-color: rgba(0, 0, 0, 0.7) !important;
-    box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
-    border-right: 2px solid rgba(255, 255, 255, 0.3) !important;
-    min-width: 100px;
-    max-width: 100px;
-    white-space: normal;
-    text-align: left;
-    padding-left: .5rem;
-}
+    /* Kolom pertama header - STICKY HORIZONTAL DAN VERTIKAL */
+    .table thead th:first-child {
+        position: sticky;
+        left: 0;
+        top: 0;
+        z-index: 21 !important;
+        background-color: rgba(0, 0, 0, 0.7) !important;
+        box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
+        border-right: 2px solid rgba(255, 255, 255, 0.3) !important;
+        min-width: 100px;
+        max-width: 100px;
+        white-space: normal;
+        text-align: left;
+        padding-left: .5rem;
+    }
 
-/* Kolom pertama body - STICKY HORIZONTAL */
-.table tbody td:first-child {
-    position: sticky;
-    left: 0;
-    z-index: 10;
-    background-color: rgba(255, 255, 255, 0.20) !important;
-    box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
-    border-right: 2px solid rgba(255, 255, 255, 0.3) !important;
-    min-width: 100px;
-    max-width: 100px;
-    white-space: normal;
-    text-align: left;
-    padding-left: .5rem;
-}
+    /* Kolom pertama body - STICKY HORIZONTAL */
+    .table tbody td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 10;
+        background-color: rgba(255, 255, 255, 0.20) !important;
+        box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
+        border-right: 2px solid rgba(255, 255, 255, 0.3) !important;
+        min-width: 100px;
+        max-width: 100px;
+        white-space: normal;
+        text-align: left;
+        padding-left: .5rem;
+    }
 
-/* Row table-secondary tetap proper */
-@*.table-secondary td:first-child {
+    /* Row table-secondary tetap proper */
+    @*.table-secondary td:first-child {
     background-color: rgba(255, 255, 255, 0.15) !important;
     font-weight: 700;
 }*@
-.extra-row {
-    display: none;
-}
+    .extra-row {
+        display: none;
+    }
 
-/* TABLE BACKGROUND */
-.table.table {
-    background-color: rgba(255, 255, 255, 0.20) !important;
-}
+    /* TABLE BACKGROUND */
+    .table.table {
+        background-color: rgba(255, 255, 255, 0.20) !important;
+    }
 
-/* TABLE HEADER - SOLID BACKGROUND GAK TEMBUS PANDANG */
-table.table thead th {
-    background-color: rgba(30, 40, 60, 1) !important;  /* SOLID 100% - GAK TRANSPARAN */
-    color: #ffffff !important;
-    font-weight: 600;
-    border-bottom: 2px solid rgba(100, 181, 246, 0.5) !important;
-}
+    /* TABLE HEADER - SOLID BACKGROUND GAK TEMBUS PANDANG */
+    table.table thead th {
+        background-color: rgba(30, 40, 60, 1) !important;  /* SOLID 100% - GAK TRANSPARAN */
+        color: #ffffff !important;
+        font-weight: 600;
+        border-bottom: 2px solid rgba(100, 181, 246, 0.5) !important;
+    }
 
 
 
-table.table tbody td {
-    background-color: rgba(255, 255, 255, 0.08) !important;
-    color: #eaeaea !important;
-}
+    table.table tbody td {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        color: #eaeaea !important;
+    }
 
-table.table-bordered > :not(caption) > * {
-    border-color: rgba(255, 255, 255, 0.5) !important;
-}
+    table.table-bordered > :not(caption) > * {
+        border-color: rgba(255, 255, 255, 0.5) !important;
+    }
 
-/* CHART CONTAINER - SUPER COMPACT */
-#dayDiv {
-    position: relative;
-    width: calc(100% - 14px);
-    max-width: 100%;
-    height: auto;
-    margin-top: 0.25rem;
-    margin-bottom: 0.25rem;
-    margin-left: 7px;
-    margin-right: 7px;
-    background: rgba(255, 255, 255, 0.20);
-    border-radius: 12px;
-    padding: 8px 12px 6px 12px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-    border: 2px solid rgba(255, 255, 255, 0.3) !important;
-    overflow: visible !important;
-}
+    /* CHART CONTAINER - SUPER COMPACT */
+    #dayDiv {
+        position: relative;
+        width: calc(100% - 14px);
+        max-width: 100%;
+        height: auto;
+        margin-top: 0.25rem;
+        margin-bottom: 0.25rem;
+        margin-left: 7px;
+        margin-right: 7px;
+        background: rgba(255, 255, 255, 0.20);
+        border-radius: 12px;
+        padding: 8px 12px 6px 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.3) !important;
+        overflow: visible !important;
+    }
 
-#dayChart {
-    width: 100% !important;
-    max-width: 100%;
-    height: 350px !important;
-    margin-bottom: 6px;
-}
-/* TOTAL INFO - SUPER COMPACT */
-.total-info-text {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 15px;
-    padding: 2px 0;
-}
+    #dayChart {
+        width: 100% !important;
+        max-width: 100%;
+        height: 350px !important;
+        margin-bottom: 6px;
+    }
+    /* TOTAL INFO - SUPER COMPACT */
+    .total-info-text {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 15px;
+        padding: 2px 0;
+    }
 
-.total-info-text span {
-    font-size: 0.75rem;
-    color: #ffffff;
-    font-weight: 500;
-    white-space: nowrap;
-}
+    .total-info-text span {
+        font-size: 0.75rem;
+        color: #ffffff;
+        font-weight: 500;
+        white-space: nowrap;
+    }
 
-.total-info-text strong {
-    font-size: 0.85rem;
-    font-weight: 700;
-    margin-left: 3px;
-}
+    .total-info-text strong {
+        font-size: 0.85rem;
+        font-weight: 700;
+        margin-left: 3px;
+    }
 
-.total-info-text span,
-.total-info-text strong {
-    color: #ffffff !important;
-}
-/* COMPACT FILTER */
-.filter-content .form-select-sm,
-.filter-content .btn-sm {
-    height: 28px;
-    min-height: 20px;
-    font-size: 12px;
-    line-height: 20px;
-}
+    .total-info-text span,
+    .total-info-text strong {
+        color: #ffffff !important;
+    }
+    /* COMPACT FILTER */
+    .filter-content .form-select-sm,
+    .filter-content .btn-sm {
+        height: 28px;
+        min-height: 20px;
+        font-size: 12px;
+        line-height: 20px;
+    }
 
-.filter-content .form-select-sm {
-    height: 28px;
-    padding: 0;
-    padding-left: 12px;
-    padding-right: 28px;
-    padding-top: -2px;
-    font-size: 12px;
-    line-height: 16px;
-    border-radius: 999px;
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 2px solid rgba(255, 255, 255, 0.5);
-    color: #ffffff;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 8px center;
-    background-size: 10px 10px;
-    text-align: center;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.filter-content .btn-sm {
-    padding: 0 12px;
-    border-radius: 999px;
-}
+    .filter-content .form-select-sm {
+        height: 28px;
+        padding: 0;
+        padding-left: 12px;
+        padding-right: 28px;
+        padding-top: -2px;
+        font-size: 12px;
+        line-height: 16px;
+        border-radius: 999px;
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        color: #ffffff;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        background-size: 10px 10px;
+        text-align: center;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .filter-content .btn-sm {
+        padding: 0 12px;
+        border-radius: 999px;
+    }
 
-.filter-content .form-check-input {
-    width: 14px;
-    height: 14px;
-    margin-top: 2px;
-}
+    .filter-content .form-check-input {
+        width: 14px;
+        height: 14px;
+        margin-top: 2px;
+    }
 
-.filter-content label,
-.filter-content .form-check-label {
-    font-size: 12px;
-    line-height: 20px;
-}
+    .filter-content label,
+    .filter-content .form-check-label {
+        font-size: 12px;
+        line-height: 20px;
+    }
 
-/* CRITICAL OVERFLOW CONTROL */
-/* CRITICAL OVERFLOW CONTROL - FIXED */
-html, body {
-    height: 100vh;
-    margin: 0;
-    padding: 0;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
-    max-width: 100vw;
-}
+    /* CRITICAL OVERFLOW CONTROL */
+    /* CRITICAL OVERFLOW CONTROL - FIXED */
+    html, body {
+        height: 100vh;
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        max-width: 100vw;
+    }
 
-.container-fluid {
-    max-width: 100%;
-    overflow-x: visible !important;
-    overflow-y: auto !important;
-    height: auto;
-    padding-left: 0px !important;  /* ← TAMBAH INI */
-    padding-right: 0px !important; /* ← GANTI JADI 1PX */
-}
+    .container-fluid {
+        max-width: 100%;
+        overflow-x: visible !important;
+        overflow-y: auto !important;
+        height: auto;
+        padding-left: 0px !important;  /* ← TAMBAH INI */
+        padding-right: 0px !important; /* ← GANTI JADI 1PX */
+    }
 
-.table-responsive {
-    max-width: calc(100% - 14px);
-    margin-left: 7px;
-    margin-right: 7px;
-    overflow-x: auto;
-    overflow-y: auto;
-    max-height: calc(100vh - 480px);
-    position: relative;
-    border-radius: 8px;
-    scroll-behavior: smooth;
-    padding-bottom: 1px;      /* ← KUNCI 1: SPACING BAWAH */
-    margin-bottom: 3px;        /* ← KUNCI 2: EXTRA SPACE */
-}
+    .table-responsive {
+        max-width: calc(100% - 14px);
+        margin-left: 7px;
+        margin-right: 7px;
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: calc(100vh - 480px);
+        position: relative;
+        border-radius: 8px;
+        scroll-behavior: smooth;
+        padding-bottom: 1px;      /* ← KUNCI 1: SPACING BAWAH */
+        margin-bottom: 3px;        /* ← KUNCI 2: EXTRA SPACE */
+    }
 
-main.pb-5 {
-    padding-bottom: 0 !important;
-    height: auto !important;
-    overflow: visible !important;
-    display: flex;
-    flex-direction: column;
-}
+    main.pb-5 {
+        padding-bottom: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+        display: flex;
+        flex-direction: column;
+    }
 
-#reportContainer {
-    height: auto !important;
-    overflow: visible !important;
-    display: flex;
-    flex-direction: column;
-}
+    #reportContainer {
+        height: auto !important;
+        overflow: visible !important;
+        display: flex;
+        flex-direction: column;
+    }
 
-#reportContainer > .container-fluid {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: visible !important;
-}
-/* CUSTOM SHIFT BUTTONS - KOTAK KAYAK GAMBAR */
-.shift-button {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    background-color: rgba(70, 80, 100, 0.6);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    color: #ffffff;
-    font-size: 12px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    user-select: none;
-}
+    #reportContainer > .container-fluid {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: visible !important;
+    }
+    /* CUSTOM SHIFT BUTTONS - KOTAK KAYAK GAMBAR */
+    .shift-button {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background-color: rgba(70, 80, 100, 0.6);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
 
-.shift-button:hover {
-    background-color: rgba(90, 100, 120, 0.7);
-    border-color: rgba(255, 255, 255, 0.5);
-}
+    .shift-button:hover {
+        background-color: rgba(90, 100, 120, 0.7);
+        border-color: rgba(255, 255, 255, 0.5);
+    }
 
-.shift-button.active {
-    background-color: rgba(50, 60, 80, 0.9);
-    border: 3px solid #ffffff;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4);
-}
+    .shift-button.active {
+        background-color: rgba(50, 60, 80, 0.9);
+        border: 3px solid #ffffff;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4);
+    }
 
-input[type="checkbox"]:checked + .shift-button {
-    background-color: rgba(50, 60, 80, 0.9);
-    border: 3px solid #ffffff;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4);
-}
+    input[type="checkbox"]:checked + .shift-button {
+        background-color: rgba(50, 60, 80, 0.9);
+        border: 3px solid #ffffff;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4);
+    }
 
-.main-content-wrapper {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-}
+    .main-content-wrapper {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
 
-.main-content-wrapper .p-4 {
-    padding-left: 1px !important;
-    padding-right: 1px !important;
-}
+    .main-content-wrapper .p-4 {
+        padding-left: 1px !important;
+        padding-right: 1px !important;
+    }
 
-#reportContainer {
-    padding: 0 !important;
-    margin: 0 !important;
-}
+    #reportContainer {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
 
-#reportContainer > .container-fluid {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-}
-/* HEADER DI DALAM BOX */
-.chart-box-header {
-    position: relative;
-    padding-bottom: 6px;
-    margin-bottom: 6px;
-}
+    #reportContainer > .container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    /* HEADER DI DALAM BOX */
+    .chart-box-header {
+        position: relative;
+        padding-bottom: 6px;
+        margin-bottom: 6px;
+    }
 
-/* TEKS JUDUL */
-.chart-box-title {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #ffffff;
-    letter-spacing: 0.3px;
-    padding-left: 2px;
-}
+    /* TEKS JUDUL */
+    .chart-box-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #ffffff;
+        letter-spacing: 0.3px;
+        padding-left: 2px;
+    }
 
-/* GARIS BAWAH */
-.chart-box-line {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 1px;
-    background: rgba(0, 0, 0, 0.4);
-    );
-    border-radius: 1px;
-}
+    /* GARIS BAWAH */
+    .chart-box-line {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 1px;
+        background: rgba(0, 0, 0, 0.4);
+        );
+        border-radius: 1px;
+    }
 
-/* ========================================
-   KOLOM CATEGORY - STICKY KIRI (BARU)
-   ======================================== */
-.
-/* ========================================
-   KOLOM PRODUCTION RESULT - STICKY KIRI (BARU)
-   ======================================== */
-.table thead th:nth-child(2),
-.table tbody td:nth-child(2) {
-    position: sticky;
-    left: 120px;
-    z-index: 11;
-    background-color: rgba(30, 40, 60, 1) !important;
-    box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
-    border-right: 2px solid rgba(255, 255, 255, 0.3) !important;
-    min-width: 130px;
-    max-width: 130px;
-    text-align: left;
-    padding-left: 0.75rem;
-    vertical-align: middle;
-    color: #ffffff !important;
-}
+    /* ========================================
+       KOLOM CATEGORY - STICKY KIRI (BARU)
+       ======================================== */
+    .
+    /* ========================================
+       KOLOM PRODUCTION RESULT - STICKY KIRI (BARU)
+       ======================================== */
+    .table thead th:nth-child(2),
+    .table tbody td:nth-child(2) {
+        position: sticky;
+        left: 120px;
+        z-index: 11;
+        background-color: rgba(30, 40, 60, 1) !important;
+        box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
+        border-right: 2px solid rgba(255, 255, 255, 0.3) !important;
+        min-width: 130px;
+        max-width: 130px;
+        text-align: left;
+        padding-left: 0.75rem;
+        vertical-align: middle;
+        color: #ffffff !important;
+    }
 
-/* ========================================
-   HEADER TETAP DI TOP (UPDATE)
-   ======================================== */
-.table thead th:first-child,
-.table thead th:nth-child(2) {
-    top: 0;
-    z-index: 21 !important;
-    background-color: rgba(30, 40, 60, 1) !important;
-}
+    /* ========================================
+       HEADER TETAP DI TOP (UPDATE)
+       ======================================== */
+    .table thead th:first-child,
+    .table thead th:nth-child(2) {
+        top: 0;
+        z-index: 21 !important;
+        background-color: rgba(30, 40, 60, 1) !important;
+    }
 
-/* ========================================
-   BODY ROWS BACKGROUND (UPDATE)
-   ======================================== */
-@*.table tbody td:first-child {
+    /* ========================================
+       BODY ROWS BACKGROUND (UPDATE)
+       ======================================== */
+    @*.table tbody td:first-child {
     background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
@@ -551,163 +551,148 @@ input[type="checkbox"]:checked + .shift-button {
 }
 *@
 
-/* GELAPIN BARIS TOTAL ACTUAL & TOTAL PLAN */
-.table tbody tr:nth-child(3) td,  /* Total Plan */
-.table tbody tr:nth-child(6) td {  /* Total Actual */
-    background-color: rgba(255, 255, 255, 0.30) !important;
-    font-weight: 700;
-}
+    /* BARIS TOTAL PLAN & TOTAL ACTUAL - bold aja, warna ikut grup */
+    .table tbody tr:nth-child(3) td,
+    .table tbody tr:nth-child(6) td {
+        font-weight: 700;
+    }
+    .table tbody tr:nth-of-type(odd) td {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        color: #eaeaea !important;
+    }
 
-/* Override khusus untuk kolom sticky (kolom 1 & 2) di baris Total */
-.table tbody tr:nth-child(3) td:first-child,
-.table tbody tr:nth-child(3) td:nth-child(2),
-.table tbody tr:nth-child(6) td:first-child,
-.table tbody tr:nth-child(6) td:nth-child(2) {
-    background-color: rgba(255, 255, 255, 0.30) !important;
-}
+    /* Baris GENAP - Warna Gelap */
+    .table tbody tr:nth-of-type(even) td {
+        background-color: rgba(255, 255, 255, 0.03) !important;
+        color: #eaeaea !important;
+    }
 
-/* Override untuk kolom tanggal (3 dst) di baris Total - lebih gelap */
-.table tbody tr:nth-child(3) td:nth-child(n+3),
-.table tbody tr:nth-child(6) td:nth-child(n+3) {
-    background-color: rgba(255, 255, 255, 0.25) !important;
-}
-.table tbody tr:nth-of-type(odd) td {
-    background-color: rgba(255, 255, 255, 0.08) !important;
-    color: #eaeaea !important;
-}
+    /* Kolom Pertama (sticky) - ikut warna barisnya tapi sedikit lebih terang untuk depth */
+    .table tbody tr:nth-of-type(odd) td:first-child {
+        background-color: rgba(255, 255, 255, 0.12) !important;
+    }
 
-/* Baris GENAP - Warna Gelap */
-.table tbody tr:nth-of-type(even) td {
-    background-color: rgba(255, 255, 255, 0.03) !important;
-    color: #eaeaea !important;
-}
+    .table tbody tr:nth-of-type(even) td:first-child {
+        background-color: rgba(255, 255, 255, 0.07) !important;
+    }
 
-/* Kolom Pertama (sticky) - ikut warna barisnya tapi sedikit lebih terang untuk depth */
-.table tbody tr:nth-of-type(odd) td:first-child {
-    background-color: rgba(255, 255, 255, 0.12) !important;
-}
+    /* Kolom Kedua (sticky) - ikut warna barisnya tapi sedikit lebih terang */
+    .table tbody tr:nth-of-type(odd) td:nth-child(2) {
+        background-color: rgba(255, 255, 255, 0.12) !important;
+    }
 
-.table tbody tr:nth-of-type(even) td:first-child {
-    background-color: rgba(255, 255, 255, 0.07) !important;
-}
+    .table tbody tr:nth-of-type(even) td:nth-child(2) {
+        background-color: rgba(255, 255, 255, 0.07) !important;
+    }
 
-/* Kolom Kedua (sticky) - ikut warna barisnya tapi sedikit lebih terang */
-.table tbody tr:nth-of-type(odd) td:nth-child(2) {
-    background-color: rgba(255, 255, 255, 0.12) !important;
-}
+    /* Hover effect */
+    .table tbody tr:hover td {
+        background-color: rgba(100, 181, 246, 0.15) !important;
+        transition: background-color 0.2s ease;
+    }
 
-.table tbody tr:nth-of-type(even) td:nth-child(2) {
-    background-color: rgba(255, 255, 255, 0.07) !important;
-}
 
-/* Hover effect */
-.table tbody tr:hover td {
-    background-color: rgba(100, 181, 246, 0.15) !important;
-    transition: background-color 0.2s ease;
-}
+    /* ========================================
+       WARNA GRUP BARIS - PLAN FORECAST VS ACTUAL
+       ======================================== */
 
-/* OVERRIDE UNTUK BARIS TOTAL - TETAP LEBIH GELAP (PRIORITAS TINGGI) */
-.table tbody tr:nth-child(3) td,  /* Total Plan */
-.table tbody tr:nth-child(6) td {  /* Total Actual */
-    background-color: rgba(255, 255, 255, 0.30) !important;
-    font-weight: 700;
-}
+    /* GRUP PLAN FORECAST (Lebih Terang) */
+    .table tbody tr:nth-child(1) td,
+    .table tbody tr:nth-child(2) td,
+    .table tbody tr:nth-child(3) td,
+    .table tbody tr:nth-child(7) td,
+    .table tbody tr:nth-child(8) td,
+    .table tbody tr:nth-child(9) td,
+    .table tbody tr:nth-child(10) td
+    {
+        background-color: rgba(255, 255, 255, 0.15) !important; /* Lebih Terang */
+    }
 
-.table tbody tr:nth-child(3) td:nth-child(n+3),
-.table tbody tr:nth-child(6) td:nth-child(n+3) {
-    background-color: rgba(255, 255, 255, 0.25) !important;
-}
+    /* GRUP ACTUAL (Lebih Gelap) */
+    .table tbody tr:nth-child(4) td,
+    .table tbody tr:nth-child(5) td,
+    .table tbody tr:nth-child(6) td,
+    .table tbody tr:nth-child(11) td,
+    .table tbody tr:nth-child(12) td,
+    .table tbody tr:nth-child(13) td,
+    .table tbody tr:nth-child(14) td
+    {
+        background-color: rgba(255, 255, 255, 0.05) !important; /* Lebih Gelap */
+    }
 
-/* ========================================
-   WARNA GRUP BARIS - PLAN FORECAST VS ACTUAL
-   ======================================== */
+    /* Override untuk kolom sticky (Plan Forecast group) */
+    .table tbody tr:nth-child(1) td:first-child,
+    .table tbody tr:nth-child(1) td:nth-child(2),
+    .table tbody tr:nth-child(2) td:first-child,
+    .table tbody tr:nth-child(2) td:nth-child(2),
+    .table tbody tr:nth-child(3) td:first-child,
+    .table tbody tr:nth-child(3) td:nth-child(2),
+    .table tbody tr:nth-child(7) td:first-child,
+    .table tbody tr:nth-child(7) td:nth-child(2),
+    .table tbody tr:nth-child(8) td:first-child,
+    .table tbody tr:nth-child(8) td:nth-child(2),
+    .table tbody tr:nth-child(9) td:first-child,
+    .table tbody tr:nth-child(9) td:nth-child(2),
+    .table tbody tr:nth-child(10) td:first-child,
+    .table tbody tr:nth-child(10) td:nth-child(2) {
+        background-color: rgba(255, 255, 255, 0.18) !important;
+    }
 
-/* GRUP PLAN FORECAST (Lebih Terang) */
-.table tbody tr:nth-child(1) td,
-.table tbody tr:nth-child(2) td,
-.table tbody tr:nth-child(3) td,
-.table tbody tr:nth-child(7) td,
-.table tbody tr:nth-child(8) td,
-.table tbody tr:nth-child(9) td,
-.table tbody tr:nth-child(10) td
-{
-    background-color: rgba(255, 255, 255, 0.15) !important; /* Lebih Terang */
-}
+    /* Override untuk kolom sticky (Actual group) */
+    .table tbody tr:nth-child(4) td:first-child,
+    .table tbody tr:nth-child(4) td:nth-child(2),
+    .table tbody tr:nth-child(5) td:first-child,
+    .table tbody tr:nth-child(5) td:nth-child(2),
+    .table tbody tr:nth-child(6) td:first-child,
+    .table tbody tr:nth-child(6) td:nth-child(2),
+    .table tbody tr:nth-child(11) td:first-child,
+    .table tbody tr:nth-child(11) td:nth-child(2),
+    .table tbody tr:nth-child(12) td:first-child,
+    .table tbody tr:nth-child(12) td:nth-child(2),
+    .table tbody tr:nth-child(13) td:first-child,
+    .table tbody tr:nth-child(13) td:nth-child(2),
+    .table tbody tr:nth-child(14) td:first-child,
+    .table tbody tr:nth-child(14) td:nth-child(2) {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+    }
+    /* LIGHT MODE - Total Info Text */
+    body.light-mode .total-info-text span,
+    body.light-mode .total-info-text strong {
+        color: #1a1a2e !important;
+    }
 
-/* GRUP ACTUAL (Lebih Gelap) */
-.table tbody tr:nth-child(4) td,
-.table tbody tr:nth-child(5) td,
-.table tbody tr:nth-child(6) td,
-.table tbody tr:nth-child(11) td,
-.table tbody tr:nth-child(12) td,
-.table tbody tr:nth-child(13) td,
-.table tbody tr:nth-child(14) td
-{
-    background-color: rgba(255, 255, 255, 0.05) !important; /* Lebih Gelap */
-}
+    body.light-mode #totalActualValue {
+        color: #1a7a35 !important;  /* hijau gelap */
+    }
 
-/* Override untuk kolom sticky (Plan Forecast group) */
-.table tbody tr:nth-child(1) td:first-child,
-.table tbody tr:nth-child(1) td:nth-child(2),
-.table tbody tr:nth-child(2) td:first-child,
-.table tbody tr:nth-child(2) td:nth-child(2),
-.table tbody tr:nth-child(3) td:first-child,
-.table tbody tr:nth-child(3) td:nth-child(2),
-.table tbody tr:nth-child(7) td:first-child,
-.table tbody tr:nth-child(7) td:nth-child(2),
-.table tbody tr:nth-child(8) td:first-child,
-.table tbody tr:nth-child(8) td:nth-child(2),
-.table tbody tr:nth-child(9) td:first-child,
-.table tbody tr:nth-child(9) td:nth-child(2),
-.table tbody tr:nth-child(10) td:first-child,
-.table tbody tr:nth-child(10) td:nth-child(2) {
-    background-color: rgba(255, 255, 255, 0.18) !important;
-}
+    body.light-mode #totalPlanValue {
+        color: #235a9b !important;  /* biru gelap */
+    }
 
-/* Override untuk kolom sticky (Actual group) */
-.table tbody tr:nth-child(4) td:first-child,
-.table tbody tr:nth-child(4) td:nth-child(2),
-.table tbody tr:nth-child(5) td:first-child,
-.table tbody tr:nth-child(5) td:nth-child(2),
-.table tbody tr:nth-child(6) td:first-child,
-.table tbody tr:nth-child(6) td:nth-child(2),
-.table tbody tr:nth-child(11) td:first-child,
-.table tbody tr:nth-child(11) td:nth-child(2),
-.table tbody tr:nth-child(12) td:first-child,
-.table tbody tr:nth-child(12) td:nth-child(2),
-.table tbody tr:nth-child(13) td:first-child,
-.table tbody tr:nth-child(13) td:nth-child(2),
-.table tbody tr:nth-child(14) td:first-child,
-.table tbody tr:nth-child(14) td:nth-child(2) {
-    background-color: rgba(255, 255, 255, 0.08) !important;
-}
-/* LIGHT MODE - Total Info Text */
-body.light-mode .total-info-text span,
-body.light-mode .total-info-text strong {
-    color: #1a1a2e !important;
-}
+    body.light-mode #totalPhhValue {
+        color: #0e7490 !important;  /* teal gelap */
+    }
+    .filter-content .btn-success {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        color: #ffffff;
+        font-weight: 600;
+    }
 
-body.light-mode #totalActualValue {
-    color: #1a7a35 !important;  /* hijau gelap */
-}
-
-body.light-mode #totalPlanValue {
-    color: #235a9b !important;  /* biru gelap */
-}
-
-body.light-mode #totalPhhValue {
-    color: #0e7490 !important;  /* teal gelap */
-}
-/* ========================================
-   HAPUS/COMMENT CSS YANG LAMA INI (HAPUS)
-   ======================================== */
-/* HAPUS YANG INI - GA DIPAKE LAGI:
-.table thead th:first-child { ... }  <- yang lama untuk "Production Result"
-.table tbody td:first-child { ... }  <- yang lama
-#toggleExtraRows { ... }
-.extra-row { ... }
-.always-visible { ... }
-*/
+    .filter-content .btn-success:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.7);
+    }
+    /* ========================================
+       HAPUS/COMMENT CSS YANG LAMA INI (HAPUS)
+       ======================================== */
+    /* HAPUS YANG INI - GA DIPAKE LAGI:
+    .table thead th:first-child { ... }  <- yang lama untuk "Production Result"
+    .table tbody td:first-child { ... }  <- yang lama
+    #toggleExtraRows { ... }
+    .extra-row { ... }
+    .always-visible { ... }
+    */
 </style>
 
 <div id="reportContainer">
@@ -736,7 +721,7 @@ body.light-mode #totalPhhValue {
 
     <div class="container-fluid">
         <!-- FILTER AREA WITH HORIZONTAL LINES -->
-        <div class="filter-area-with-lines">    
+        <div class="filter-area-with-lines">
             <!-- GARIS HORIZONTAL - ALWAYS SHOW -->
             <div class="panamon-bottom-line"></div>
             <div class="panamon-bottomm-line"></div>
@@ -744,82 +729,85 @@ body.light-mode #totalPhhValue {
             <div class="filter-content">
                 <div class="row g-3 align-items-center">
                     <!-- FILTER FORM -->
-                  <div class="col-12">
-    <form method="post" class="d-flex flex-wrap align-items-center gap-3">
-        <!-- LINE - PALING KIRI -->
-       <div class="d-flex align-items-center gap-2">
-    <label class="mb-0 text-white small">Line</label>
-    <select class="form-select form-select-sm" style="width: 70px;" id="MachineLine" name="MachineLine" asp-for="MachineLine">
-        <option value="All" selected>All</option>
-        <option value="MCH1-01">CU</option>
-        <option value="MCH1-02">CS</option>
-    </select>
-</div>
+                    <div class="col-12">
+                        <form method="post" class="d-flex flex-wrap align-items-center gap-3">
+                            <!-- LINE - PALING KIRI -->
+                            <div class="d-flex align-items-center gap-2">
+                                <label class="mb-0 text-white small">Line</label>
+                                <select class="form-select form-select-sm" style="width: 70px;" id="MachineLine" name="MachineLine" asp-for="MachineLine">
+                                    <option value="All" selected>All</option>
+                                    <option value="MCH1-01">CU</option>
+                                    <option value="MCH1-02">CS</option>
+                                </select>
+                            </div>
 
-        <!-- MONTH -->
-        <div class="d-flex align-items-center gap-2">
-            <label class="mb-0 text-white small">Month</label>
-            <select class="form-select form-select-sm" style="width: 110px;" id="SelectedMonth" name="SelectedMonth" asp-for="SelectedMonth">
+                            <!-- MONTH -->
+                            <div class="d-flex align-items-center gap-2">
+                                <label class="mb-0 text-white small">Month</label>
+                                <select class="form-select form-select-sm" style="width: 110px;" id="SelectedMonth" name="SelectedMonth" asp-for="SelectedMonth">
                                     @for (int i = 1; i <= 12; i++)
                                     {
-                                    <option value="@i">@CultureInfo.GetCultureInfo("en-US").DateTimeFormat.GetMonthName(i)</option>
+                                        <option value="@i">@CultureInfo.GetCultureInfo("en-US").DateTimeFormat.GetMonthName(i)</option>
                                     }
-            </select>
-        </div>
+                                </select>
+                            </div>
 
-        <!-- YEAR -->
-        <div class="d-flex align-items-center gap-2">
-            <label class="mb-0 text-white small">Year</label>
-            <select class="form-select form-select-sm" style="width: 80px;" id="SelectedYear" name="SelectedYear" asp-for="SelectedYear">
+                            <!-- YEAR -->
+                            <div class="d-flex align-items-center gap-2">
+                                <label class="mb-0 text-white small">Year</label>
+                                <select class="form-select form-select-sm" style="width: 80px;" id="SelectedYear" name="SelectedYear" asp-for="SelectedYear">
                                     @for (int i = DateTime.Now.Year; i >= 2020; i--)
                                     {
-                                    <option value="@i">@i</option>
+                                        <option value="@i">@i</option>
                                     }
-            </select>
-        </div>
+                                </select>
+                            </div>
 
-        <!-- SHIFT -->
-        <div class="d-flex align-items-center gap-2">
-            <label class="mb-0 text-white small">Shift</label>
-            <div class="d-flex gap-2 shift-buttons-container">
-                <input type="checkbox" id="Shift1" name="SelectedShifts" value="1" @(Model.SelectedShifts.Contains("1") ? "checked" : "") style="display: none;">
-                <label for="Shift1" class="shift-button @(Model.SelectedShifts.Contains("1") ? "active" : "")">1</label>
+                            <!-- SHIFT -->
+                            <div class="d-flex align-items-center gap-2">
+                                <label class="mb-0 text-white small">Shift</label>
+                                <div class="d-flex gap-2 shift-buttons-container">
+                                    <input type="checkbox" id="Shift1" name="SelectedShifts" value="1" @(Model.SelectedShifts.Contains("1") ? "checked" : "") style="display: none;">
+                                    <label for="Shift1" class="shift-button @(Model.SelectedShifts.Contains("1") ? "active" : "")">1</label>
 
-                <input type="checkbox" id="Shift2" name="SelectedShifts" value="2" @(Model.SelectedShifts.Contains("2") ? "checked" : "") style="display: none;">
-                <label for="Shift2" class="shift-button @(Model.SelectedShifts.Contains("2") ? "active" : "")">2</label>
+                                    <input type="checkbox" id="Shift2" name="SelectedShifts" value="2" @(Model.SelectedShifts.Contains("2") ? "checked" : "") style="display: none;">
+                                    <label for="Shift2" class="shift-button @(Model.SelectedShifts.Contains("2") ? "active" : "")">2</label>
 
-                <input type="checkbox" id="Shift3" name="SelectedShifts" value="3" @(Model.SelectedShifts.Contains("3") ? "checked" : "") style="display: none;">
-                <label for="Shift3" class="shift-button @(Model.SelectedShifts.Contains("3") ? "active" : "")">3</label>
+                                    <input type="checkbox" id="Shift3" name="SelectedShifts" value="3" @(Model.SelectedShifts.Contains("3") ? "checked" : "") style="display: none;">
+                                    <label for="Shift3" class="shift-button @(Model.SelectedShifts.Contains("3") ? "active" : "")">3</label>
 
-                <input type="checkbox" id="NonShift" name="SelectedShifts" value="NS" @(Model.SelectedShifts.Contains("NS") ? "checked" : "") style="display: none;">
-                <label for="NonShift" class="shift-button @(Model.SelectedShifts.Contains("NS") ? "active" : "")">NS</label>
+                                    <input type="checkbox" id="NonShift" name="SelectedShifts" value="NS" @(Model.SelectedShifts.Contains("NS") ? "checked" : "") style="display: none;">
+                                    <label for="NonShift" class="shift-button @(Model.SelectedShifts.Contains("NS") ? "active" : "")">NS</label>
 
-                <input type="checkbox" id="AllShift" name="SelectedShifts" value="All" @(Model.SelectedShifts.Contains("All") || !Model.SelectedShifts.Any() ? "checked" : "") style="display: none;">
-                <label for="AllShift" class="shift-button @(Model.SelectedShifts.Contains("All") || !Model.SelectedShifts.Any() ? "active" : "")">All</label>
-            </div>
-        </div>
+                                    <input type="checkbox" id="AllShift" name="SelectedShifts" value="All" @(Model.SelectedShifts.Contains("All") || !Model.SelectedShifts.Any() ? "checked" : "") style="display: none;">
+                                    <label for="AllShift" class="shift-button @(Model.SelectedShifts.Contains("All") || !Model.SelectedShifts.Any() ? "active" : "")">All</label>
+                                </div>
+                            </div>
 
-        <button type="submit" name="submitButton" value="search" class="btn btn-sm btn-primary">Search</button>
-        @*<button type="submit" name="submitButton" value="reset" class="btn btn-sm btn-danger">Reset</button>*@
+                            <button type="submit" name="submitButton" value="search" class="btn btn-sm btn-primary">Search</button>
+                            <button type="button" id="toggleChangePlanButton" class="btn btn-sm btn-success">
+                                <i class="fas fa-eye me-1"></i> Hide Change Plan
+                            </button>
+                            @*<button type="submit" name="submitButton" value="reset" class="btn btn-sm btn-danger">Reset</button>*@
 
-        <div class="ms-auto d-flex gap-2">
-    <button type="button" id="downloadPdfButton" class="btn btn-sm btn-danger">
-        <i class="bi bi-download me-2"></i>Download
-    </button>
-</div>
-    </form>
-</div>
+                            <div class="ms-auto d-flex gap-2">
+                                <button type="button" id="downloadPdfButton" class="btn btn-sm btn-danger">
+                                    <i class="bi bi-download me-2"></i>Download
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div id="dayDiv">
             <div class="chart-box-header">
-        <span class="chart-box-title">
-            Production Achievement
-        </span>
-        <div class="chart-box-line"></div>
-    </div>
+                <span class="chart-box-title">
+                    Production Achievement
+                </span>
+                <div class="chart-box-line"></div>
+            </div>
             <div class="row">
                 <div class="col-12">
                     <canvas id="dayChart"></canvas>
@@ -836,82 +824,83 @@ body.light-mode #totalPhhValue {
         </div>
 
         <!-- TABLE -->
-       <div class="table-responsive">
-    <table class="table table-bordered text-center align-middle w-100" id="productionTable">
-        <thead class="table-dark">
-    <tr>
-        <th colspan="2" style="min-width: 300px;">Production Result</th>
+        <div class="table-responsive">
+            <table class="table table-bordered text-center align-middle w-100" id="productionTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Category</th>
+                        <th>Production Result</th>
                         @for (int day = 1; day <= Model.DaysInMonth; day++)
                         {
                             <th>@day</th>
                         }
-    </tr>
-</thead>
-        <tbody>
-            <!-- PLAN FORECAST -->
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- PLAN FORECAST -->
                     <tr>
                         <td rowspan="3" style="vertical-align: middle; text-align: center; font-weight: 700;">Plan Forecast</td>
                         <td style="text-align: left;">Normal</td>
-                        @for (int i = 0; i < Model.PlanData.Count; i++)
+                        @for (int i = 0; i < Model.EffectivePlanData.Count; i++)
                         {
-                                <td>@Model.PlanData[i]</td>
+                            <td>@Model.EffectivePlanData[i].ToString("N0")</td>
                         }
                     </tr>
                     <tr>
                         <td style="text-align: left;">Overtime</td>
-                        @for (int i = 0; i < Model.PlanOvertimeData.Count; i++)
+                        @for (int i = 0; i < Model.EffectivePlanOvertimeData.Count; i++)
                         {
-                                <td>@Model.PlanOvertimeData[i]</td>
+                            <td>@Model.EffectivePlanOvertimeData[i].ToString("N0")</td>
                         }
                     </tr>
                     <tr>
                         <td style="text-align: left;"><b>Total Plan</b></td>
                         @for (int i = 0; i < Model.PlanData.Count; i++)
                         {
-                                <td>@(Model.PlanData[i] + Model.PlanOvertimeData[i])</td>
+                            <td>@((Model.EffectivePlanData[i] + Model.EffectivePlanOvertimeData[i]).ToString("N0"))</td>
                         }
                     </tr>
 
-            <!-- ACTUAL -->
-<tr>
-    <td rowspan="3" style="vertical-align: middle; text-align: center; font-weight: 700;">Actual</td>
-    <td style="text-align: left;">Normal</td>
+                    <!-- ACTUAL -->
+                    <tr>
+                        <td rowspan="3" style="vertical-align: middle; text-align: center; font-weight: 700;">Actual</td>
+                        <td style="text-align: left;">Normal</td>
                         @for (int i = 0; i < Model.NormalData.Count; i++)
                         {
-                        <td>@Model.NormalData[i]</td>
+                            <td>@Model.NormalData[i].ToString("N0")</td>
                         }
-</tr>
-<tr>
-    <td style="text-align: left;">Overtime</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Overtime</td>
                         @for (int i = 0; i < Model.OvertimeData.Count; i++)
                         {
-                        <td>@Model.OvertimeData[i]</td>
+                            <td>@Model.OvertimeData[i].ToString("N0")</td>
                         }
-</tr>
-<tr>
-    <td style="text-align: left;"><b>Total Actual</b></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;"><b>Total Actual</b></td>
                         @for (int i = 0; i < Model.NormalData.Count; i++)
                         {
-                        <td>@(Model.NormalData[i] + Model.OvertimeData[i])</td>
+                            <td>@((Model.NormalData[i] + Model.OvertimeData[i]).ToString("N0"))</td>
                         }
-</tr>
+                    </tr>
 
-<!-- DIFFERENCE - SATU KOLOM PENUH -->
-<tr>
-    <td colspan="2" style="text-align: left; font-weight: 700;">Difference (Actual - Plan)</td>
+                    <!-- DIFFERENCE - SATU KOLOM PENUH -->
+                    <tr>
+                        <td colspan="2" style="text-align: left; font-weight: 700;">Difference (Actual - Plan)</td>
                         @for (int i = 0; i < Model.NormalData.Count; i++)
                         {
-                        <td>@((Model.NormalData[i] + Model.OvertimeData[i]) - Model.PlanData[i])</td>
+                            <td>@(((Model.NormalData[i] + Model.OvertimeData[i]) - (Model.EffectivePlanData[i] + Model.EffectivePlanOvertimeData[i])).ToString("N0"))</td>
                         }
-</tr>
+                    </tr>
 
-<!-- ACHIEVEMENT RATIO - SATU KOLOM PENUH, DIBAWAH DIFFERENCE -->
-<tr>
-    <td colspan="2" style="text-align: left; font-weight: 700;">Achievement Ratio</td>
+                    <!-- ACHIEVEMENT RATIO - SATU KOLOM PENUH, DIBAWAH DIFFERENCE -->
+                    <tr>
+                        <td colspan="2" style="text-align: left; font-weight: 700;">Achievement Ratio</td>
                         @for (int i = 0; i < Model.PlanData.Count; i++)
                         {
                             decimal totalActual = Model.NormalData[i] + Model.OvertimeData[i];
-                            decimal plan = Model.PlanData[i];
+                            decimal plan = Model.EffectivePlanData[i] + Model.EffectivePlanOvertimeData[i];
                             string ratioDisplay = "-";
 
                             if (plan > 0)
@@ -924,61 +913,61 @@ body.light-mode #totalPhhValue {
                                 ratioDisplay = "N/A";
                             }
 
-        <td>@ratioDisplay</td>
+                            <td>@ratioDisplay</td>
                         }
-</tr>
+                    </tr>
 
-<!-- NO. OF DIRECT WORKERS - SATU KOLOM PENUH, DIBAWAH ACHIEVEMENT RATIO -->
-<tr>
-    <td colspan="2" style="text-align: left; font-weight: 700;">No. of Direct Workers</td>
+                    <!-- NO. OF DIRECT WORKERS - SATU KOLOM PENUH, DIBAWAH ACHIEVEMENT RATIO -->
+                    <tr>
+                        <td colspan="2" style="text-align: left; font-weight: 700;">No. of Direct Workers</td>
                         @for (int i = 0; i < Model.NoOfDirectWorkers.Count; i++)
                         {
-                    <td>@(Model.NoOfDirectWorkers[i] > 0 ? Model.NoOfDirectWorkers[i].ToString() : "0")</td>
+                            <td>@(Model.NoOfDirectWorkers[i] > 0 ? Model.NoOfDirectWorkers[i].ToString() : "0")</td>
                         }
-</tr>
+                    </tr>
 
-            <!-- WORKFORCE -->
-<tr>
-    <td rowspan="1" style="vertical-align: middle; text-align: center; font-weight: 700;">Workforce</td>
-    <td style="text-align: left;">Overtime - No. of Operator</td>
+                    <!-- WORKFORCE -->
+                    <tr>
+                        <td rowspan="1" style="vertical-align: middle; text-align: center; font-weight: 700;">Workforce</td>
+                        <td style="text-align: left;">Overtime - No. of Operator</td>
                         @for (int i = 0; i < Model.OvertimeOperators.Count; i++)
                         {
-                <td>@(Model.OvertimeOperators[i] > 0 ? Model.OvertimeOperators[i] : "0")</td>
+                            <td>@(Model.OvertimeOperators[i] > 0 ? Model.OvertimeOperators[i] : "0")</td>
                         }
-</tr>
+                    </tr>
 
-<!-- TIME MANAGEMENT -->
-<tr>
-    <td rowspan="2" style="vertical-align: middle; text-align: center; font-weight: 700;">Time Management</td>
-    <td style="text-align: left;">Overtime - Minutes</td>
+                    <!-- TIME MANAGEMENT -->
+                    <tr>
+                        <td rowspan="2" style="vertical-align: middle; text-align: center; font-weight: 700;">Time Management</td>
+                        <td style="text-align: left;">Overtime - Minutes</td>
                         @for (int i = 0; i < Model.OvertimeMinutes.Count; i++)
                         {
-                <td>@(Model.OvertimeMinutes[i] > 0 ? Model.OvertimeMinutes[i] : "0")</td>
+                            <td>@(Model.OvertimeMinutes[i] > 0 ? Model.OvertimeMinutes[i] : "0")</td>
                         }
-</tr>
-<tr>
-    <td style="text-align: left;">Loss Time</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Loss Time</td>
                         @for (int i = 0; i < Model.DailyLossTime.Count; i++)
                         {
-                <td>@(Model.DailyLossTime[i] > 0 ? Model.DailyLossTime[i] : "0")</td>
+                            <td>@(Model.DailyLossTime[i] > 0 ? Model.DailyLossTime[i] : "0")</td>
                         }
-</tr>
+                    </tr>
 
-<!-- TOTAL WORKING TIME - SATU KOLOM PENUH, DIBAWAH LOSS TIME -->
-<tr>
-    <td colspan="2" style="text-align: left; font-weight: 700;">Total Working Time</td>
+                    <!-- TOTAL WORKING TIME - SATU KOLOM PENUH, DIBAWAH LOSS TIME -->
+                    <tr>
+                        <td colspan="2" style="text-align: left; font-weight: 700;">Total Working Time</td>
                         @for (int i = 0; i < Model.DailyWorkTime.Count; i++)
                         {
-                <td>@Model.DailyWorkTime[i]</td>
+                            <td>@Model.DailyWorkTime[i]</td>
                         }
-</tr>
+                    </tr>
 
-<!-- PROD. QTY / HEAD / HOUR - SATU KOLOM PENUH, DIBAWAH TOTAL WORKING TIME -->
-<tr>
-    <td colspan="2" style="text-align: left; font-weight: 700;">Prod. Qty / Head / Hour</td>
+                    <!-- PROD. QTY / HEAD / HOUR - SATU KOLOM PENUH, DIBAWAH TOTAL WORKING TIME -->
+                    <tr>
+                        <td colspan="2" style="text-align: left; font-weight: 700;">Production Qty. / Head / Hour</td>
                         @for (int i = 0; i < Model.PlanData.Count; i++)
                         {
-                <td>
+                            <td>
                                 @{
                                     decimal totalActual = Model.NormalData[i] + Model.OvertimeData[i];
                                     int workers = Model.NoOfDirectWorkers[i];
@@ -993,16 +982,16 @@ body.light-mode #totalPhhValue {
                                     }
                                 }
                                 @(pph > 0 ? pph.ToString() : "")
-                </td>
+                            </td>
                         }
-</tr>
-        </tbody>
-    </table>
-</div>
-</div>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
     @section Scripts {
-            <!-- GANTI JADI LOCAL -->
+        <!-- GANTI JADI LOCAL -->
         <script src="~/js/jquery-3.6.0.min.js"></script>
         <script src="~/js/jquery.validate.min.js"></script>
         <script src="~/js/jquery.validate.unobtrusive.min.js"></script>
@@ -1014,258 +1003,314 @@ body.light-mode #totalPhhValue {
 
 
         <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                // ===== DATA DARI MODEL =====
-                const normalData = @Html.Raw(Json.Serialize(Model.NormalData));
-                const overtimeData = @Html.Raw(Json.Serialize(Model.OvertimeData));
-                const planData = @Html.Raw(Json.Serialize(Model.PlanData));
-                const planOvertimeData = @Html.Raw(Json.Serialize(Model.PlanOvertimeData));
-                const originalPlanData = @Html.Raw(Json.Serialize(Model.OriginalPlanData));
-                const chartLabels = @Html.Raw(Json.Serialize(Model.ChartLabels));
-                const isCurrentMonth = @Html.Raw(Json.Serialize(Model.IsCurrentMonthView));
-                const today = new Date().getDate();
-                const daysInMonth = @Model.DaysInMonth;
-                const anchorDay = isCurrentMonth ? today : daysInMonth;
+                    document.addEventListener('DOMContentLoaded', function () {
+                        // ===== DATA DARI MODEL =====
+                          const normalData = @Html.Raw(Json.Serialize(Model.NormalData));
+            const overtimeData = @Html.Raw(Json.Serialize(Model.OvertimeData));
+            const planData = @Html.Raw(Json.Serialize(Model.PlanData));
+            const planOvertimeData = @Html.Raw(Json.Serialize(Model.PlanOvertimeData));
+            const originalPlanData = @Html.Raw(Json.Serialize(Model.OriginalPlanData));
+            const originalPlanOvertimeData = @Html.Raw(Json.Serialize(Model.OriginalPlanOvertimeData));
+            const effectivePlanData = @Html.Raw(Json.Serialize(Model.EffectivePlanData));
+            const effectivePlanOtData = @Html.Raw(Json.Serialize(Model.EffectivePlanOvertimeData));
+            const chartChangePlanData = planData.map((v, i) => v > 0 ? effectivePlanData[i] : null);
+            const chartChangePlanOtData = planOvertimeData.map((v, i) => v > 0 ? effectivePlanOtData[i] : null);
+            const chartLabels = @Html.Raw(Json.Serialize(Model.ChartLabels));
+            const isCurrentMonth = @Html.Raw(Json.Serialize(Model.IsCurrentMonthView));
+            const today = new Date().getDate();
+            const daysInMonth = @Model.DaysInMonth;
+            const anchorDay = isCurrentMonth ? today : daysInMonth;
 
-                // ===== HITUNG TOTAL =====
-                let totalActualAtAnchor = 0;
-                let totalPlanAtAnchor = 0;
-                for (let i = 0; i < anchorDay; i++) {
-                    totalActualAtAnchor += (normalData[i] || 0) + (overtimeData[i] || 0);
-                    totalPlanAtAnchor += (planData[i] || 0);
+                        // ===== HITUNG TOTAL =====
+                        let totalActualAtAnchor = 0;
+                        let totalPlanAtAnchor = 0;
+                        for (let i = 0; i < anchorDay; i++) {
+                            totalActualAtAnchor += (normalData[i] || 0) + (overtimeData[i] || 0);
+                                   totalPlanAtAnchor += (effectivePlanData[i] || 0) + (effectivePlanOtData[i] || 0);
+                        }
+
+                        document.getElementById('totalActualValue').textContent = totalActualAtAnchor.toLocaleString();
+                        document.getElementById('totalPlanValue').textContent = totalPlanAtAnchor.toLocaleString();
+
+                        // ===== HITUNG RATIO =====
+                        const ratioActualData = [], ratioPlanData = [];
+                        let runningActualTotal = 0, runningPlanTotal = 0;
+
+                        for (let i = 0; i < chartLabels.length; i++) {
+                            if (isCurrentMonth && (i + 1) > today) {
+                                ratioActualData.push(null);
+                                ratioPlanData.push(null);
+                            } else {
+                                runningActualTotal += (normalData[i] || 0) + (overtimeData[i] || 0);
+                                       runningPlanTotal += (effectivePlanData[i] || 0) + (effectivePlanOtData[i] || 0);
+                                ratioActualData.push((totalActualAtAnchor > 0) ? (runningActualTotal / totalActualAtAnchor) * 100 : 0);
+                                ratioPlanData.push((totalPlanAtAnchor > 0) ? (runningPlanTotal / totalPlanAtAnchor) * 100 : 0);
+                            }
+                        }
+            // ===== DETEKSI LIGHT MODE =====
+            const isLightMode = document.body.classList.contains('light-mode');
+            const chartTextColor = isLightMode ? '#1a1a2e' : '#ffffff';
+            const tooltipBgColor = isLightMode ? 'rgba(232, 240, 247, 0.95)' : 'rgba(0, 0, 0, 0.8)';
+            const tooltipTitleColor = isLightMode ? '#1a1a2e' : '#ffffff';
+            const tooltipBodyColor = isLightMode ? '#1a1a2e' : '#ffffff';
+            const gridColor = isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+
+            // ===== CHART =====
+            new Chart(document.getElementById('dayChart'), {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        { type: 'line', label: 'Act Ratio (%)', data: ratioActualData, borderColor: '#FACC15', backgroundColor: 'rgba(255, 215, 0, 0.2)', tension: 0.1, yAxisID: 'y1' },
+                        { type: 'line', label: 'Plan Ratio (%)', data: ratioPlanData, borderColor: isLightMode ? '#666666' : '#FFFFFF', backgroundColor: isLightMode ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.2)', tension: 0.1, yAxisID: 'y1' },
+                           { label: 'SAP Plan Normal', data: originalPlanData, backgroundColor: '#3cb9fc', borderColor: '#3cb9fc', barThickness: 15, stack: 'OriginalPlan', yAxisID: 'y' },
+            { label: 'SAP Plan Overtime', data: originalPlanOvertimeData, backgroundColor: '#1a3a6b', borderColor: '#1a3a6b', barThickness: 15, stack: 'OriginalPlan', yAxisID: 'y' },
+               { label: 'Change Plan', data: chartChangePlanData, backgroundColor: '#a32ca3', borderColor: '#a32ca3', barThickness: 15, stack: 'Plan', yAxisID: 'y' },
+            { label: 'Overtime Plan', data: chartChangePlanOtData, backgroundColor: '#6a1b9a', borderColor: '#6a1b9a', barThickness: 15, stack: 'Plan', yAxisID: 'y' },
+                        { label: 'Act Normal', data: normalData, backgroundColor: '#35FF00', borderColor: '#35FF00', barThickness: 15, stack: 'Actual', yAxisID: 'y' },
+                        { label: 'Act Overtime', data: overtimeData, backgroundColor: '#006330', borderColor: '#006330', barThickness: 15, stack: 'Actual', yAxisID: 'y' }
+                    ]
+                },
+                options: {
+                    devicePixelRatio: 3,
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 500 },
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                           x: {
+                stacked: true,
+                ticks: {
+                        color: function(context) {
+                const day = parseInt(chartLabels[context.index]); // paksa jadi integer
+                const month = parseInt(document.getElementById('SelectedMonth').value) - 1;
+                const year = parseInt(document.getElementById('SelectedYear').value);
+                const date = new Date(year, month, day);
+                const dayOfWeek = date.getDay();
+
+                // DEBUG - hapus setelah berhasil
+                console.log(`Day: ${day}, DayOfWeek: ${dayOfWeek}, Date: ${date}`);
+
+                if (dayOfWeek === 0 || dayOfWeek === 6) {
+                    return '#FF4444';
                 }
-
-                document.getElementById('totalActualValue').textContent = totalActualAtAnchor.toLocaleString();
-                document.getElementById('totalPlanValue').textContent = totalPlanAtAnchor.toLocaleString();
-
-                // ===== HITUNG RATIO =====
-                const ratioActualData = [], ratioPlanData = [];
-                let runningActualTotal = 0, runningPlanTotal = 0;
-
-                for (let i = 0; i < chartLabels.length; i++) {
-                    if (isCurrentMonth && (i + 1) > today) {
-                        ratioActualData.push(null);
-                        ratioPlanData.push(null);
-                    } else {
-                        runningActualTotal += (normalData[i] || 0) + (overtimeData[i] || 0);
-                        runningPlanTotal += (planData[i] || 0);
-                        ratioActualData.push((totalActualAtAnchor > 0) ? (runningActualTotal / totalActualAtAnchor) * 100 : 0);
-                        ratioPlanData.push((totalPlanAtAnchor > 0) ? (runningPlanTotal / totalPlanAtAnchor) * 100 : 0);
+                return chartTextColor;
+            }
+                },
+                grid: { color: gridColor }
+            },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: 'Production Qty (unit)', color: chartTextColor },
+                            ticks: { color: chartTextColor },
+                            grid: { color: gridColor }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            max: 120,
+                            title: { display: true, text: 'Ratio (%)', color: chartTextColor },
+                            ticks: { color: chartTextColor, callback: v => v + '%' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: chartTextColor,
+                                font: { weight: '600' }
+                            }
+                        },
+                        tooltip: {
+                            titleColor: tooltipTitleColor,
+                            bodyColor: tooltipBodyColor,
+                            backgroundColor: tooltipBgColor,
+                            borderColor: isLightMode ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.2)',
+                            borderWidth: 1,
+                            padding: 10,
+                            titleFont: { weight: 'bold' }
+                        }
                     }
                 }
-    // ===== DETEKSI LIGHT MODE =====
-    const isLightMode = document.body.classList.contains('light-mode');
-    const chartTextColor = isLightMode ? '#1a1a2e' : '#ffffff';
-    const tooltipBgColor = isLightMode ? 'rgba(232, 240, 247, 0.95)' : 'rgba(0, 0, 0, 0.8)';
-    const tooltipTitleColor = isLightMode ? '#1a1a2e' : '#ffffff';
-    const tooltipBodyColor = isLightMode ? '#1a1a2e' : '#ffffff';
-    const gridColor = isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+            });
+                // ===== TOGGLE CHANGE PLAN BUTTON =====
+            let changePlanVisible = true;
+            const toggleChangePlanBtn = document.getElementById('toggleChangePlanButton');
 
-    // ===== CHART =====
-    new Chart(document.getElementById('dayChart'), {
-        type: 'bar',
-        data: {
-            labels: chartLabels,
-            datasets: [
-                { type: 'line', label: 'Rasio Actual (%)', data: ratioActualData, borderColor: '#FACC15', backgroundColor: 'rgba(255, 215, 0, 0.2)', tension: 0.1, yAxisID: 'y1' },
-                { type: 'line', label: 'Rasio Plan (%)', data: ratioPlanData, borderColor: isLightMode ? '#666666' : '#FFFFFF', backgroundColor: isLightMode ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.2)', tension: 0.1, yAxisID: 'y1' },
-                { label: 'SAP Plan', data: originalPlanData, backgroundColor: '#3cb9fc', borderColor: '#3cb9fc', barThickness: 15, stack: 'OriginalPlan', yAxisID: 'y' },
-                { label: 'Change Plan', data: planData, backgroundColor: '#a32ca3', borderColor: '#a32ca3', barThickness: 15, stack: 'Plan', yAxisID: 'y' },
-                { label: 'Overtime Plan', data: planOvertimeData, backgroundColor: '#6a1b9a', borderColor: '#6a1b9a', barThickness: 15, stack: 'Plan', yAxisID: 'y' },
-                { label: 'Act Normal', data: normalData, backgroundColor: '#35FF00', borderColor: '#35FF00', barThickness: 15, stack: 'Actual', yAxisID: 'y' },
-                { label: 'Act Overtime', data: overtimeData, backgroundColor: '#006330', borderColor: '#006330', barThickness: 15, stack: 'Actual', yAxisID: 'y' }
-            ]
-        },
-        options: {
-            devicePixelRatio: 3,
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: { duration: 500 },
-            interaction: { mode: 'index', intersect: false },
-            scales: {
-                x: { 
-                    stacked: true, 
-                    ticks: { color: chartTextColor },
-                    grid: { color: gridColor }
-                },
-                y: { 
-                    type: 'linear', 
-                    position: 'left', 
-                    title: { display: true, text: 'Production Qty (unit)', color: chartTextColor }, 
-                    ticks: { color: chartTextColor },
-                    grid: { color: gridColor }
-                },
-                y1: { 
-                    type: 'linear', 
-                    position: 'right', 
-                    max: 120, 
-                    title: { display: true, text: 'Ratio (%)', color: chartTextColor }, 
-                    ticks: { color: chartTextColor, callback: v => v + '%' }, 
-                    grid: { drawOnChartArea: false } 
+            toggleChangePlanBtn?.addEventListener('click', function () {
+                changePlanVisible = !changePlanVisible;
+
+                // Dataset index: 0=ActRatio, 1=PlanRatio, 2=SAPNormal, 3=SAPOvertime, 4=ChangePlan, 5=OvertimePlan
+                const chart = Chart.getChart('dayChart');
+                if (chart) {
+                    if (changePlanVisible) {
+                        chart.show(4); // Change Plan
+                        chart.show(5); // Overtime Plan
+                    } else {
+                        chart.hide(4);
+                        chart.hide(5);
+                    }
+                    chart.update();
                 }
-            },
-            plugins: {
-                legend: { 
-                    labels: { 
-                        color: chartTextColor,
-                        font: { weight: '600' }
-                    } 
-                },
-                tooltip: { 
-                    titleColor: tooltipTitleColor, 
-                    bodyColor: tooltipBodyColor,
-                    backgroundColor: tooltipBgColor,
-                    borderColor: isLightMode ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.2)',
-                    borderWidth: 1,
-                    padding: 10,
-                    titleFont: { weight: 'bold' }
+
+                // Update tampilan tombol (ikut light/dark mode)
+                const isLight = document.body.classList.contains('light-mode');
+                if (changePlanVisible) {
+                    toggleChangePlanBtn.innerHTML = '<i class="fas fa-eye me-1"></i> Hide Change Plan';
+                    toggleChangePlanBtn.style.borderColor = '';
+                    toggleChangePlanBtn.style.color = '';
+                    toggleChangePlanBtn.style.backgroundColor = '';
+                } else {
+                    toggleChangePlanBtn.innerHTML = '<i class="fas fa-eye-slash me-1"></i> Show Change Plan';
+                    toggleChangePlanBtn.style.borderColor = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(100, 181, 246, 0.6)';
+                    toggleChangePlanBtn.style.color = isLight ? 'rgba(0,0,0,0.6)' : 'rgba(100, 181, 246, 1)';
+                    toggleChangePlanBtn.style.backgroundColor = isLight ? 'rgba(0,0,0,0.05)' : '';
                 }
-            }
-        }
-    });
+            });
 
-                // ===== DOWNLOAD PDF =====
-                document.getElementById('downloadPdfButton')?.addEventListener('click', function () {
-                    const btn = this;
-                    const origContent = btn.innerHTML;
-                    btn.disabled = true;
-                    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating...';
+                        // ===== DOWNLOAD PDF =====
+                        document.getElementById('downloadPdfButton')?.addEventListener('click', function () {
+                            const btn = this;
+                            const origContent = btn.innerHTML;
+                            btn.disabled = true;
+                            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating...';
 
-                    setTimeout(() => {
-                        try {
-                            const { jsPDF } = window.jspdf;
-                            const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-                            const pageWidth = doc.internal.pageSize.getWidth();
+                            setTimeout(() => {
+                                try {
+                                    const { jsPDF } = window.jspdf;
+                                    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+                                    const pageWidth = doc.internal.pageSize.getWidth();
 
-                            doc.setFontSize(18);
-                            doc.text('Production Achievement', 40, 50);
-                            doc.setFontSize(10);
-                            doc.setTextColor(100);
-                            doc.text(`Period: ${document.getElementById('SelectedMonth').selectedOptions[0].text} ${document.getElementById('SelectedYear').value}`, 40, 70);
-                            doc.text(`Total Plan: ${document.getElementById('totalPlanValue').innerText}`, pageWidth - 40, 70, { align: 'right' });
-                            doc.text(`Total Actual: ${document.getElementById('totalActualValue').innerText}`, pageWidth - 40, 85, { align: 'right' });
-                            doc.text(`P/H/H: ${document.getElementById('totalPhhValue').innerText}`, pageWidth - 40, 100, { align: 'right' });
-                            doc.setTextColor(0);
+                                    doc.setFontSize(18);
+                                    doc.text('Production Achievement', 40, 50);
+                                    doc.setFontSize(10);
+                                    doc.setTextColor(100);
+                                    doc.text(`Period: ${document.getElementById('SelectedMonth').selectedOptions[0].text} ${document.getElementById('SelectedYear').value}`, 40, 70);
+                                    doc.text(`Total Plan: ${document.getElementById('totalPlanValue').innerText}`, pageWidth - 40, 70, { align: 'right' });
+                                    doc.text(`Total Actual: ${document.getElementById('totalActualValue').innerText}`, pageWidth - 40, 85, { align: 'right' });
+                                    doc.text(`P/H/H: ${document.getElementById('totalPhhValue').innerText}`, pageWidth - 40, 100, { align: 'right' });
+                                    doc.setTextColor(0);
 
-                            const chartImgData = document.getElementById('dayChart').toDataURL('image/png', 1.0);
-                            doc.addImage(chartImgData, 'PNG', 40, 110, 760, 220);
+                                    const chartImgData = document.getElementById('dayChart').toDataURL('image/png', 1.0);
+                                    doc.addImage(chartImgData, 'PNG', 40, 110, 760, 220);
 
-                            doc.autoTable({
-                                html: '#productionTable',
-                                startY: 340,
-                                theme: 'grid',
-                                styles: { fontSize: 5, cellPadding: 2 },
-                                headStyles: { fillColor: [44, 62, 80], fontSize: 6 }
-                            });
+                                    doc.autoTable({
+                                        html: '#productionTable',
+                                        startY: 340,
+                                        theme: 'grid',
+                                        styles: { fontSize: 5, cellPadding: 2 },
+                                        headStyles: { fillColor: [44, 62, 80], fontSize: 6 }
+                                    });
 
-                            doc.save('Production-Report.pdf');
-                        } catch (err) {
-                            console.error(err);
-                            alert('Gagal membuat PDF. Cek console untuk detail.');
-                        } finally {
-                            btn.disabled = false;
-                            btn.innerHTML = origContent;
+                                    doc.save('Production-Report.pdf');
+                                } catch (err) {
+                                    console.error(err);
+                                    alert('Gagal membuat PDF. Cek console untuk detail.');
+                                } finally {
+                                    btn.disabled = false;
+                                    btn.innerHTML = origContent;
+                                }
+                            }, 100);
+                        });
+
+                        // ===== DROPDOWN STYLE (BOLD) =====
+                        function updateDropdownStyle() {
+                            const dropdowns = document.querySelectorAll('.filter-content .form-select-sm');
+
+                            dropdowns.forEach(dropdown => {
+                                const dropdownId = dropdown.id;
+                                const dropdownValue = dropdown.value;
+
+                                if (dropdownId === 'SelectedYear') {
+                                    if (dropdownValue) {
+                                        dropdown.classList.add('selected');
+                                    }
+
+                                    }  else if (dropdownId === 'SelectedMonth') {
+                        if (dropdownValue) {
+                            dropdown.classList.add('selected');
+                        } else {
+                            dropdown.classList.remove('selected');
                         }
-                    }, 100);
+                    }
+                                else if (dropdown.name === 'MachineLine') {
+                                    if (dropdownValue && dropdownValue !== 'All') {
+                                        dropdown.classList.add('selected');
+                                    } else {
+                                        dropdown.classList.remove('selected');
+                                    }
+                                }
+                            });
+                        }
+
+                        // Jalankan saat halaman load
+                        updateDropdownStyle();
+
+                        // Jalankan saat dropdown berubah
+                        const dropdowns = document.querySelectorAll('.filter-content .form-select-sm');
+                        dropdowns.forEach(dropdown => {
+                            dropdown.addEventListener('change', updateDropdownStyle);
+                        });
+                    });
+
+                        // SHIFT BUTTON LOGIC - MUTUAL EXCLUSIVITY
+            document.addEventListener('DOMContentLoaded', function() {
+                const allShiftCheckbox = document.getElementById('AllShift');
+                const individualShifts = ['Shift1', 'Shift2', 'Shift3', 'NonShift'];
+
+                // Ketika "All" diklik
+                allShiftCheckbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        // Uncheck semua shift individual
+                        individualShifts.forEach(id => {
+                            const checkbox = document.getElementById(id);
+                            checkbox.checked = false;
+                            checkbox.nextElementSibling.classList.remove('active');
+                        });
+                        this.nextElementSibling.classList.add('active');
+                    } else {
+                        // Jika user uncheck "All" dan tidak ada shift lain yang dipilih
+                        const anyChecked = individualShifts.some(id =>
+                            document.getElementById(id).checked
+                        );
+                        if (!anyChecked) {
+                            // Force check "All" kembali
+                            this.checked = true;
+                            this.nextElementSibling.classList.add('active');
+                        }
+                    }
                 });
 
-                // ===== DROPDOWN STYLE (BOLD) =====
-                function updateDropdownStyle() {
-                    const dropdowns = document.querySelectorAll('.filter-content .form-select-sm');
+                // Ketika shift individual diklik
+                individualShifts.forEach(shiftId => {
+                    const checkbox = document.getElementById(shiftId);
+                    checkbox.addEventListener('change', function() {
+                        if (this.checked) {
+                            // Uncheck "All"
+                            allShiftCheckbox.checked = false;
+                            allShiftCheckbox.nextElementSibling.classList.remove('active');
+                            this.nextElementSibling.classList.add('active');
+                        } else {
+                            this.nextElementSibling.classList.remove('active');
 
-                    dropdowns.forEach(dropdown => {
-                        const dropdownId = dropdown.id;
-                        const dropdownValue = dropdown.value;
-
-                        if (dropdownId === 'SelectedYear') {
-                            if (dropdownValue) {
-                                dropdown.classList.add('selected');
-                            }
-
-                            }  else if (dropdownId === 'SelectedMonth') {
-                if (dropdownValue) {
-                    dropdown.classList.add('selected');
-                } else {
-                    dropdown.classList.remove('selected');
-                }
-            }
-                        else if (dropdown.name === 'MachineLine') {
-                            if (dropdownValue && dropdownValue !== 'All') {
-                                dropdown.classList.add('selected');
-                            } else {
-                                dropdown.classList.remove('selected');
+                            // Jika semua shift individual di-uncheck
+                            const anyChecked = individualShifts.some(id =>
+                                document.getElementById(id).checked
+                            );
+                            if (!anyChecked) {
+                                // Auto-check "All"
+                                allShiftCheckbox.checked = true;
+                                allShiftCheckbox.nextElementSibling.classList.add('active');
                             }
                         }
                     });
-                }
-
-                // Jalankan saat halaman load
-                updateDropdownStyle();
-
-                // Jalankan saat dropdown berubah
-                const dropdowns = document.querySelectorAll('.filter-content .form-select-sm');
-                dropdowns.forEach(dropdown => {
-                    dropdown.addEventListener('change', updateDropdownStyle);
                 });
             });
-
-                // SHIFT BUTTON LOGIC - MUTUAL EXCLUSIVITY
-    document.addEventListener('DOMContentLoaded', function() {
-        const allShiftCheckbox = document.getElementById('AllShift');
-        const individualShifts = ['Shift1', 'Shift2', 'Shift3', 'NonShift'];
-
-        // Ketika "All" diklik
-        allShiftCheckbox.addEventListener('change', function() {
-            if (this.checked) {
-                // Uncheck semua shift individual
-                individualShifts.forEach(id => {
-                    const checkbox = document.getElementById(id);
-                    checkbox.checked = false;
-                    checkbox.nextElementSibling.classList.remove('active');
-                });
-                this.nextElementSibling.classList.add('active');
-            } else {
-                // Jika user uncheck "All" dan tidak ada shift lain yang dipilih
-                const anyChecked = individualShifts.some(id => 
-                    document.getElementById(id).checked
-                );
-                if (!anyChecked) {
-                    // Force check "All" kembali
-                    this.checked = true;
-                    this.nextElementSibling.classList.add('active');
-                }
-            }
-        });
-
-        // Ketika shift individual diklik
-        individualShifts.forEach(shiftId => {
-            const checkbox = document.getElementById(shiftId);
-            checkbox.addEventListener('change', function() {
-                if (this.checked) {
-                    // Uncheck "All"
-                    allShiftCheckbox.checked = false;
-                    allShiftCheckbox.nextElementSibling.classList.remove('active');
-                    this.nextElementSibling.classList.add('active');
-                } else {
-                    this.nextElementSibling.classList.remove('active');
-
-                    // Jika semua shift individual di-uncheck
-                    const anyChecked = individualShifts.some(id => 
-                        document.getElementById(id).checked
-                    );
-                    if (!anyChecked) {
-                        // Auto-check "All"
-                        allShiftCheckbox.checked = true;
-                        allShiftCheckbox.nextElementSibling.classList.add('active');
-                    }
-                }
+                flatpickr(".datepicker", {
+                dateFormat: "Y-m-d",
+                allowInput: true
             });
-        });
-    });
-        flatpickr(".datepicker", {
-        dateFormat: "Y-m-d",
-        allowInput: true
-    });
 
         </script>
-}
+    }

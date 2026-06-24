@@ -10,7 +10,6 @@ namespace MonitoringSystem.Pages.Summary
         private readonly IConfiguration _config;
         private readonly IWebHostEnvironment _env;
 
-        // Loss category definitions (single source of truth)
         private static readonly List<(string Col, string Group)> LossColumns = new()
         {
             ("QualityTrouble",           "WorkingLoss"),
@@ -45,9 +44,7 @@ namespace MonitoringSystem.Pages.Summary
 
         public void OnGet() { }
 
-        // =====================================================
-        // HELPER: Normalisasi shift format
-        // =====================================================
+        // ── Normalize Shift ────────────────────────────────
         private static string NormalizeShift(string? shift) => (shift ?? "") switch
         {
             "1" or "Shift 1" => "Shift 1",
@@ -57,37 +54,38 @@ namespace MonitoringSystem.Pages.Summary
             var s => s
         };
 
-        // =====================================================
-        // HELPER: Hitung semua metric dari input
-        // =====================================================
-        private static (double? quality, double? operatingRatio, double? ability, double? oee, double? achievement, string? category)
+        // ── Hitung OEE & semua metric ──────────────────────
+        private static (double? quality, double? operatingRatio, double? ability,
+                        double? oee, double? achievement, string? category)
             CalcMetrics(MachineEfficiencyInput input)
         {
             double? quality = null;
             if (input.GoodProductionQty.HasValue && input.GoodProductionQty.Value > 0)
             {
                 double defect = input.DefectQty ?? 0;
-                quality = Math.Round(((input.GoodProductionQty.Value - defect) / input.GoodProductionQty.Value) * 100.0, 2);
+                quality = Math.Round(
+                    ((input.GoodProductionQty.Value - defect) / input.GoodProductionQty.Value) * 100.0, 2);
             }
 
             double? operatingRatio = null;
             if (input.WorkingTime.HasValue && input.WorkingTime.Value > 0)
             {
                 double totalLoss = input.LossItems?.Sum(x => x.LossMinutes ?? 0) ?? 0;
-                operatingRatio = Math.Round(((input.WorkingTime.Value - totalLoss) / input.WorkingTime.Value) * 100.0, 2);
+                operatingRatio = Math.Round(
+                    ((input.WorkingTime.Value - totalLoss) / input.WorkingTime.Value) * 100.0, 2);
             }
 
             double? ability = null;
             if (input.PlanQty.HasValue && input.PlanQty.Value > 0 && input.GoodProductionQty.HasValue)
-                ability = Math.Round((input.GoodProductionQty.Value / input.PlanQty.Value) * 100.0, 2);
+                ability = Math.Round(
+                    (input.GoodProductionQty.Value / input.PlanQty.Value) * 100.0, 2);
 
             double? oee = null;
             if (operatingRatio.HasValue && ability.HasValue && quality.HasValue)
-                oee = Math.Round((operatingRatio.Value * ability.Value * quality.Value) / 10000.0, 2);
+                oee = Math.Round(
+                    (operatingRatio.Value * ability.Value * quality.Value) / 10000.0, 2);
 
-            double? achievement = null;
-            if (input.PlanQty.HasValue && input.PlanQty.Value > 0 && input.GoodProductionQty.HasValue)
-                achievement = Math.Round((input.GoodProductionQty.Value / input.PlanQty.Value) * 100.0, 2);
+            double? achievement = ability;
 
             string? category = oee.HasValue
                 ? (oee.Value >= 85 ? "Good" : oee.Value >= 60 ? "Average" : "Poor")
@@ -96,33 +94,29 @@ namespace MonitoringSystem.Pages.Summary
             return (quality, operatingRatio, ability, oee, achievement, category);
         }
 
-        // =====================================================
-        // API: ?handler=Machines
-        // =====================================================
-        public JsonResult OnGetMachines()
+        // ── GET: MachineList ───────────────────────────────
+        public JsonResult OnGetMachineList()
         {
-            var machines = new List<object>();
+            var result = new List<object>();
             try
             {
                 using var conn = OpenConn();
-                using var cmd = new SqlCommand("SELECT DISTINCT MachineName FROM [dbo].[MachineEfficiency] WHERE MachineName IS NOT NULL ORDER BY MachineName", conn);
-                using var reader = cmd.ExecuteReader();
-                // BENAR - value pakai MachineName karena tidak ada kolom ID
-                while (reader.Read())
-                    machines.Add(new { value = reader["MachineName"].ToString(), label = reader["MachineName"].ToString() });
+                using var cmd = new SqlCommand(
+                    "SELECT IdMachine, MachineName FROM [dbo].[MachineList] ORDER BY MachineName", conn);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                    result.Add(new { machineName = r["MachineName"]?.ToString() ?? "" });
             }
             catch (Exception ex) { return new JsonResult(new { error = ex.Message }); }
-            return new JsonResult(machines);
+            return new JsonResult(result);
         }
 
-        // =====================================================
-        // API: ?handler=LossCategories
-        // =====================================================
-
+        // ── GET: LossCategories ────────────────────────────
         public JsonResult OnGetLossCategories()
         {
             static string ToLabel(string col) =>
-                System.Text.RegularExpressions.Regex.Replace(col, @"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ");
+                System.Text.RegularExpressions.Regex.Replace(
+                    col, @"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ");
 
             var workingLoss = LossColumns
                 .Where(x => x.Group == "WorkingLoss")
@@ -135,38 +129,7 @@ namespace MonitoringSystem.Pages.Summary
             return new JsonResult(new { workingLoss, fixedLoss });
         }
 
-        // =====================================================
-        // API: ?handler=WorkingTime&machineName=X&date=Y&shift=Z
-        // =====================================================
-        public JsonResult OnGetWorkingTime(string machineName, DateTime date, string shift)
-        {
-            try
-            {
-                string shiftNorm = NormalizeShift(shift);
-                using var conn = OpenConn();
-                string sql = @"
-                    SELECT TOP 1 WorkingTime
-                    FROM [dbo].[MachineEfficiency]
-                    WHERE MachineName = @MachineName
-                      AND CAST([Date] AS DATE) = CAST(@Date AS DATE)
-                      AND Shift = @Shift
-                      AND WorkingTime IS NOT NULL
-                    ORDER BY ID DESC";
-                using var cmd = new SqlCommand(sql, conn);
-                cmd.Parameters.AddWithValue("@MachineName", machineName ?? "");
-                cmd.Parameters.AddWithValue("@Date", date);
-                cmd.Parameters.AddWithValue("@Shift", shiftNorm);
-                var result = cmd.ExecuteScalar();
-                if (result != null && result != DBNull.Value)
-                    return new JsonResult(new { found = true, workingTime = Convert.ToDouble(result) });
-                return new JsonResult(new { found = false });
-            }
-            catch (Exception ex) { return new JsonResult(new { found = false, error = ex.Message }); }
-        }
-
-        // =====================================================
-        // API: ?handler=LoadExisting&machineName=X&date=Y&shift=Z
-        // =====================================================
+        // ── GET: LoadExisting ──────────────────────────────
         public JsonResult OnGetLoadExisting(string machineName, DateTime date, string shift)
         {
             try
@@ -174,55 +137,65 @@ namespace MonitoringSystem.Pages.Summary
                 string shiftNorm = NormalizeShift(shift);
                 using var conn = OpenConn();
 
-                // Ambil header
-                string sqlHeader = @"
+                // Cari IdMachine dari MachineList
+                int? idMachine = null;
+                using (var cmdM = new SqlCommand(
+                    "SELECT IdMachine FROM [dbo].[MachineList] WHERE MachineName = @Name", conn))
+                {
+                    cmdM.Parameters.AddWithValue("@Name", machineName);
+                    var res = cmdM.ExecuteScalar();
+                    if (res != null && res != DBNull.Value)
+                        idMachine = Convert.ToInt32(res);
+                }
+                if (!idMachine.HasValue) return new JsonResult(new { found = false });
+
+                // Ambil header dari Efficiency
+                using var cmd = new SqlCommand(@"
                     SELECT TOP 1 ID, PlanQty, DefectQty, GoodProductionQty, WorkingTime
-                    FROM [dbo].[MachineEfficiency]
-                    WHERE MachineName = @MachineName
+                    FROM [dbo].[Efficiency]
+                    WHERE IdMachine = @IdMachine
                       AND CAST([Date] AS DATE) = CAST(@Date AS DATE)
                       AND Shift = @Shift
-                    ORDER BY ID DESC";
-                using var cmd = new SqlCommand(sqlHeader, conn);
-                cmd.Parameters.AddWithValue("@MachineName", machineName ?? "");
+                    ORDER BY ID DESC", conn);
+                cmd.Parameters.AddWithValue("@IdMachine", idMachine.Value);
                 cmd.Parameters.AddWithValue("@Date", date);
                 cmd.Parameters.AddWithValue("@Shift", shiftNorm);
-                using var reader = cmd.ExecuteReader();
+                using var r = cmd.ExecuteReader();
 
-                if (!reader.Read()) return new JsonResult(new { found = false });
+                if (!r.Read()) return new JsonResult(new { found = false });
 
-                int efficiencyId = Convert.ToInt32(reader["ID"]);
-                double? G(string col) => reader[col] == DBNull.Value ? null : Convert.ToDouble(reader[col]);
-                double? planQty = G("PlanQty");
-                double? defectQty = G("DefectQty");
-                double? goodProductionQty = G("GoodProductionQty");
-                double? workingTime = G("WorkingTime");
-                reader.Close();
+                int effId = Convert.ToInt32(r["ID"]);
+                double? G(string col) => r[col] == DBNull.Value ? null : Convert.ToDouble(r[col]);
+                var planQty = G("PlanQty");
+                var defect = G("DefectQty");
+                var goodQty = G("GoodProductionQty");
+                var workTime = G("WorkingTime");
+                r.Close();
 
-                // Ambil loss items
-                string sqlLoss = @"
-                    SELECT LossCategory, LossGroup, LossMinutes
-                    FROM [dbo].[MachineEfficiencyLoss]
-                    WHERE EfficiencyID = @EfficiencyID";
-                using var cmdLoss = new SqlCommand(sqlLoss, conn);
-                cmdLoss.Parameters.AddWithValue("@EfficiencyID", efficiencyId);
-                using var readerLoss = cmdLoss.ExecuteReader();
+                // Ambil loss dari EfficiencyLoss
+                using var cmdL = new SqlCommand(@"
+                    SELECT LossCategory, LossMinutes
+                    FROM [dbo].[EfficiencyLoss]
+                    WHERE EfficiencyID = @ID", conn);
+                cmdL.Parameters.AddWithValue("@ID", effId);
+                using var rL = cmdL.ExecuteReader();
 
                 var lossDict = new Dictionary<string, double?>();
-                while (readerLoss.Read())
+                while (rL.Read())
                 {
-                    string cat = readerLoss["LossCategory"]?.ToString() ?? "";
-                    double? min = readerLoss["LossMinutes"] == DBNull.Value ? null : Convert.ToDouble(readerLoss["LossMinutes"]);
+                    string cat = rL["LossCategory"]?.ToString() ?? "";
+                    double? min = rL["LossMinutes"] == DBNull.Value
+                        ? null : Convert.ToDouble(rL["LossMinutes"]);
                     lossDict[cat] = min;
                 }
 
-                // Build response compatible dengan frontend lama
                 return new JsonResult(new
                 {
                     found = true,
                     planQty,
-                    defectQty,
-                    goodProductionQty,
-                    workingTime,
+                    defectQty = defect,
+                    goodProductionQty = goodQty,
+                    workingTime = workTime,
                     qualityTrouble = lossDict.GetValueOrDefault("QualityTrouble"),
                     modelChangingLoss = lossDict.GetValueOrDefault("ModelChangingLoss"),
                     materialShortageExternal = lossDict.GetValueOrDefault("MaterialShortageExternal"),
@@ -250,9 +223,49 @@ namespace MonitoringSystem.Pages.Summary
             catch (Exception ex) { return new JsonResult(new { found = false, error = ex.Message }); }
         }
 
-        // =====================================================
-        // API: ?handler=Submit (UPSERT)
-        // =====================================================
+        // ── GET: Efficiency (untuk display tabel) ──────────
+        public JsonResult OnGetEfficiency(int month, int year)
+        {
+            if (month < 1 || month > 12) return new JsonResult(new { error = "Bulan tidak valid (1-12)." });
+            if (year < 2000 || year > 2100) return new JsonResult(new { error = "Tahun tidak valid." });
+
+            var result = new List<object>();
+            try
+            {
+                using var conn = OpenConn();
+                string sql = @"
+                    SELECT ml.MachineName,
+                        ISNULL(CAST(e.OEE AS VARCHAR),'-')           AS OEE,
+                        ISNULL(CAST(e.OperatingRatio AS VARCHAR),'-') AS OperatingRatio,
+                        ISNULL(CAST(e.Ability AS VARCHAR),'-')        AS Ability,
+                        ISNULL(CAST(e.Quality AS VARCHAR),'-')        AS Quality,
+                        ISNULL(CAST(e.Achievement AS VARCHAR),'-')    AS Achievement,
+                        CONVERT(VARCHAR, e.Date, 23)                  AS Date
+                    FROM [dbo].[Efficiency] e
+                    JOIN [dbo].[MachineList] ml ON ml.IdMachine = e.IdMachine
+                    WHERE MONTH(e.Date) = @Month AND YEAR(e.Date) = @Year
+                    ORDER BY ml.MachineName, e.Date";
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@Month", month);
+                cmd.Parameters.AddWithValue("@Year", year);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    result.Add(new
+                    {
+                        machineName = reader["MachineName"]?.ToString() ?? "-",
+                        oEE = reader["OEE"]?.ToString() ?? "-",
+                        operatingRatio = reader["OperatingRatio"]?.ToString() ?? "-",
+                        ability = reader["Ability"]?.ToString() ?? "-",
+                        quality = reader["Quality"]?.ToString() ?? "-",
+                        achievement = reader["Achievement"]?.ToString() ?? "-",
+                        date = reader["Date"]?.ToString() ?? "-"
+                    });
+                return new JsonResult(result);
+            }
+            catch (Exception ex) { return new JsonResult(new { error = ex.Message }); }
+        }
+
+        // ── POST: Submit ───────────────────────────────────
         public JsonResult OnPostSubmit([FromBody] MachineEfficiencyInput input)
         {
             try
@@ -263,65 +276,89 @@ namespace MonitoringSystem.Pages.Summary
                 using var conn = OpenConn();
                 using var tx = conn.BeginTransaction();
 
-                // Cek existing
+                // Cari IdMachine
+                int idMachine = 0;
+                using (var cmdM = new SqlCommand(
+                    "SELECT IdMachine FROM [dbo].[MachineList] WHERE MachineName = @Name", conn, tx))
+                {
+                    cmdM.Parameters.AddWithValue("@Name", input.MachineName ?? "");
+                    var res = cmdM.ExecuteScalar();
+                    if (res != null && res != DBNull.Value)
+                        idMachine = Convert.ToInt32(res);
+                }
+                if (idMachine == 0)
+                {
+                    tx.Rollback();
+                    return new JsonResult(new { success = false, error = "Machine tidak ditemukan di MachineList." });
+                }
+
+                // Cek existing di Efficiency
                 int? existingId = null;
-                using (var checkCmd = new SqlCommand(@"
-                    SELECT TOP 1 ID FROM [dbo].[MachineEfficiency]
-                    WHERE MachineName = @MachineName
+                using (var chk = new SqlCommand(@"
+                    SELECT TOP 1 ID FROM [dbo].[Efficiency]
+                    WHERE IdMachine = @IdMachine
                       AND CAST([Date] AS DATE) = CAST(@Date AS DATE)
                       AND Shift = @Shift", conn, tx))
                 {
-                    checkCmd.Parameters.AddWithValue("@MachineName", input.MachineName ?? "");
-                    checkCmd.Parameters.AddWithValue("@Date", input.Date);
-                    checkCmd.Parameters.AddWithValue("@Shift", input.Shift ?? "");
-                    var result = checkCmd.ExecuteScalar();
-                    if (result != null && result != DBNull.Value)
-                        existingId = Convert.ToInt32(result);
+                    chk.Parameters.AddWithValue("@IdMachine", idMachine);
+                    chk.Parameters.AddWithValue("@Date", input.Date);
+                    chk.Parameters.AddWithValue("@Shift", input.Shift ?? "");
+                    var res = chk.ExecuteScalar();
+                    if (res != null && res != DBNull.Value)
+                        existingId = Convert.ToInt32(res);
                 }
 
-                int efficiencyId;
+                int effId;
                 if (existingId.HasValue)
                 {
-                    // UPDATE header
-                    using var updateCmd = new SqlCommand(@"
-                        UPDATE [dbo].[MachineEfficiency] SET
+                    // UPDATE
+                    using var upd = new SqlCommand(@"
+                        UPDATE [dbo].[Efficiency] SET
                             WorkingTime = @WorkingTime, PlanQty = @PlanQty,
                             GoodProductionQty = @GoodProductionQty, DefectQty = @DefectQty,
                             OEE = @OEE, OperatingRatio = @OperatingRatio,
                             Ability = @Ability, Quality = @Quality,
                             Achievement = @Achievement, Category = @Category
                         WHERE ID = @ID", conn, tx);
-                    AddHeaderParams(updateCmd, input, quality, operatingRatio, ability, oee, achievement, category);
-                    updateCmd.Parameters.AddWithValue("@ID", existingId.Value);
-                    updateCmd.ExecuteNonQuery();
+                    AddHeaderParams(upd, idMachine, input, quality, operatingRatio,
+                                    ability, oee, achievement, category);
+                    upd.Parameters.AddWithValue("@ID", existingId.Value);
+                    upd.ExecuteNonQuery();
 
                     // Hapus loss lama
-                    using var delLoss = new SqlCommand("DELETE FROM [dbo].[MachineEfficiencyLoss] WHERE EfficiencyID = @ID", conn, tx);
-                    delLoss.Parameters.AddWithValue("@ID", existingId.Value);
-                    delLoss.ExecuteNonQuery();
+                    using var del = new SqlCommand(
+                        "DELETE FROM [dbo].[EfficiencyLoss] WHERE EfficiencyID = @ID", conn, tx);
+                    del.Parameters.AddWithValue("@ID", existingId.Value);
+                    del.ExecuteNonQuery();
 
-                    efficiencyId = existingId.Value;
+                    effId = existingId.Value;
                 }
                 else
                 {
-                    // INSERT header
-                    using var insertCmd = new SqlCommand(@"
-                        INSERT INTO [dbo].[MachineEfficiency]
-                            (MachineName, Date, Shift, WorkingTime, PlanQty, GoodProductionQty, DefectQty,
-                             OEE, OperatingRatio, Ability, Quality, Achievement, Category)
+                    // INSERT
+                    using var ins = new SqlCommand(@"
+                        INSERT INTO [dbo].[Efficiency]
+                            (IdMachine, Date, Shift, WorkingTime, PlanQty,
+                             GoodProductionQty, DefectQty, OEE, OperatingRatio,
+                             Ability, Quality, Achievement, Category)
                         VALUES
-                            (@MachineName, @Date, @Shift, @WorkingTime, @PlanQty, @GoodProductionQty, @DefectQty,
-                             @OEE, @OperatingRatio, @Ability, @Quality, @Achievement, @Category);
+                            (@IdMachine, @Date, @Shift, @WorkingTime, @PlanQty,
+                             @GoodProductionQty, @DefectQty, @OEE, @OperatingRatio,
+                             @Ability, @Quality, @Achievement, @Category);
                         SELECT SCOPE_IDENTITY();", conn, tx);
-                    AddHeaderParams(insertCmd, input, quality, operatingRatio, ability, oee, achievement, category);
-                    efficiencyId = Convert.ToInt32(insertCmd.ExecuteScalar());
+                    AddHeaderParams(ins, idMachine, input, quality, operatingRatio,
+                                    ability, oee, achievement, category);
+                    effId = Convert.ToInt32(ins.ExecuteScalar());
                 }
 
-                // INSERT loss items
-                InsertLossItems(conn, tx, efficiencyId, input.LossItems);
-
+                InsertLossItems(conn, tx, effId, input.LossItems);
                 tx.Commit();
-                return new JsonResult(new { success = true, action = existingId.HasValue ? "updated" : "inserted" });
+
+                return new JsonResult(new
+                {
+                    success = true,
+                    action = existingId.HasValue ? "updated" : "inserted"
+                });
             }
             catch (Exception ex)
             {
@@ -329,18 +366,16 @@ namespace MonitoringSystem.Pages.Summary
             }
         }
 
-        // =====================================================
-        // API: ?handler=ImportExcel
-        // =====================================================
-        public async Task<JsonResult> OnPostImportExcel(IFormFile file, string machineName, int month, int year)
+        // ── POST: ImportExcel ──────────────────────────────
+        public async Task<JsonResult> OnPostImportExcel(
+            IFormFile file, string machineName, int month, int year)
         {
             if (file == null || file.Length == 0)
                 return new JsonResult(new { success = false, error = "File tidak boleh kosong." });
             if (string.IsNullOrEmpty(machineName))
-                return new JsonResult(new { success = false, error = "Nama machine harus dipilih." });
+                return new JsonResult(new { success = false, error = "Machine harus dipilih." });
 
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-
             var shifts = new[] { "Shift 1", "Shift 2", "Shift 3", "Non Shift" };
 
             const int ROW_QUALITY_TROUBLE = 3;
@@ -370,10 +405,24 @@ namespace MonitoringSystem.Pages.Summary
             const int ROW_DEFECT_QTY = 29;
             const int ROW_WORKING_TIME = 30;
 
-            var newData = new List<MachineEfficiencyInput>();
-
             try
             {
+                // Cari IdMachine dulu
+                int idMachine = 0;
+                using (var connM = OpenConn())
+                using (var cmdM = new SqlCommand(
+                    "SELECT IdMachine FROM [dbo].[MachineList] WHERE MachineName = @Name", connM))
+                {
+                    cmdM.Parameters.AddWithValue("@Name", machineName);
+                    var res = cmdM.ExecuteScalar();
+                    if (res != null && res != DBNull.Value)
+                        idMachine = Convert.ToInt32(res);
+                }
+                if (idMachine == 0)
+                    return new JsonResult(new { success = false, error = "Machine tidak ditemukan di database." });
+
+                var newData = new List<MachineEfficiencyInput>();
+
                 using var stream = new MemoryStream();
                 await file.CopyToAsync(stream);
                 using var package = new ExcelPackage(stream);
@@ -382,13 +431,17 @@ namespace MonitoringSystem.Pages.Summary
 
                 for (int day = 1; day <= daysInMonth; day++)
                 {
-                    for (int shiftIndex = 0; shiftIndex < 4; shiftIndex++)
+                    for (int si = 0; si < 4; si++)
                     {
-                        int col = 3 + (day - 1) * 4 + shiftIndex;
+                        int col = 3 + (day - 1) * 4 + si;
                         double? D(int row) => TryParseDouble(sheet.Cells[row, col].Value);
 
                         var lossItems = new List<LossItem>();
-                        void AddLoss(string cat, string grp, double? min) { if (min.HasValue) lossItems.Add(new LossItem { LossCategory = cat, LossGroup = grp, LossMinutes = min }); }
+                        void AddLoss(string cat, string grp, double? min)
+                        {
+                            if (min.HasValue && min.Value > 0)
+                                lossItems.Add(new LossItem { LossCategory = cat, LossGroup = grp, LossMinutes = min });
+                        }
 
                         AddLoss("QualityTrouble", "WorkingLoss", D(ROW_QUALITY_TROUBLE));
                         AddLoss("ModelChangingLoss", "WorkingLoss", D(ROW_MODEL_CHANGING_LOSS));
@@ -418,15 +471,15 @@ namespace MonitoringSystem.Pages.Summary
                         double? defectQty = D(ROW_DEFECT_QTY);
                         double? workingTime = D(ROW_WORKING_TIME);
 
-                        bool hasAnyData = planQty.HasValue || goodQty.HasValue || defectQty.HasValue
-                            || workingTime.HasValue || lossItems.Count > 0;
-                        if (!hasAnyData) continue;
+                        bool hasData = planQty.HasValue || goodQty.HasValue
+                            || defectQty.HasValue || workingTime.HasValue || lossItems.Count > 0;
+                        if (!hasData) continue;
 
                         newData.Add(new MachineEfficiencyInput
                         {
                             MachineName = machineName,
                             Date = new DateTime(year, month, day),
-                            Shift = shifts[shiftIndex],
+                            Shift = shifts[si],
                             PlanQty = planQty,
                             GoodProductionQty = goodQty,
                             DefectQty = defectQty,
@@ -436,70 +489,69 @@ namespace MonitoringSystem.Pages.Summary
                     }
                 }
 
-                // ✅ BARU — hapus hanya Date+Shift yang ada di Excel
                 using var conn = OpenConn();
                 using var tx = conn.BeginTransaction();
 
+                // Hapus data lama yang ada di Excel
                 foreach (var item in newData)
                 {
-                    // Cari existing ID untuk Date + Shift ini
                     int? existingId = null;
-                    using (var checkCmd = new SqlCommand(@"
-        SELECT TOP 1 ID FROM [dbo].[MachineEfficiency]
-        WHERE MachineName = @MachineName
-          AND CAST([Date] AS DATE) = CAST(@Date AS DATE)
-          AND Shift = @Shift", conn, tx))
+                    using (var chk = new SqlCommand(@"
+                        SELECT TOP 1 ID FROM [dbo].[Efficiency]
+                        WHERE IdMachine = @IdMachine
+                          AND CAST([Date] AS DATE) = CAST(@Date AS DATE)
+                          AND Shift = @Shift", conn, tx))
                     {
-                        checkCmd.Parameters.AddWithValue("@MachineName", machineName);
-                        checkCmd.Parameters.AddWithValue("@Date", item.Date);
-                        checkCmd.Parameters.AddWithValue("@Shift", item.Shift ?? "");
-                        var result = checkCmd.ExecuteScalar();
-                        if (result != null && result != DBNull.Value)
-                            existingId = Convert.ToInt32(result);
+                        chk.Parameters.AddWithValue("@IdMachine", idMachine);
+                        chk.Parameters.AddWithValue("@Date", item.Date);
+                        chk.Parameters.AddWithValue("@Shift", item.Shift ?? "");
+                        var res = chk.ExecuteScalar();
+                        if (res != null && res != DBNull.Value)
+                            existingId = Convert.ToInt32(res);
                     }
 
                     if (existingId.HasValue)
                     {
-                        // Hapus loss lama untuk hari+shift ini saja
-                        using var delLoss = new SqlCommand(@"
-            DELETE FROM [dbo].[MachineEfficiencyLoss]
-            WHERE EfficiencyID = @ID", conn, tx);
-                        delLoss.Parameters.AddWithValue("@ID", existingId.Value);
-                        delLoss.ExecuteNonQuery();
+                        using var delL = new SqlCommand(
+                            "DELETE FROM [dbo].[EfficiencyLoss] WHERE EfficiencyID = @ID", conn, tx);
+                        delL.Parameters.AddWithValue("@ID", existingId.Value);
+                        delL.ExecuteNonQuery();
 
-                        // Hapus header lama untuk hari+shift ini saja
-                        using var delHeader = new SqlCommand(@"
-            DELETE FROM [dbo].[MachineEfficiency]
-            WHERE ID = @ID", conn, tx);
-                        delHeader.Parameters.AddWithValue("@ID", existingId.Value);
-                        delHeader.ExecuteNonQuery();
-
-                        Console.WriteLine($"[ImportExcel] Replaced: {machineName} {item.Date:yyyy-MM-dd} {item.Shift}");
+                        using var delH = new SqlCommand(
+                            "DELETE FROM [dbo].[Efficiency] WHERE ID = @ID", conn, tx);
+                        delH.Parameters.AddWithValue("@ID", existingId.Value);
+                        delH.ExecuteNonQuery();
                     }
                 }
 
-                int insertedCount = 0;
+                // Insert semua data baru
+                int count = 0;
                 foreach (var item in newData)
                 {
                     var (quality, operatingRatio, ability, oee, achievement, category) = CalcMetrics(item);
-
-                    using var insertCmd = new SqlCommand(@"
-                        INSERT INTO [dbo].[MachineEfficiency]
-                            (MachineName, Date, Shift, WorkingTime, PlanQty, GoodProductionQty, DefectQty,
-                             OEE, OperatingRatio, Ability, Quality, Achievement, Category)
+                    using var ins = new SqlCommand(@"
+                        INSERT INTO [dbo].[Efficiency]
+                            (IdMachine, Date, Shift, WorkingTime, PlanQty,
+                             GoodProductionQty, DefectQty, OEE, OperatingRatio,
+                             Ability, Quality, Achievement, Category)
                         VALUES
-                            (@MachineName, @Date, @Shift, @WorkingTime, @PlanQty, @GoodProductionQty, @DefectQty,
-                             @OEE, @OperatingRatio, @Ability, @Quality, @Achievement, @Category);
+                            (@IdMachine, @Date, @Shift, @WorkingTime, @PlanQty,
+                             @GoodProductionQty, @DefectQty, @OEE, @OperatingRatio,
+                             @Ability, @Quality, @Achievement, @Category);
                         SELECT SCOPE_IDENTITY();", conn, tx);
-                    AddHeaderParams(insertCmd, item, quality, operatingRatio, ability, oee, achievement, category);
-                    int efficiencyId = Convert.ToInt32(insertCmd.ExecuteScalar());
-
-                    InsertLossItems(conn, tx, efficiencyId, item.LossItems);
-                    insertedCount++;
+                    AddHeaderParams(ins, idMachine, item, quality, operatingRatio,
+                                    ability, oee, achievement, category);
+                    int effId = Convert.ToInt32(ins.ExecuteScalar());
+                    InsertLossItems(conn, tx, effId, item.LossItems);
+                    count++;
                 }
 
                 tx.Commit();
-                return new JsonResult(new { success = true, message = $"Berhasil import {insertedCount} data untuk {machineName} (Bulan {month}/{year})." });
+                return new JsonResult(new
+                {
+                    success = true,
+                    message = $"Berhasil import {count} data untuk {machineName} bulan {month}/{year}."
+                });
             }
             catch (Exception ex)
             {
@@ -507,82 +559,19 @@ namespace MonitoringSystem.Pages.Summary
             }
         }
 
-        // =====================================================
-        // API: ?handler=MachineList
-        // =====================================================
-        public JsonResult OnGetMachineList()
+        // ── Helpers ────────────────────────────────────────
+        private static void InsertLossItems(SqlConnection conn, SqlTransaction tx,
+            int effId, List<LossItem>? items)
         {
-            var result = new List<object>();
-            try
-            {
-                using var conn = OpenConn();
-                using var cmd = new SqlCommand(@"
-                    SELECT DISTINCT MachineName FROM [dbo].[MachineEfficiency]
-                    WHERE MachineName IS NOT NULL AND MachineName != ''
-                    ORDER BY MachineName", conn);
-                using var reader = cmd.ExecuteReader();
-                while (reader.Read())
-                    result.Add(new { machineName = reader["MachineName"]?.ToString() ?? "-" });
-                return new JsonResult(result);
-            }
-            catch (Exception ex) { return new JsonResult(new { error = ex.Message }); }
-        }
-
-        // =====================================================
-        // API: ?handler=Efficiency&month=X&year=Y
-        // =====================================================
-        public JsonResult OnGetEfficiency(int month, int year)
-        {
-            if (month < 1 || month > 12) return new JsonResult(new { error = "Bulan tidak valid (1-12)." });
-            if (year < 2000 || year > 2100) return new JsonResult(new { error = "Tahun tidak valid." });
-
-            var result = new List<object>();
-            try
-            {
-                using var conn = OpenConn();
-                string sql = @"
-                    SELECT MachineName,
-                        ISNULL(CAST(OEE AS VARCHAR),'-') AS OEE,
-                        ISNULL(CAST(OperatingRatio AS VARCHAR),'-') AS OperatingRatio,
-                        ISNULL(CAST(Ability AS VARCHAR),'-') AS Ability,
-                        ISNULL(CAST(Quality AS VARCHAR),'-') AS Quality,
-                        ISNULL(CAST(Achievement AS VARCHAR),'-') AS Achievement,
-                        CONVERT(VARCHAR, Date, 23) AS Date
-                    FROM [dbo].[MachineEfficiency]
-                    WHERE MONTH(Date) = @Month AND YEAR(Date) = @Year
-                    ORDER BY MachineName, Date";
-                using var cmd = new SqlCommand(sql, conn);
-                cmd.Parameters.AddWithValue("@Month", month);
-                cmd.Parameters.AddWithValue("@Year", year);
-                using var reader = cmd.ExecuteReader();
-                while (reader.Read())
-                    result.Add(new
-                    {
-                        machineName = reader["MachineName"]?.ToString() ?? "-",
-                        oEE = reader["OEE"]?.ToString() ?? "-",
-                        operatingRatio = reader["OperatingRatio"]?.ToString() ?? "-",
-                        ability = reader["Ability"]?.ToString() ?? "-",
-                        quality = reader["Quality"]?.ToString() ?? "-",
-                        achievement = reader["Achievement"]?.ToString() ?? "-",
-                        date = reader["Date"]?.ToString() ?? "-"
-                    });
-                return new JsonResult(result);
-            }
-            catch (Exception ex) { return new JsonResult(new { error = ex.Message }); }
-        }
-
-        // =====================================================
-        // HELPER: Insert loss items ke MachineEfficiencyLoss
-        // =====================================================
-        private static void InsertLossItems(SqlConnection conn, SqlTransaction tx, int efficiencyId, List<LossItem>? lossItems)
-        {
-            if (lossItems == null || lossItems.Count == 0) return;
-            foreach (var loss in lossItems.Where(l => l.LossMinutes.HasValue))
+            if (items == null || items.Count == 0) return;
+            foreach (var loss in items.Where(l => l.LossMinutes.HasValue && l.LossMinutes > 0))
             {
                 using var cmd = new SqlCommand(@"
-                    INSERT INTO [dbo].[MachineEfficiencyLoss] (EfficiencyID, LossCategory, LossGroup, LossMinutes)
-                    VALUES (@EfficiencyID, @LossCategory, @LossGroup, @LossMinutes)", conn, tx);
-                cmd.Parameters.AddWithValue("@EfficiencyID", efficiencyId);
+                    INSERT INTO [dbo].[EfficiencyLoss]
+                        (EfficiencyID, LossCategory, LossGroup, LossMinutes)
+                    VALUES
+                        (@EfficiencyID, @LossCategory, @LossGroup, @LossMinutes)", conn, tx);
+                cmd.Parameters.AddWithValue("@EfficiencyID", effId);
                 cmd.Parameters.AddWithValue("@LossCategory", loss.LossCategory ?? "");
                 cmd.Parameters.AddWithValue("@LossGroup", loss.LossGroup ?? "");
                 cmd.Parameters.AddWithValue("@LossMinutes", (object?)loss.LossMinutes ?? DBNull.Value);
@@ -590,14 +579,12 @@ namespace MonitoringSystem.Pages.Summary
             }
         }
 
-        // =====================================================
-        // HELPER: Tambah header params ke SqlCommand
-        // =====================================================
-        private static void AddHeaderParams(SqlCommand cmd, MachineEfficiencyInput input,
-            double? quality, double? operatingRatio, double? ability, double? oee,
-            double? achievement, string? category)
+        private static void AddHeaderParams(SqlCommand cmd, int idMachine,
+            MachineEfficiencyInput input,
+            double? quality, double? operatingRatio, double? ability,
+            double? oee, double? achievement, string? category)
         {
-            cmd.Parameters.AddWithValue("@MachineName", input.MachineName ?? "");
+            cmd.Parameters.AddWithValue("@IdMachine", idMachine);
             cmd.Parameters.AddWithValue("@Date", input.Date);
             cmd.Parameters.AddWithValue("@Shift", input.Shift ?? "");
             cmd.Parameters.AddWithValue("@WorkingTime", (object?)input.WorkingTime ?? DBNull.Value);
@@ -612,9 +599,6 @@ namespace MonitoringSystem.Pages.Summary
             cmd.Parameters.AddWithValue("@Category", (object?)category ?? DBNull.Value);
         }
 
-        // =====================================================
-        // HELPER: Open DB connection
-        // =====================================================
         private SqlConnection OpenConn()
         {
             var conn = new SqlConnection(_config.GetConnectionString("MachineConnection")!);
@@ -622,36 +606,29 @@ namespace MonitoringSystem.Pages.Summary
             return conn;
         }
 
-        // =====================================================
-        // HELPER: Parse double dari Excel cell
-        // =====================================================
         private static double? TryParseDouble(object? val)
         {
             if (val == null) return null;
-            return double.TryParse(val.ToString(), out double result) ? result : null;
+            return double.TryParse(val.ToString(), out double r) ? r : null;
         }
 
-        // =====================================================
-        // API: ?handler=DownloadTemplate
-        // =====================================================
         public IActionResult OnGetDownloadTemplate()
         {
-            var possibleNames = new[] { "TemplateMachine.xlsx", "Machine_input_template.xlsx", "template.xlsx" };
-            string? filePath = null;
-            foreach (var name in possibleNames)
+            var names = new[] { "TemplateMachine.xlsx", "Machine_input_template.xlsx", "template.xlsx" };
+            string? path = null;
+            foreach (var n in names)
             {
-                var candidate = Path.Combine(_env.WebRootPath, "data", "MachineEfficiency", name);
-                if (System.IO.File.Exists(candidate)) { filePath = candidate; break; }
+                var c = Path.Combine(_env.WebRootPath, "data", "MachineEfficiency", n);
+                if (System.IO.File.Exists(c)) { path = c; break; }
             }
-            if (filePath == null)
-                return new NotFoundObjectResult(new { error = "File template tidak ditemukan di server." });
-            var bytes = System.IO.File.ReadAllBytes(filePath);
-            return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "TemplateMachine.xlsx");
+            if (path == null)
+                return new NotFoundObjectResult(new { error = "Template tidak ditemukan." });
+            return File(System.IO.File.ReadAllBytes(path),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "TemplateMachine.xlsx");
         }
 
-        // =====================================================
-        // Models
-        // =====================================================
+        // ── Models ─────────────────────────────────────────
         public class LossItem
         {
             public string? LossCategory { get; set; }

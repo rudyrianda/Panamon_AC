@@ -1,25 +1,25 @@
 ﻿using System;
-using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
 
-namespace MonitoringSystem.Models
+namespace MonitoringSystem.Models;
+
+public partial class LossTimePlan
 {
-    public class LossTimePlan
-    {
-        [Key]
-        public int Id { get; set; }
+    public int Id { get; set; }
 
-        [Required]
-        public string Category { get; set; }
+    public string Category { get; set; } = null!;
 
-        [Required]
-        public string MachineLine { get; set; }
+    public string MachineLine { get; set; } = null!;
 
-        public int Month { get; set; }
-        public int Year { get; set; }
+    public int Month { get; set; }
 
-        public double TargetMinutes { get; set; }
-        public decimal Ratio { get; set; }
+    public int Year { get; set; }
 
-        public DateTime UploadedAt { get; set; } = DateTime.Now;
-    }
+    public double TargetMinutes { get; set; }
+
+    public decimal Ratio { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime UploadedAt { get; set; }
 }

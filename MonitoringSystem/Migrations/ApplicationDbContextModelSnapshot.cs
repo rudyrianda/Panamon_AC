@@ -232,23 +232,23 @@ namespace MonitoringSystem.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<TimeSpan?>("BreakTime1End")
+                    b.Property<TimeOnly?>("BreakTime1End")
                         .HasColumnType("time");
 
-                    b.Property<TimeSpan?>("BreakTime1Start")
+                    b.Property<TimeOnly?>("BreakTime1Start")
                         .HasColumnType("time");
 
-                    b.Property<TimeSpan?>("BreakTime2End")
+                    b.Property<TimeOnly?>("BreakTime2End")
                         .HasColumnType("time");
 
-                    b.Property<TimeSpan?>("BreakTime2Start")
+                    b.Property<TimeOnly?>("BreakTime2Start")
                         .HasColumnType("time");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime>("Date")
-                        .HasColumnType("datetime2");
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
 
                     b.HasKey("Id");
 
@@ -302,6 +302,9 @@ namespace MonitoringSystem.Migrations
                     b.Property<int>("Day")
                         .HasColumnType("int");
 
+                    b.Property<string>("DetailedReason")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("MachineLine")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -311,6 +314,9 @@ namespace MonitoringSystem.Migrations
 
                     b.Property<int>("Month")
                         .HasColumnType("int");
+
+                    b.Property<string>("Shift")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Year")
                         .HasColumnType("int");
@@ -332,6 +338,9 @@ namespace MonitoringSystem.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("MachineLine")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -340,7 +349,8 @@ namespace MonitoringSystem.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("Ratio")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<double>("TargetMinutes")
                         .HasColumnType("float");

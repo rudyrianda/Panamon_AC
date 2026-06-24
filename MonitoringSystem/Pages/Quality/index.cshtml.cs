@@ -82,7 +82,7 @@ namespace MonitoringSystem.Pages.Quality
         {
             if (string.IsNullOrEmpty(MachineCode))
             {
-                MachineCode = "MCH1-01";
+                MachineCode = "Line1";
             }
             if (string.IsNullOrEmpty(StartDate))
             {
@@ -337,7 +337,7 @@ namespace MonitoringSystem.Pages.Quality
 
                     List<string> masterStations = new List<string>();
 
-                    if (MachineCode == "MCH1-01")
+                    if (MachineCode == "Line1" || MachineCode == "Line2" || MachineCode == "Line3")
                     {
                         masterStations = new List<string> {
                             "PREPARING",
@@ -348,7 +348,8 @@ namespace MonitoringSystem.Pages.Quality
                             "DETAIL"
                         };
                     }
-                    else if (MachineCode == "MCH1-02")
+                    else if (MachineCode == "Line4" || MachineCode == "Line5" ||
+                             MachineCode == "Line6" || MachineCode == "Line7")
                     {
                         masterStations = new List<string> {
                             "Chassis",

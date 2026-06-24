@@ -297,9 +297,9 @@
 
 /* Default body untuk dashboard - Full White */
 body:not(.auth-body) {
-    background: transparent !important; /* ← GANTI JADI TRANSPARENT! */
+    background: transparent !important;
     color: #333333;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'DINPro', sans-serif; /* ← GANTI INI */
 }
 
     /* HIDE elemen auth HANYA di dashboard (body tanpa class auth-body) */

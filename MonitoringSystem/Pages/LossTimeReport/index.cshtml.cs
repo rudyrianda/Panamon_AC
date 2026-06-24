@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -13,18 +13,27 @@ using OfficeOpenXml;
 using MonitoringSystem.Models;
 using MonitoringSystem.Data;
 using System;
-using System.Drawing;
 
 namespace MonitoringSystem.Pages.LossTimeReport
 {
     public class indexModel : PageModel
     {
         private readonly ApplicationDbContext _context;
-
-        public indexModel(ApplicationDbContext context)
+        private readonly string _connectionString;
+        public indexModel(ApplicationDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
+        //public indexModel(ApplicationDbContext context, IConfiguration configuration)
+        //{
+        //    _context = context;
+        //    _connectionString = configuration.GetConnectionString("DefaultConnection");
+        //}   
+        //public indexModel(ApplicationDbContext context)
+        //{
+        //    _context = context;
+        //}
 
         [BindProperty(SupportsGet = true)]
         public int SelectedYear { get; set; } = DateTime.Today.Year;
@@ -40,12 +49,15 @@ namespace MonitoringSystem.Pages.LossTimeReport
 
         public string ChartDataJson { get; set; } = "{}";
         public List<string> Categories { get; set; } = new List<string>();
+        public List<string> LegendCategories { get; set; } = new List<string>();
         public Dictionary<string, double[]> DetailActuals { get; set; } = new Dictionary<string, double[]>();
         public Dictionary<string, double[]> DetailPlans { get; set; } = new Dictionary<string, double[]>();
+
+        // Menampung total Working Loss saja (untuk ringkasan & grafik)
         public double[] TotalActualPerMonth { get; set; } = new double[12];
         public double[] TotalPlanPerMonth { get; set; } = new double[12];
         public double[] ActualRatios { get; set; } = new double[12];
-        public double[] PlanRatios { get; set;} = new double[12];
+        public double[] PlanRatios { get; set; } = new double[12];
 
         public void OnGet()
         {
@@ -59,39 +71,37 @@ namespace MonitoringSystem.Pages.LossTimeReport
                 (x.Year == SelectedYear + 1 && x.Month <= 3)
             );
 
-            if (MachineLine != "All")
-            {
-                planQuery = planQuery.Where(x => x.MachineLine == MachineLine);
-            }
+            if (MachineLine != "All") planQuery = planQuery.Where(x => x.MachineLine == MachineLine);
 
             var plansRaw = planQuery.ToList()
-                .GroupBy(x => new {Category = NormalizeCategoryName(x.Category), Month = x.Month })
+                .GroupBy(x => new { Category = NormalizeCategoryName(x.Category), Month = x.Month })
                 .Select(g => new { Category = g.Key.Category, Month = g.Key.Month, Total = g.Sum(x => x.TargetMinutes) })
                 .ToList();
 
             var plansRatioRaw = planQuery.ToList()
                 .GroupBy(x => x.Month)
-                .Select(g => new { Month = g.Key, RatioVal = g.Max(x => x.Ratio)  })
+                .Select(g => new { Month = g.Key, RatioVal = g.Max(x => x.Ratio) })
                 .ToList();
 
-            //Data not valid(need improvement)
             var workingTimeRaw = GetMonthlyWorkingTime(SelectedYear, MachineLine);
 
+            // Semua kategori untuk Tabel
             var allCats = actualsRaw.Select(x => x.Category)
                           .Union(plansRaw.Select(x => x.Category))
                           .Distinct()
-                          //.OrderBy(x => x)
                           .ToList();
 
             Categories = allCats
                 .OrderBy(c => {
                     string group = GetCategoryGroup(c);
-
-                    if (group == "Working Loss") return 1;
-                    if (group == "Fixed Loss") return 2;
-                    return 99;
+                    return group == "Working Loss" ? 1 : 2;
                 })
                 .ThenBy(c => c)
+                .ToList();
+
+            // Khusus Legend & Data Grafik (Hanya Working Loss)
+            LegendCategories = Categories
+                .Where(c => GetCategoryGroup(c) == "Working Loss")
                 .ToList();
 
             foreach (var cat in Categories)
@@ -117,39 +127,37 @@ namespace MonitoringSystem.Pages.LossTimeReport
                 DetailPlans.Add(cat, planArr);
             }
 
+            // Hitung Total (HANYA WORKING LOSS)
             for (int i = 0; i < 12; i++)
             {
-                TotalActualPerMonth[i] = DetailActuals.Sum(x => x.Value[i]);
-                TotalPlanPerMonth[i] = DetailPlans.Sum(x => x.Value[i]);
-            }
+                TotalActualPerMonth[i] = DetailActuals
+                    .Where(x => GetCategoryGroup(x.Key) == "Working Loss")
+                    .Sum(x => x.Value[i]);
 
-            for (int i = 0; i < 12; i++)
-            {
+                TotalPlanPerMonth[i] = DetailPlans
+                    .Where(x => GetCategoryGroup(x.Key) == "Working Loss")
+                    .Sum(x => x.Value[i]);
+
                 int monthNum = (i + 4) > 12 ? (i + 4) - 12 : (i + 4);
+
                 var pRatio = plansRatioRaw.FirstOrDefault(x => x.Month == monthNum);
                 PlanRatios[i] = pRatio != null ? (double)pRatio.RatioVal : 0;
 
-                double totalLoss = TotalActualPerMonth[i];
                 double workingTime = workingTimeRaw.ContainsKey(monthNum) ? workingTimeRaw[monthNum] : 0;
-
-                if (workingTime > 0 )
+                if (workingTime > 0)
                 {
-                    ActualRatios[i] = Math.Round((totalLoss / workingTime) * 100, 2);
-                }
-                else
-                {
-                    ActualRatios[i] = 0;
+                    ActualRatios[i] = Math.Round((TotalActualPerMonth[i] / workingTime) * 100, 2);
                 }
             }
 
-            var datasets = new List<object>();
-
+            // Kirim ke Frontend: Hanya DetailActuals/DetailPlans yang masuk Working Loss untuk grafik
             var chartPayload = new
             {
                 Labels = months,
-                Categories = Categories,
-                Actuals = DetailActuals,
-                Plans = DetailPlans,
+                LegendCategories = LegendCategories,
+                // Filter dictionary agar JS Chart hanya merender Working Loss
+                Actuals = DetailActuals.Where(x => LegendCategories.Contains(x.Key)).ToDictionary(x => x.Key, x => x.Value),
+                Plans = DetailPlans.Where(x => LegendCategories.Contains(x.Key)).ToDictionary(x => x.Key, x => x.Value),
                 RatioActual = ActualRatios,
                 RatioPlan = PlanRatios
             };
@@ -159,23 +167,40 @@ namespace MonitoringSystem.Pages.LossTimeReport
 
         public string GetCategoryGroup(string categoryName)
         {
+            if (string.IsNullOrWhiteSpace(categoryName)) return "Working Loss";
             string lowerCat = categoryName.ToLower().Trim();
 
-            if (lowerCat.Contains("break time (am/pm") || lowerCat.Contains("company activity") || lowerCat.Contains("morning assembly") || lowerCat.Contains("cleaning") || lowerCat.Contains("stock opname") || lowerCat.Contains("general assembly") || lowerCat.Contains("maintenance") || lowerCat.Contains("trial run") || lowerCat.Contains("training education") || lowerCat.Contains("free talking/qc activity") || lowerCat.Contains("no production day"))
+            if (lowerCat.Contains("break time") || lowerCat.Contains("company activity") ||
+                lowerCat.Contains("stock opname") || lowerCat.Contains("maintenance") ||
+                lowerCat.Contains("trial run") || lowerCat.Contains("training education") ||
+                lowerCat.Contains("free talking") || lowerCat.Contains("no production day") ||
+                lowerCat.Contains("morning assembly") || lowerCat.Contains("cleaning") ||
+                lowerCat.Contains("general assy"))
+            {
                 return "Fixed Loss";
-
-            if (lowerCat.Contains("quality trouble") || lowerCat.Contains("model changing loss") || lowerCat.Contains("material shortage external") || lowerCat.Contains("machine & tools trouble") || lowerCat.Contains("man power adjustment") || lowerCat.Contains("material shortage inhouse") || lowerCat.Contains("material shortage internal") || lowerCat.Contains("set repairing loss") || lowerCat.Contains("gawse - external bodies") || lowerCat.Contains("rework") || lowerCat.Contains("mold changing loss"))
-                return "Working Loss";
-
-            return "Others";
+            }
+            return "Working Loss";
         }
 
         private string NormalizeCategoryName(string input)
         {
             if (string.IsNullOrWhiteSpace(input)) return "Uncategorized";
+            string name = input.Trim().ToLower();
 
-            TextInfo textInfo = new CultureInfo("en-US", false).TextInfo;
-            return textInfo.ToTitleCase(input.Trim().ToLower());
+            // Sesuai request: changing -> change
+            if (name.Contains("change model") || name.Contains("model changing"))
+                return "Model Change Loss";
+
+            if (name.Contains("mold changing") || name.Contains("mold change"))
+                return "Mold Change Loss";
+
+            if (name.Contains("machine trouble") || name.Contains("machine tools trouble"))
+                return "Machine & Tools Trouble";
+
+            if (name.Contains("break time") || name.Contains("breaktime"))
+                return "Break Time";
+
+            return new CultureInfo("en-US", false).TextInfo.ToTitleCase(name);
         }
 
         private class MonthlyCategoryData
@@ -187,130 +212,140 @@ namespace MonitoringSystem.Pages.LossTimeReport
 
         private List<MonthlyCategoryData> GetDetailedActualData(int fiscalYear, string line)
         {
-            var result = new List<MonthlyCategoryData>();
-            var connectionString = _context.Database.GetDbConnection().ConnectionString;
-
+            var rawList = new List<MonthlyCategoryData>();
             DateTime startDate = new DateTime(fiscalYear, 4, 1);
             DateTime endDate = new DateTime(fiscalYear + 1, 3, 31);
 
-            string query = @"
-                SELECT 
-                    MONTH(Date) as MonthVal,
-                    Reason, 
-                    SUM(LossTime) / 60 as TotalMinutes
-                FROM AssemblyLossTime
-                WHERE Date >= @Start AND Date <= @End
-            ";
+            var actualsQuery = _context.LossTimeActuals.Where(x =>
+                (x.Year == fiscalYear && x.Month >= 4) ||
+                (x.Year == fiscalYear + 1 && x.Month <= 3)
+            );
+            if (line != "All") actualsQuery = actualsQuery.Where(x => x.MachineLine == line);
 
-            if (line != "All")
+            // Cek bulan mana yang sudah ada di LossTimeActuals
+            var monthsWithActuals = actualsQuery.Select(x => x.Month).Distinct().ToList();
+
+            // Semua bulan fiscal year
+            var allFiscalMonths = new List<int> { 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3 };
+
+            // Bulan yang BELUM ada di LossTimeActuals → fallback
+            var monthsMissing = allFiscalMonths.Where(m => !monthsWithActuals.Contains(m)).ToList();
+
+            // ✅ Ambil dari LossTimeActuals untuk bulan yang sudah ada
+            if (monthsWithActuals.Any())
             {
-                query += " AND MachineCode = @MachineCode";
+                var grouped = actualsQuery
+                    .GroupBy(x => new { x.Month, x.Category })
+                    .Select(g => new
+                    {
+                        Month = g.Key.Month,
+                        Category = g.Key.Category,
+                        Total = g.Sum(x => x.Minutes)
+                    }).ToList();
+
+                foreach (var item in grouped)
+                {
+                    rawList.Add(new MonthlyCategoryData
+                    {
+                        Month = item.Month,
+                        Category = NormalizeCategoryName(item.Category),
+                        Total = Math.Round(item.Total, 1)
+                    });
+                }
             }
 
-            query += " GROUP BY MONTH(Date), Reason";
-
-            try
+            // ✅ Fallback ke AssemblyLossTime untuk bulan yang BELUM ada
+            if (monthsMissing.Any())
             {
-                using (var conn = new SqlConnection(connectionString))
+                var dateConditions = string.Join(" OR ", monthsMissing.Select(m =>
                 {
-                    conn.Open();
-                    using (var cmd = new SqlCommand(query, conn))
+                    int year = m >= 4 ? fiscalYear : fiscalYear + 1;
+                    return $"(YEAR(Date) = {year} AND MONTH(Date) = {m})";
+                }));
+
+                string query = $@"SELECT MONTH(Date) AS MonthVal, Reason, 
+                                 SUM(LossTime) / 60.0 AS TotalMinutes
+                          FROM AssemblyLossTime 
+                          WHERE ({dateConditions})";
+
+                if (line != "All") query += " AND MachineCode = @MachineCode";
+                query += " GROUP BY MONTH(Date), Reason";
+
+                try
+                {
+                    using (var conn = new SqlConnection(_connectionString))
                     {
-                        cmd.Parameters.AddWithValue("@Start", startDate);
-                        cmd.Parameters.AddWithValue("@End", endDate);
-
-                        if (line != "All")
+                        conn.Open();
+                        using (var cmd = new SqlCommand(query, conn))
                         {
-                            cmd.Parameters.AddWithValue("@MachineCode", line);
-                        }
-
-                        using (var reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
+                            if (line != "All") cmd.Parameters.AddWithValue("@MachineCode", line);
+                            using (var reader = cmd.ExecuteReader())
                             {
-                                string rawCat = reader["Reason"]?.ToString();
-                                string cleanCat = NormalizeCategoryName(rawCat);
-
-                                result.Add(new MonthlyCategoryData
+                                while (reader.Read())
                                 {
-                                    Month = Convert.ToInt32(reader["MonthVal"]),
-                                    Category = cleanCat,
-                                    Total = reader["TotalMinutes"] != DBNull.Value ? Convert.ToDouble(reader["TotalMinutes"]) : 0
-                                });
+                                    rawList.Add(new MonthlyCategoryData
+                                    {
+                                        Month = Convert.ToInt32(reader["MonthVal"]),
+                                        Category = NormalizeCategoryName(reader["Reason"]?.ToString()),
+                                        Total = Convert.ToDouble(reader["TotalMinutes"])
+                                    });
+                                }
                             }
                         }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("SQL Error: " + ex.Message);
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Fallback error: {ex.Message}");
+                }
             }
 
-            return result;
+            // Gabungkan dan group ulang jika ada duplikat kategori
+            return rawList
+                .GroupBy(x => new { x.Month, x.Category })
+                .Select(g => new MonthlyCategoryData
+                {
+                    Month = g.Key.Month,
+                    Category = g.Key.Category,
+                    Total = g.Sum(x => x.Total)
+                }).ToList();
         }
 
-        //Not Valid Need Improvement for for calculation working time
         private Dictionary<int, double> GetMonthlyWorkingTime(int fiscalYear, string line)
         {
             var result = new Dictionary<int, double>();
-            string query = @"
-            SELECT 
-                MONTH(Date) as MonthVal,
-                SUM(WorkingTime) as TotalWT 
-            FROM ProductionData 
-            WHERE Date >= @Start AND Date <= @End
-        ";
-
+            string query = @"SELECT MONTH(Date) as MonthVal, SUM(WorkingTime) as TotalWT 
+                             FROM ProductionData WHERE Date >= @Start AND Date <= @End";
             if (line != "All") query += " AND MachineCode = @MachineCode";
             query += " GROUP BY MONTH(Date)";
-
-            DateTime startDate = new DateTime(fiscalYear, 4, 1);
-            DateTime endDate = new DateTime(fiscalYear + 1, 3, 31);
-
             try
             {
-                using (var conn = new SqlConnection(_context.Database.GetDbConnection().ConnectionString))
+                using (var conn = new SqlConnection(_connectionString))
                 {
                     conn.Open();
                     using (var cmd = new SqlCommand(query, conn))
                     {
-                        cmd.Parameters.AddWithValue("@Start", startDate);
-                        cmd.Parameters.AddWithValue("@End", endDate);
+                        cmd.Parameters.AddWithValue("@Start", new DateTime(fiscalYear, 4, 1));
+                        cmd.Parameters.AddWithValue("@End", new DateTime(fiscalYear + 1, 3, 31));
                         if (line != "All") cmd.Parameters.AddWithValue("@MachineCode", line);
-
                         using (var reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
                             {
-                                int m = Convert.ToInt32(reader["MonthVal"]);
-                                double val = reader["TotalWT"] != DBNull.Value ? Convert.ToDouble(reader["TotalWT"]) : 0;
-                                if (!result.ContainsKey(m)) result.Add(m, val);
+                                result[Convert.ToInt32(reader["MonthVal"])] = reader["TotalWT"] != DBNull.Value ? Convert.ToDouble(reader["TotalWT"]) : 0;
                             }
                         }
                     }
                 }
             }
-            catch (Exception ex) { Console.WriteLine("WT Error: " + ex.Message); }
+            catch { }
             return result;
         }
 
         public async Task<IActionResult> OnPostImportExcelAsync()
         {
-            if (UploadedExcel == null || UploadedExcel.Length == 0)
-            {
-                TempData["Error"] = "File Excel belum dipilih.";
-                return RedirectToPage(new { SelectedYear, MachineLine });
-            }
-
-            if (UploadMachineLine == "All" || string.IsNullOrEmpty(UploadMachineLine))
-            {
-                TempData["Error"] = "Saat Upload, anda harus memilih Mesin Spesifik (CU atau CS) di dalam Pop-up.";
-                return RedirectToPage(new { SelectedYear, MachineLine });
-            }
-
+            if (UploadedExcel == null || UploadedExcel.Length == 0) return RedirectToPage();
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-
             try
             {
                 using (var stream = new MemoryStream())
@@ -319,87 +354,45 @@ namespace MonitoringSystem.Pages.LossTimeReport
                     using (var package = new ExcelPackage(stream))
                     {
                         var sheet = package.Workbook.Worksheets[0];
-                        int rowCount = sheet.Dimension.Rows;
-
-                        var monthColMap = new Dictionary<int, (int targetMinutes, int ratioPlans)>
-                        {
-                            { 4, (3,4) }, { 5, (5, 6) }, { 6, (7, 8) }, { 7, (9, 10) }, { 8, (11, 12) }, { 9, (13, 14) },
-                            { 10, (15, 16) }, { 11, (17, 18) }, { 12, (19, 20) }, { 1, (21, 22) }, { 2, (23, 24) }, {3, (25, 26) }
-                         };
-
                         var newPlans = new List<LossTimePlan>();
-
-                        for (int row = 4; row <= rowCount; row++)
+                        for (int row = 4; row <= sheet.Dimension.Rows; row++)
                         {
-                            var catName = sheet.Cells[row, 2].Text?.Trim();
-                            if (string.IsNullOrEmpty(catName) || catName.ToLower().Contains("loss category")) continue;
-
-                            catName = NormalizeCategoryName(catName);
-
-                            foreach (var map in monthColMap)
+                            var catName = NormalizeCategoryName(sheet.Cells[row, 2].Text);
+                            if (string.IsNullOrEmpty(catName) || catName.Contains("Total")) continue;
+                            int[] months = { 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3 };
+                            int col = 3;
+                            foreach (var m in months)
                             {
-                                var targetText = sheet.Cells[row, map.Value.targetMinutes].Text;
-                                var ratioCell = sheet.Cells[row, map.Value.ratioPlans].Value;
-
-                                bool targetValid = double.TryParse(targetText, out double targetVal) && targetVal >= 0;
-
-                                decimal ratioVal = 0;
-                                bool ratioValid = false;
-
-                                if (ratioCell != null)
+                                double.TryParse(sheet.Cells[row, col].Text, out double tVal);
+                                decimal.TryParse(sheet.Cells[row, col + 1].Text, out decimal rVal);
+                                newPlans.Add(new LossTimePlan
                                 {
-                                    ratioVal = Convert.ToDecimal(ratioCell) * 100;
-                                    ratioValid = ratioVal >= 0;
-                                }
-
-                                if (!targetValid && !ratioValid) continue;
-
-                                {
-                                    int dataYear = (map.Key >= 4) ? SelectedYear : SelectedYear + 1;
-
-                                    newPlans.Add(new LossTimePlan
-                                    {
-                                        Category = catName,
-                                        MachineLine = this.UploadMachineLine,
-                                        Month = map.Key,
-                                        Year = dataYear,
-                                        TargetMinutes = targetValid ? targetVal : 0,
-                                        Ratio = ratioValid ? ratioVal : 0
-                                    });
-                                }
+                                    Category = catName,
+                                    MachineLine = UploadMachineLine,
+                                    Month = m,
+                                    Year = m >= 4 ? SelectedYear : SelectedYear + 1,
+                                    TargetMinutes = tVal,
+                                    Ratio = rVal * 100
+                                });
+                                col += 2;
                             }
                         }
-
-                        var dataToDelete = _context.LossTimePlans
-                            .Where(x => x.MachineLine == this.UploadMachineLine &&
-                                        ((x.Year == SelectedYear && x.Month >= 4) ||
-                                         (x.Year == SelectedYear + 1 && x.Month <= 3)));
-
-                        _context.LossTimePlans.RemoveRange(dataToDelete);
-
-                        if (newPlans.Any())
-                        {
-                            _context.LossTimePlans.AddRange(newPlans);
-                            await _context.SaveChangesAsync();
-                            TempData["Success"] = $"Berhasil import Plan untuk {UploadMachineLine}.";
-                        }
+                        var old = _context.LossTimePlans.Where(x => x.MachineLine == UploadMachineLine &&
+                            ((x.Year == SelectedYear && x.Month >= 4) || (x.Year == SelectedYear + 1 && x.Month <= 3)));
+                        _context.LossTimePlans.RemoveRange(old);
+                        _context.LossTimePlans.AddRange(newPlans);
+                        await _context.SaveChangesAsync();
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                TempData["Error"] = "Gagal Import: " + ex.Message;
-            }
-
+            catch { }
             return RedirectToPage(new { SelectedYear, MachineLine });
         }
 
         public IActionResult OnGetDownloadTemplate()
         {
             var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "data", "planlosstime", "LossTimePlan_Template.xlsx");
-            if (!System.IO.File.Exists(filePath)) return NotFound("File template tidak ditemukan di server.");
-            var bytes = System.IO.File.ReadAllBytes(filePath);
-            return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "LossTimePlan_Template.xlsx");
+            return System.IO.File.Exists(filePath) ? File(System.IO.File.ReadAllBytes(filePath), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "LossTimePlan_Template.xlsx") : (IActionResult)NotFound();
         }
     }
 }

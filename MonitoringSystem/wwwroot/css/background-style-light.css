@@ -543,3 +543,199 @@ body.light-mode .dashboard-container .btn-blue-active {
    File ini TIDAK mengandung override modal sama sekali.
    Ini mencegah konflik CSS antar file.
    ==================================================== */
+body.light-mode .kpi-box canvas,
+body.light-mode canvas {
+    color: #555555;
+}
+/* ========== SORT DROPDOWN DETAIL LOSS TIME ========== */
+body.light-mode #sortSelect {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    border-color: rgba(0, 0, 0, 0.2) !important;
+    color: #1a1a2e !important;
+}
+
+    body.light-mode #sortSelect option {
+        background-color: #ffffff !important;
+        color: #1a1a2e !important;
+    }
+/* ====================================================
+   MACHINE PAGE — LIGHT MODE FIX
+   Tambahkan blok ini ke lightmode.css
+   ==================================================== */
+
+/* Info Card — model name, labels, stat rows */
+body.light-mode .info-model-lbl {
+    color: rgba(26, 26, 46, 0.55) !important;
+}
+
+body.light-mode .info-model-name {
+    color: #1a1a2e !important;
+}
+
+body.light-mode .stat-row {
+    border-top-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode .stat-lbl {
+    color: rgba(26, 26, 46, 0.55) !important;
+}
+
+body.light-mode .stat-val {
+    color: #1a1a2e !important;
+}
+
+    body.light-mode .stat-val.neg {
+        color: #c53030 !important;
+    }
+
+    body.light-mode .stat-val.pos {
+        color: #276749 !important;
+    }
+
+/* Shift Card — shift labels, rows, scroll */
+body.light-mode .shift-card {
+    overflow-y: auto;
+}
+
+    body.light-mode .shift-card::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05) !important;
+    }
+
+    body.light-mode .shift-card::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.18) !important;
+    }
+
+body.light-mode .shift-lbl {
+    color: #185FA5 !important;
+}
+
+body.light-mode .shift-row {
+    color: rgba(26, 26, 46, 0.55) !important;
+}
+
+    body.light-mode .shift-row span:last-child {
+        color: #1a1a2e !important;
+    }
+
+/* OEE Card — donut center value, legend */
+body.light-mode .oee-card .card-title {
+    color: rgba(26, 26, 46, 0.6) !important;
+}
+
+body.light-mode .donut-center {
+    color: #1a1a2e !important;
+}
+
+body.light-mode .legend-item {
+    color: rgba(26, 26, 46, 0.75) !important;
+}
+
+/* Plan & Actual card title */
+body.light-mode .pa-card .card-title {
+    color: rgba(26, 26, 46, 0.6) !important;
+}
+
+/* Gantt card — labels dan track */
+body.light-mode .gantt-card .card-title {
+    color: rgba(26, 26, 46, 0.6) !important;
+}
+
+body.light-mode .gantt-lbl {
+    color: rgba(26, 26, 46, 0.5) !important;
+}
+
+body.light-mode .gantt-track {
+    background: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Machine page — card-title global (uppercase labels) */
+body.light-mode .card-title {
+    color: rgba(26, 26, 46, 0.6) !important;
+}
+
+/* Filter area slider group text — Machine page */
+body.light-mode .filter-content .slider-group {
+    color: rgba(26, 26, 46, 0.85) !important;
+}
+
+    body.light-mode .filter-content .slider-group b {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode .filter-content .slider-group input[type=range] {
+        accent-color: #185FA5 !important;
+    }
+
+/* Machine select dropdown */
+body.light-mode #mdp-machine-select {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    border-color: rgba(0, 0, 0, 0.2) !important;
+    color: #1a1a2e !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+}
+
+    body.light-mode #mdp-machine-select option {
+        background-color: #ffffff !important;
+        color: #1a1a2e !important;
+    }
+
+/* ====================================================
+   LOSS TIME PAGE — LIGHT MODE PATCH TAMBAHAN
+   ==================================================== */
+
+/* MTT info badge */
+body.light-mode .mtt-info-badge {
+    color: rgba(26, 26, 46, 0.65) !important;
+    background: rgba(100, 100, 120, 0.12) !important;
+    border-color: rgba(100, 100, 120, 0.25) !important;
+}
+
+/* MTT top info bar */
+body.light-mode #mttTopInfoBar {
+    background: rgba(61, 121, 176, 0.07) !important;
+    border-color: rgba(61, 121, 176, 0.2) !important;
+    color: rgba(26, 26, 46, 0.75) !important;
+}
+
+    body.light-mode #mttTopInfoBar .mtt-top-label {
+        color: #185FA5 !important;
+    }
+
+/* sortSelect & chartCategoryFilter — override base hardcoded dark bg */
+body.light-mode #sortSelect,
+body.light-mode #chartCategoryFilter {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+    border-color: rgba(61, 121, 176, 0.5) !important;
+    color: #1a1a2e !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 6px center !important;
+    background-size: 9px 9px !important;
+}
+
+    body.light-mode #sortSelect option,
+    body.light-mode #chartCategoryFilter option {
+        background-color: #ffffff !important;
+        color: #1a1a2e !important;
+    }
+
+/* mttCountBadge text */
+body.light-mode #mttCountBadge {
+    color: rgba(26, 26, 46, 0.7) !important;
+}
+
+/* tableFilterBadge */
+body.light-mode #tableFilterBadge {
+    background: rgba(100, 110, 130, 0.12) !important;
+    border-color: rgba(100, 110, 130, 0.3) !important;
+    color: rgba(26, 26, 46, 0.65) !important;
+}
+
+/* Daily chart title */
+body.light-mode #dailyChartTitle {
+    color: #1a1a2e !important;
+}
+
+    body.light-mode #dailyChartTitle small {
+        color: rgba(26, 26, 46, 0.6) !important;
+    }

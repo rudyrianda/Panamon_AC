@@ -26,7 +26,7 @@ namespace MonitoringSystem.Controllers
         }
 
         // ─── GET /api/machine/efficiency?month=X&year=Y ───────────────────────────
-        // Ambil rata-rata OEE, OperatingRatio, Ability, Quality per machine per bulan
+        // Ambil rata-rata OEE, OperatingRatio, Ability, Quality, Achievement per machine per bulan
         [HttpGet("efficiency")]
         public IActionResult GetMachineEfficiency([FromQuery] int month, [FromQuery] int year)
         {
@@ -41,17 +41,18 @@ namespace MonitoringSystem.Controllers
                 using var conn = OpenConn();
                 var query = @"
                     SELECT
-                        [MachineName],
-                        ISNULL(CAST(ROUND(AVG(CAST([OEE]            AS FLOAT)), 2) AS VARCHAR), '-') AS [OEE],
-                        ISNULL(CAST(ROUND(AVG(CAST([OperatingRatio] AS FLOAT)), 2) AS VARCHAR), '-') AS [OperatingRatio],
-                        ISNULL(CAST(ROUND(AVG(CAST([Ability]        AS FLOAT)), 2) AS VARCHAR), '-') AS [Ability],
-                        ISNULL(CAST(ROUND(AVG(CAST([Quality]        AS FLOAT)), 2) AS VARCHAR), '-') AS [Quality],
-                        ISNULL(CAST(ROUND(AVG(CAST([Achievement]    AS FLOAT)), 2) AS VARCHAR), '-') AS [Achievement]
-                    FROM [dbo].[MachineEfficiency]
-                    WHERE MONTH([Date]) = @Month
-                      AND YEAR([Date])  = @Year
-                    GROUP BY [MachineName]
-                    ORDER BY [MachineName]";
+                        ml.MachineName,
+                        ROUND(AVG(CAST(e.OEE            AS FLOAT)), 2) AS OEE,
+                        ROUND(AVG(CAST(e.OperatingRatio AS FLOAT)), 2) AS OperatingRatio,
+                        ROUND(AVG(CAST(e.Ability        AS FLOAT)), 2) AS Ability,
+                        ROUND(AVG(CAST(e.Quality        AS FLOAT)), 2) AS Quality,
+                        ROUND(AVG(CAST(e.Achievement    AS FLOAT)), 2) AS Achievement
+                    FROM [dbo].[Efficiency] e
+                    JOIN [dbo].[MachineList] ml ON ml.IdMachine = e.IdMachine
+                    WHERE MONTH(e.[Date]) = @Month
+                      AND YEAR(e.[Date])  = @Year
+                    GROUP BY ml.MachineName
+                    ORDER BY ml.MachineName";
 
                 using var cmd = new SqlCommand(query, conn);
                 cmd.Parameters.AddWithValue("@Month", month);
@@ -63,11 +64,11 @@ namespace MonitoringSystem.Controllers
                     result.Add(new
                     {
                         machineName = reader["MachineName"]?.ToString() ?? "-",
-                        oEE = reader["OEE"]?.ToString() ?? "-",
-                        operatingRatio = reader["OperatingRatio"]?.ToString() ?? "-",
-                        ability = reader["Ability"]?.ToString() ?? "-",
-                        quality = reader["Quality"]?.ToString() ?? "-",
-                        achievement = reader["Achievement"]?.ToString() ?? "-"
+                        oee = reader["OEE"] == DBNull.Value ? (double?)null : Convert.ToDouble(reader["OEE"]),
+                        operatingRatio = reader["OperatingRatio"] == DBNull.Value ? (double?)null : Convert.ToDouble(reader["OperatingRatio"]),
+                        ability = reader["Ability"] == DBNull.Value ? (double?)null : Convert.ToDouble(reader["Ability"]),
+                        quality = reader["Quality"] == DBNull.Value ? (double?)null : Convert.ToDouble(reader["Quality"]),
+                        achievement = reader["Achievement"] == DBNull.Value ? (double?)null : Convert.ToDouble(reader["Achievement"])
                     });
                 }
 
@@ -78,7 +79,7 @@ namespace MonitoringSystem.Controllers
         }
 
         // ─── GET /api/machine/list ─────────────────────────────────────────────────
-        // Daftar machine yang pernah ada di MachineEfficiency
+        // Daftar semua machine dari tabel MachineList
         [HttpGet("list")]
         public IActionResult GetMachineList()
         {
@@ -87,15 +88,18 @@ namespace MonitoringSystem.Controllers
             {
                 using var conn = OpenConn();
                 var query = @"
-                    SELECT DISTINCT [MachineName]
-                    FROM [dbo].[MachineEfficiency]
-                    WHERE [MachineName] IS NOT NULL AND [MachineName] != ''
-                    ORDER BY [MachineName]";
+                    SELECT IdMachine, MachineName
+                    FROM [dbo].[MachineList]
+                    ORDER BY MachineName";
 
                 using var cmd = new SqlCommand(query, conn);
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
-                    result.Add(new { machineName = reader["MachineName"]?.ToString() ?? "-" });
+                    result.Add(new
+                    {
+                        idMachine = Convert.ToInt32(reader["IdMachine"]),
+                        machineName = reader["MachineName"]?.ToString() ?? "-"
+                    });
 
                 return Ok(result);
             }
@@ -115,6 +119,8 @@ namespace MonitoringSystem.Controllers
                 return BadRequest(new { error = "machineName wajib diisi." });
             if (month < 1 || month > 12)
                 return BadRequest(new { error = "Bulan tidak valid." });
+            if (year < 2000 || year > 2100)
+                return BadRequest(new { error = "Tahun tidak valid." });
 
             var result = new List<object>();
             try
@@ -122,28 +128,29 @@ namespace MonitoringSystem.Controllers
                 using var conn = OpenConn();
                 var query = @"
                     SELECT
-                        me.ID,
-                        me.MachineName,
-                        CONVERT(VARCHAR, me.[Date], 23)  AS [Date],
-                        me.Shift,
-                        me.OEE,
-                        me.OperatingRatio,
-                        me.Ability,
-                        me.Quality,
-                        me.Achievement,
-                        me.WorkingTime,
-                        me.PlanQty,
-                        me.GoodProductionQty,
-                        me.DefectQty,
-                        mel.LossCategory,
-                        mel.LossGroup,
-                        mel.LossMinutes
-                    FROM [dbo].[MachineEfficiency] me
-                    LEFT JOIN [dbo].[MachineEfficiencyLoss] mel ON mel.EfficiencyID = me.ID
-                    WHERE me.MachineName = @MachineName
-                      AND MONTH(me.[Date]) = @Month
-                      AND YEAR(me.[Date])  = @Year
-                    ORDER BY me.[Date], me.Shift, mel.LossGroup, mel.LossCategory";
+                        e.ID,
+                        ml.MachineName,
+                        CONVERT(VARCHAR, e.[Date], 23) AS [Date],
+                        e.Shift,
+                        e.OEE,
+                        e.OperatingRatio,
+                        e.Ability,
+                        e.Quality,
+                        e.Achievement,
+                        e.WorkingTime,
+                        e.PlanQty,
+                        e.GoodProductionQty,
+                        e.DefectQty,
+                        el.LossCategory,
+                        el.LossGroup,
+                        el.LossMinutes
+                    FROM [dbo].[Efficiency] e
+                    JOIN [dbo].[MachineList] ml ON ml.IdMachine = e.IdMachine
+                    LEFT JOIN [dbo].[EfficiencyLoss] el ON el.EfficiencyID = e.ID
+                    WHERE ml.MachineName = @MachineName
+                      AND MONTH(e.[Date]) = @Month
+                      AND YEAR(e.[Date])  = @Year
+                    ORDER BY e.[Date], e.Shift, el.LossGroup, el.LossCategory";
 
                 using var cmd = new SqlCommand(query, conn);
                 cmd.Parameters.AddWithValue("@MachineName", machineName);

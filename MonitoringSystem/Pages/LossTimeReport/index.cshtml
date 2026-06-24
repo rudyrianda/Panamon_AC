@@ -326,7 +326,7 @@ table.table-bordered > :not(caption) > * {
     border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
-.table-dark td:first-child {
+.table-dark td{
     background-color: rgba(0, 0, 0, 0.7) !important;
     color: white !important;
     font-weight: 700;
@@ -334,11 +334,11 @@ table.table-bordered > :not(caption) > * {
 }
 
 .table-secondary {
-    background-color: rgba(255, 255, 255, 0.20) !important;
+    background-color: rgba(0, 0, 0, 0.20) !important;
 }
 
 .table-secondary td:first-child {
-    background-color: rgba(255, 255, 255, 0.20) !important;
+    background-color: rgba(0, 0, 0, 0.20) !important;
     font-weight: 700;
     box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
 }
@@ -469,6 +469,30 @@ main.pb-5 {
     background-color: rgba(20, 30, 50, 0.9) !important;
 }
 
+.extra-row td {
+    background-color: #000000 !important;
+    color: #ffffff !important; /* Warna teks jadi putih agar kontras */
+}
+/* 1. Paksa semua kolom di baris TOTAL LOSS jadi hitam pekat */
+.table-dark.extra-row td {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 2. KHUSUS kolom pertama (Loss Category) yang ada efek lengket/sticky */
+/* Ini yang paling sering bikin gagal karena dia punya background sendiri */
+.table tbody tr.table-dark td:first-child {
+    background-color: #000000 !important;
+    z-index: 15 !important;
+    box-shadow: 3px 0 8px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 3. Pastikan baris total tidak ikut hilang/transparan */
+.extra-row.table-dark {
+    opacity: 1 !important;
+    display: table-row !important; /* Paksa muncul jika sebelumnya display: none */
+}
 </style>
 
 <div id="reportContainer">
@@ -484,7 +508,7 @@ main.pb-5 {
                     <select class="form-select form-select-sm" style="width: 80px;" id="SelectedYear" name="SelectedYear" asp-for="SelectedYear">
                             @for (int i = DateTime.Now.Year; i >= 2020; i--)
                             {
-                                    <option value="@i">@i</option>
+                                            <option value="@i">@i</option>
                             }
                     </select>
                 </div>
@@ -516,27 +540,27 @@ main.pb-5 {
         <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100">
             @if (TempData["Error"] != null)
             {
-                        <div id="errorToast" class="toast align-items-center text-bg-danger border-0 shadow" role="alert">
-                            <div class="d-flex">
-                                <div class="toast-body">
-                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                <div id="errorToast" class="toast align-items-center text-bg-danger border-0 shadow" role="alert">
+                                    <div class="d-flex">
+                                        <div class="toast-body">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
                             @TempData["Error"]
+                                        </div>
+                                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                                    </div>
                                 </div>
-                                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                            </div>
-                        </div>
             }
             @if (TempData["Success"] != null)
             {
-                        <div id="successToast" class="toast align-items-center text-bg-success border-0 shadow" role="alert">
-                            <div class="d-flex">
-                                <div class="toast-body">
-                                    <i class="fas fa-check-circle me-2"></i>
+                                <div id="successToast" class="toast align-items-center text-bg-success border-0 shadow" role="alert">
+                                    <div class="d-flex">
+                                        <div class="toast-body">
+                                            <i class="fas fa-check-circle me-2"></i>
                             @TempData["Success"]
+                                        </div>
+                                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                                    </div>
                                 </div>
-                                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                            </div>
-                        </div>
             }
         </div>
 
@@ -550,9 +574,9 @@ main.pb-5 {
             </div>
             @if (Model.ChartDataJson == "{}" || !Model.Categories.Any())
             {
-                        <div class="alert alert-warning text-center mt-2" style="font-size: 0.75rem;">
-                            No data found for Fiscal Year @Model.SelectedYear. Please check if data exists in database.
-                        </div>
+                                <div class="alert alert-warning text-center mt-2" style="font-size: 0.75rem;">
+                                    No data found for Fiscal Year @Model.SelectedYear. Please check if data exists in database.
+                                </div>
             }
             <canvas id="monthlyLossChart" class="chart-canvas"></canvas>
         </div>
@@ -569,14 +593,14 @@ main.pb-5 {
                         </th>
                         @foreach (var m in months)
                         {
-                                    <th colspan="2">@m</th>
+                                            <th colspan="2">@m</th>
                         }
                     </tr>
                     <tr>
                         @for (int i = 0; i < 12; i++)
                         {
-                                    <th class="fw-bold small">BP</th>
-                                    <th class="fw-bold small">Act</th>
+                                            <th class="fw-bold small">BP</th>
+                                            <th class="fw-bold small">Act</th>
                         }
                     </tr>
                 </thead>
@@ -593,37 +617,37 @@ main.pb-5 {
 
                             if (groupName != currentGroup)
                             {
-                                                        <tr class="table-secondary @rowClass">
-                                                            <td colspan="25" class="text-center fw-bold text-uppercase" style="letter-spacing: 1px;">
+                                                                                <tr class="table-secondary @rowClass">
+                                                                                    <td colspan="25" class="text-center fw-bold text-uppercase" style="letter-spacing: 1px;">
                                         @groupName
-                                                            </td>
-                                                        </tr>
+                                                                                    </td>
+                                                                                </tr>
                                 currentGroup = groupName;
                             }
 
-                                            <tr class="@rowClass">
-                                                <td class="text-start fw-bold">@cat</td>
+                                                            <tr class="@rowClass">
+                                                                <td class="text-start fw-bold">@cat</td>
                                 @for (int i = 0; i < 12; i++)
                                 {
                                     var planVal = Model.DetailPlans.ContainsKey(cat) ? Model.DetailPlans[cat][i] : 0;
                                     var actVal = Model.DetailActuals.ContainsKey(cat) ? Model.DetailActuals[cat][i] : 0;
-                                                            <td class="text-center fw-bold">@planVal</td>
-                                                            <td class="text-center fw-bold">@actVal</td>
+                                                                                                <td class="text-center fw-bold">@planVal.ToString("N0")</td>
+                                    <td class="text-center fw-bold">@actVal.ToString("N0")</td>
                                 }
-                                            </tr>
+                                                            </tr>
                         }
-                                <tr class="table-dark fw-bold extra-row">
-                                    <td class="text-start">TOTAL LOSS</td>
+                                        <tr class="table-dark fw-bold extra-row">
+                                            <td class="text-start">TOTAL LOSS</td>
                             @for (int i = 0; i < 12; i++)
                             {
-                                                <td>@Model.TotalPlanPerMonth[i].ToString("N1")</td>
-                                                <td>@Model.TotalActualPerMonth[i].ToString("N1")</td>
+                                                                <td>@Model.TotalPlanPerMonth[i].ToString("N1")</td>
+                                                                <td>@Model.TotalActualPerMonth[i].ToString("N1")</td>
                             }
-                                </tr>
+                                        </tr>
                     }
                     else
                     {
-                                <tr><td colspan="25">No Data Available</td></tr>
+                                        <tr><td colspan="25">No Data Available</td></tr>
                     }
                 </tbody>
             </table>
@@ -688,21 +712,14 @@ main.pb-5 {
             icon?.classList.toggle('bi-chevron-up', !isVisible);
         });
 
-        // ============================================================
-        // ✅ HELPER: CEK LIGHT MODE DI <html> ATAU <body>
-        // Karena theme toggle bisa apply class ke html atau body
-        // ============================================================
-        const isLightModeActive = () =>
-            document.documentElement.classList.contains('light-mode') ||
-            document.body.classList.contains('light-mode');
-
         const getChartColors = () => {
-            const isLight = isLightModeActive();
+            const isLight = document.body.classList.contains('light-mode');
             return {
-                textColor:     isLight ? '#1a1a2e'                    : '#ffffff',
-                gridColor:     isLight ? 'rgba(26, 26, 46, 0.12)'     : 'rgba(255, 255, 255, 0.15)',
-                tooltipBg:     isLight ? 'rgba(240, 245, 255, 0.97)'  : 'rgba(0, 0, 0, 0.82)',
-                tooltipBorder: isLight ? 'rgba(26, 26, 46, 0.15)'     : 'rgba(255, 255, 255, 0.15)'
+                textColor:     isLight ? '#1a1a2e'                  : '#ffffff',
+                gridColor:     isLight ? 'rgba(0, 0, 0, 0.1)'        : 'rgba(255, 255, 255, 0.15)',
+                tooltipBg:     isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.85)',
+                tooltipBorder: isLight ? 'rgba(0, 0, 0, 0.15)'       : 'rgba(255, 255, 255, 0.2)',
+                tooltipText:   isLight ? '#1a1a2e'                  : '#ffffff'
             };
         };
 
@@ -721,46 +738,31 @@ main.pb-5 {
         let colorIdx = 0;
         let bpDatasetIndices = [];
 
-        if (chartData.Categories) {
-            chartData.Categories.forEach((cat) => {
-                let color = barColors[colorIdx % barColors.length];
+        const activeCategories = Object.keys(chartData.Actuals);
 
-                datasets.push({
-                    type: 'bar', label: cat + ' (Act)',
-                    data: chartData.Actuals[cat],
-                    backgroundColor: color, borderColor: color,
-                    barThickness: 40, stack: 'Actual', order: 2, yAxisID: 'y'
-                });
+        activeCategories.forEach((cat) => {
+            let color = barColors[colorIdx % barColors.length];
 
-                bpDatasetIndices.push(datasets.length);
-                datasets.push({
-                    type: 'bar', label: cat + ' (Plan)',
-                    data: chartData.Plans[cat],
-                    backgroundColor: color, borderColor: color,
-                    barThickness: 40, stack: 'Plan', order: 2, yAxisID: 'y', hidden: false
-                });
-
-                colorIdx++;
+            bpDatasetIndices.push(datasets.length);
+            datasets.push({
+                type: 'bar', label: cat + ' (Plan)',
+                data: chartData.Plans[cat],
+                backgroundColor: color, borderColor: color,
+                barThickness: 40, stack: 'Plan', order: 2, yAxisID: 'y', hidden: false
             });
-        }
 
-        datasets.push({
-            type: 'line', label: 'Actual Ratio (%)',
-            data: chartData.RatioActual,
-            borderColor: '#e74a3b', backgroundColor: 'rgba(231,74,59,0.7)',
-            borderWidth: 3, pointRadius: 4, tension: 0.1, yAxisID: 'y_ratio', order: 0
-        });
+            datasets.push({
+                type: 'bar', label: cat + ' (Act)',
+                data: chartData.Actuals[cat],
+                backgroundColor: color, borderColor: color,
+                barThickness: 40, stack: 'Actual', order: 2, yAxisID: 'y'
+            });
 
-        datasets.push({
-            type: 'line', label: 'Plan Ratio (%)',
-            data: chartData.RatioPlan,
-            borderColor: '#4e73df', backgroundColor: 'rgba(78,115,223,0.7)',
-            borderWidth: 2, borderDash: [5, 5], pointRadius: 3,
-            tension: 0.1, yAxisID: 'y_ratio', order: 0
+            colorIdx++;
         });
 
         // ============================================================
-        // ✅ AMBIL WARNA SAAT INI (saat halaman load)
+        // INIT CHART
         // ============================================================
         const c0 = getChartColors();
 
@@ -776,19 +778,38 @@ main.pb-5 {
                 plugins: {
                     tooltip: {
                         mode: 'index', intersect: false,
-                        titleColor: c0.textColor, bodyColor: c0.textColor,
+                        position: 'nearest',
+                        caretSize: 8,
+                        caretPadding: 10,
                         backgroundColor: c0.tooltipBg,
-                        borderColor: c0.tooltipBorder, borderWidth: 1,
+                        borderColor: c0.tooltipBorder,
+                        borderWidth: 1,
+                        titleColor: c0.tooltipText,   // ✅ FIX: property langsung, bukan callback
+                        bodyColor:  c0.tooltipText,   // ✅ FIX: property langsung, bukan callback
+                        footerColor: c0.tooltipText,  // ✅ FIX: property langsung, bukan callback
+                        itemSort: function(a, b) { return b.parsed.y - a.parsed.y; },
                         callbacks: {
                             label: function (context) {
-                                let label = context.dataset.label || '';
-                                if (!label.includes('(Act)') && !label.includes('Actual')) return null;
-                                if (label) label += ': ';
-                                if (context.parsed.y !== null) {
-                                    label += context.parsed.y;
-                                    if (context.dataset.yAxisID === 'y_ratio') label += '%';
-                                }
-                                return label;
+                                const label = context.dataset.label || '';
+                                if (!label.includes('(Act)')) return null;
+                                if (!context.parsed.y || context.parsed.y === 0) return null;
+                                return label.replace(' (Act)', '') + ': ' + context.parsed.y.toLocaleString() + ' min';
+                            },
+                            footer: function (tooltipItems) {
+                                if (!tooltipItems.length) return [];
+                                const dataIndex = tooltipItems[0].dataIndex;
+                                const chart = tooltipItems[0].chart;
+                                let totalAct = 0, totalBP = 0;
+                                chart.data.datasets.forEach((ds) => {
+                                    const val = ds.data[dataIndex] || 0;
+                                    if (ds.label?.includes('(Act)')) totalAct += val;
+                                    else if (ds.label?.includes('(Plan)')) totalBP += val;
+                                });
+                                return [
+                                    '─────────────────',
+                                    'Total Actual : ' + totalAct.toLocaleString() + ' min',
+                                    'Total BP     : ' + totalBP.toLocaleString() + ' min'
+                                ];
                             }
                         }
                     },
@@ -799,9 +820,8 @@ main.pb-5 {
                             generateLabels: function (chart) {
                                 const original = Chart.defaults.plugins.legend.labels.generateLabels;
                                 const labels = original.call(this, chart);
-                                return labels.filter(l => l.text.includes('(Act)') || l.text.includes('Ratio'))
-                                    .map(l => { l.text = l.text.replace(' (Act)', ''); return l; })
-                                    .slice(0, 13);
+                                return labels.filter(l => l.text.includes('(Act)'))
+                                             .map(l => { l.text = l.text.replace(' (Act)', ''); return l; });
                             }
                         },
                         onClick: (e, item, legend) => {
@@ -822,12 +842,12 @@ main.pb-5 {
                     },
                     y: {
                         type: 'linear', display: true, position: 'left', stacked: true,
-                        title: { display: true, text: 'Loss Time (Minutes)', color: c0.textColor },
+                        title: { display: true, text: 'Loss Time (Min)', color: c0.textColor },
                         ticks: { color: c0.textColor },
                         grid:  { color: c0.gridColor }
                     },
                     y_ratio: {
-                        type: 'linear', display: true, position: 'right',
+                        type: 'linear', display: false, position: 'right',
                         grid: { drawOnChartArea: false },
                         title: { display: true, text: 'Ratio (%)', color: c0.textColor },
                         ticks: { color: c0.textColor, callback: v => v + '%' },
@@ -836,8 +856,6 @@ main.pb-5 {
                 }
             }
         });
-
-
 
         // ============================================================
         // TOGGLE BP BUTTON
@@ -848,7 +866,6 @@ main.pb-5 {
         toggleBPBtn?.addEventListener('click', function () {
             bpVisible = !bpVisible;
             bpDatasetIndices.forEach(i => { if (bpVisible) monthlyChart.show(i); else monthlyChart.hide(i); });
-
             if (bpVisible) {
                 toggleBPBtn.innerHTML = '<i class="fas fa-eye me-1"></i> Hide BP';
                 toggleBPBtn.style.borderColor = 'rgba(231, 74, 59, 0.6)';
@@ -859,6 +876,28 @@ main.pb-5 {
                 toggleBPBtn.style.color       = 'rgba(100, 181, 246, 1)';
             }
             monthlyChart.update();
+        });
+
+        // ============================================================
+        // SYNC TOOLTIP + CHART COLORS SAAT THEME TOGGLE
+        // ============================================================
+        document.getElementById('themeToggle')?.addEventListener('click', function () {
+            setTimeout(() => {
+                const c = getChartColors();
+                monthlyChart.options.plugins.tooltip.backgroundColor  = c.tooltipBg;
+                monthlyChart.options.plugins.tooltip.borderColor       = c.tooltipBorder;
+                monthlyChart.options.plugins.tooltip.titleColor        = c.tooltipText;   // ✅ sync saat theme toggle
+                monthlyChart.options.plugins.tooltip.bodyColor         = c.tooltipText;   // ✅ sync saat theme toggle
+                monthlyChart.options.plugins.tooltip.footerColor       = c.tooltipText;   // ✅ sync saat theme toggle
+                monthlyChart.options.plugins.legend.labels.color       = c.textColor;
+                monthlyChart.options.scales.x.ticks.color              = c.textColor;
+                monthlyChart.options.scales.x.grid.color               = c.gridColor;
+                monthlyChart.options.scales.x.title.color              = c.textColor;
+                monthlyChart.options.scales.y.ticks.color              = c.textColor;
+                monthlyChart.options.scales.y.grid.color               = c.gridColor;
+                monthlyChart.options.scales.y.title.color              = c.textColor;
+                monthlyChart.update('none');
+            }, 50);
         });
 
     }); // END DOMContentLoaded

@@ -1740,3 +1740,229 @@ body.light-mode .toast.text-bg-success {
     background-color: rgba(25, 135, 84, 0.93) !important;
     border: 1px solid rgba(25, 135, 84, 0.4) !important;
 }
+/* ====================================================
+   19. PERFORMANCE PAGE - HOURLY TABLE THEAD FIX
+   ==================================================== */
+.perf-hourly-table thead tr th {
+    background-color: rgba(61, 121, 176, 0.82) !important;
+    background: rgba(61, 121, 176, 0.82) !important;
+    color: #ffffff !important;
+    --bs-table-bg: rgba(61, 121, 176, 0.82) !important;
+    --bs-table-color: #ffffff !important;
+    --bs-table-striped-bg: rgba(61, 121, 176, 0.82) !important;
+    --bs-table-hover-bg: rgba(61, 121, 176, 0.82) !important;
+    --bs-table-active-bg: rgba(61, 121, 176, 0.82) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+body.light-mode .perf-hourly-table thead tr th {
+    background-color: rgba(61, 121, 176, 0.92) !important;
+    background: rgba(61, 121, 176, 0.92) !important;
+    color: #ffffff !important;
+    --bs-table-bg: rgba(61, 121, 176, 0.92) !important;
+    --bs-table-color: #ffffff !important;
+    --bs-table-striped-bg: rgba(61, 121, 176, 0.92) !important;
+    --bs-table-hover-bg: rgba(61, 121, 176, 0.92) !important;
+    --bs-table-active-bg: rgba(61, 121, 176, 0.92) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+}
+/* ====================================================
+   20. INPUT DATE - CALENDAR ICON THEME FIX
+   ==================================================== */
+
+/* Dark mode: icon kalender jadi putih */
+body.reusable-bg input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) !important;
+    opacity: 0.8 !important;
+    cursor: pointer;
+}
+
+/* Light mode: icon kalender gelap tapi tetap keliatan */
+body.light-mode input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.4) !important;
+    opacity: 1 !important;
+    cursor: pointer;
+}
+
+/* ====================================================
+   21. SUMMARY PAGE - TABLE STYLES (mengikuti perf-card)
+   ==================================================== */
+
+.summary-card {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.20) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28) !important;
+    border-radius: 10px !important;
+}
+
+body.light-mode .summary-card {
+    background: rgba(255, 255, 255, 0.60) !important;
+    border: 1px solid rgba(255, 255, 255, 0.70) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10) !important;
+}
+
+.summary-card .table,
+.summary-card .table > :not(caption) > * > * {
+    --bs-table-bg: transparent !important;
+    --bs-table-striped-bg: transparent !important;
+    --bs-table-active-bg: transparent !important;
+    --bs-table-hover-bg: transparent !important;
+    --bs-table-color: #ffffff !important;
+    --bs-table-border-color: rgba(255, 255, 255, 0.12) !important;
+    background-color: transparent !important;
+    color: #ffffff !important;
+}
+
+body.light-mode .summary-card .table,
+body.light-mode .summary-card .table > :not(caption) > * > * {
+    --bs-table-bg: transparent !important;
+    --bs-table-color: #1a1a2e !important;
+    --bs-table-border-color: rgba(0, 0, 0, 0.08) !important;
+    background-color: transparent !important;
+    color: #1a1a2e !important;
+}
+
+.summary-card .table {
+    border-collapse: collapse !important;
+}
+
+    /* TH header cells */
+    .summary-card .table thead th {
+        background-color: rgba(61, 121, 176, 0.82) !important;
+        color: #ffffff !important;
+        border-color: rgba(255, 255, 255, 0.15) !important;
+        --bs-table-bg: rgba(61, 121, 176, 0.82) !important;
+        --bs-table-color: #ffffff !important;
+    }
+
+body.light-mode .summary-card .table thead th {
+    background-color: rgba(61, 121, 176, 0.92) !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    --bs-table-bg: rgba(61, 121, 176, 0.92) !important;
+}
+
+/* TD body cells */
+.summary-card .table tbody td,
+.summary-card .table tbody th {
+    background-color: transparent !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    --bs-table-color: #ffffff !important;
+}
+
+body.light-mode .summary-card .table tbody td,
+body.light-mode .summary-card .table tbody th {
+    background-color: transparent !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.10) !important;
+    --bs-table-color: #1a1a2e !important;
+}
+
+/* Row border */
+.summary-card .table tbody tr {
+    border-bottom: 1.5px solid rgba(255, 255, 255, 0.18) !important;
+}
+
+body.light-mode .summary-card .table tbody tr {
+    border-bottom: 1.5px solid rgba(61, 121, 176, 0.35) !important;
+}
+
+/* Hover row */
+.summary-card .table tbody tr:hover td,
+.summary-card .table tbody tr:hover th {
+    background-color: rgba(100, 181, 246, 0.12) !important;
+    transition: background-color 0.2s ease;
+}
+
+body.light-mode .summary-card .table tbody tr:hover td,
+body.light-mode .summary-card .table tbody tr:hover th {
+    background-color: rgba(61, 121, 176, 0.10) !important;
+}
+
+/* Label tanggal di atas tabel */
+.summary-date-label {
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+
+body.light-mode .summary-date-label {
+    color: #1a1a2e !important;
+}
+
+/* Filter form inputs */
+.summary-filter input[type="date"] {
+    background-color: rgba(255, 255, 255, 0.10) !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
+    color: #ffffff !important;
+    border-radius: 6px !important;
+}
+
+body.light-mode .summary-filter input[type="date"] {
+    background-color: rgba(255, 255, 255, 0.72) !important;
+    border: 1.5px solid rgba(0, 0, 0, 0.18) !important;
+    color: #1a1a2e !important;
+}
+
+.summary-filter input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.7;
+    cursor: pointer;
+}
+
+body.light-mode .summary-filter input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: none;
+    opacity: 0.55;
+}
+
+/* Label di filter */
+.summary-filter label {
+    color: rgba(255, 255, 255, 0.88) !important;
+}
+
+body.light-mode .summary-filter label {
+    color: #1a1a2e !important;
+}
+
+/* Tombol Search */
+.btn-summary {
+    background-color: rgba(61, 121, 176, 0.85) !important;
+    border: 1.5px solid rgba(100, 181, 246, 0.55) !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    border-radius: 6px !important;
+    transition: all 0.2s;
+}
+
+    .btn-summary:hover {
+        background-color: rgba(35, 90, 150, 1) !important;
+        border-color: rgba(144, 202, 249, 1) !important;
+        color: #ffffff !important;
+    }
+
+body.light-mode .btn-summary {
+    background-color: rgba(61, 121, 176, 0.92) !important;
+    border-color: rgba(61, 121, 176, 0.9) !important;
+}
+
+.summary-card .table thead tr th,
+.summary-card .table thead tr th:nth-child(2) {
+    background-color: rgba(61, 121, 176, 0.82) !important;
+    background: rgba(61, 121, 176, 0.82) !important;
+    --bs-table-bg: rgba(61, 121, 176, 0.82) !important;
+    --bs-table-striped-bg: rgba(61, 121, 176, 0.82) !important;
+    --bs-table-hover-bg: rgba(61, 121, 176, 0.82) !important;
+    color: #ffffff !important;
+}
+
+/* Selektor super spesifik untuk memaksa logo menjadi hitam */
+html.light-mode .header-center img.logo-panamon,
+body.light-mode .header-center img.logo-panamon,
+.light-mode .logo-panamon {
+    /* brightness(0) menghilangkan semua cahaya (putih jadi hitam) */
+    /* saturate(0) menghilangkan saturasi warna */
+    /* contrast(2) mempertegas warna hitamnya */
+    filter: brightness(0) saturate(0) contrast(2) !important;
+    -webkit-filter: brightness(0) saturate(0) contrast(2) !important;
+    opacity: 1 !important;
+    transition: filter 0.3s ease;
+}

@@ -4,6 +4,8 @@
 @{
     /* Pa Adan Disini */
     ViewData["Title"] = "Performance";
+    // ✅ FIX LCP: Hint browser agar render teks besar lebih cepat
+    ViewData["ExtraHead"] = "<style>.perf-panel-title,.perf-th,.perf-td{font-display:swap}</style>";
 
     var currentTime = DateTime.Now.TimeOfDay;
     var currentDate = DateTime.Now.Date;
@@ -14,53 +16,52 @@
     var listRestTime = Model.GetRestTime(Model.DetermineTypeOfDay(currentDay));
 
     var workingTimeData = CalculateWorkingTime(Model.SelectedDate, currentTime, startWorkingTime, endWorkingTime, listRestTime);
-    // var workingTime = workingTimeData.WorkingTime;
-    // var totalLossTime = Model.CalculateTotalLossTime(Model.assemblyTimes, listRestTime) / 60;
 
-    var totalDefect = Model.GetTotalDefectBySummaryLogic();
-    var workingTime = Model.GetWorkingTimeBySummaryLogic();
-    var totalLossTime = Model.GetLossTimeBySummaryLogic();
+    var totalDefect = Model.CachedDefect;
+    var workingTime = Model.CachedWorkingTime;
+    var totalLossTime = Model.CachedLossTime;
 
     InitializeFirstAssemblyTime();
 
-    var planProd = Model.GetProductionPlan();
-    var hourlyPlans = CalculateAllHourlyPlans();
+    var planProd = Model.CachedPlan;
 
+    // ✅ OPTIMASI: Hitung sekali, simpan ke variabel, reuse — jangan panggil ulang
+    var hourlyPlansCU = CalculateAllHourlyPlansForCU();
+    var hourlyPlansCS = CalculateAllHourlyPlansForCS();
+    var totalPlanForCU = hourlyPlansCU.Sum();
+    var totalPlanForCS = hourlyPlansCS.Sum();
 
-    // var hourlyPlans = CalculateAllHourlyPlans();
-    // var planProd = hourlyPlans.Sum(); Sum of all hourly plans
-   
-    var totalPlanForCU = CalculateAllHourlyPlansForCU().Sum();
-    var totalPlanForCS = CalculateAllHourlyPlansForCS().Sum();
-    System.Diagnostics.Debug.WriteLine($"totalPlanForCU: " + totalPlanForCU);
-    System.Diagnostics.Debug.WriteLine($"totalPlanForCS: " + totalPlanForCS);
-    // Simpan total plan ke database
-    Model.SavePlanToDatabase(totalPlanForCU, "MCH1-01");
-    Model.SavePlanToDatabase(totalPlanForCS, "MCH1-02");
+    // ✅ OPTIMASI: Gabungkan ke satu list untuk keperluan lain
+    var hourlyPlans = hourlyPlansCU.Concat(hourlyPlansCS).ToList();
 
-    var targetProd = Model.GetTargetFromOEESN();
+    // ✅ OPTIMASI: SavePlanToDatabase hanya dipanggil jika hari ini
+    // (method sudah ada guard SelectedDate != Today di backend, ini double-check di view)
+    if (Model.SelectedDate == currentDate)
+    {
+        Model.SavePlanToDatabase(totalPlanForCU, "MCH1-01");
+        Model.SavePlanToDatabase(totalPlanForCS, "MCH1-02");
+    }
 
-    // var productionMetrics = CalculateProductionMetrics(Model.listProdAchieve, currentDate, currentTime, listRestTime, planProd);
-    // var targetProd = productionMetrics.TargetProd;
-    var actualProd = Model.GetActualProduction();
+    var targetProd = Model.CachedTarget;
+    var actualProd = Model.CachedActual;
     var differenceProd = actualProd - targetProd;
-    var planTaktTime = Model.GetPlanTaktTime();
+    var planTaktTime = Model.CachedPlanTaktTime;
 
-    var efficiencyValue = Model.GetEfficiencyFromOEESN();
-
+    var efficiencyValue = Model.CachedEfficiency;
     var efficiencyMetrics = CalculateEfficiencyMetrics(workingTime, totalLossTime, planTaktTime, actualProd);
 
-    // var totalDefect = Model.GetTotalDefect();
-    // var defectRatio = planProd > 0 ? (100 - ((totalDefect / planProd) * 100)) : 0;
-
-    var defectRatio = (Model.GetActualProduction() > 0)
-    ? Math.Round(100.0 - ((double)totalDefect / Model.GetActualProduction() * 100.0))
-    : 100.0;
+    // ✅ OPTIMASI: actualProd sudah dihitung, tidak perlu panggil GetActualProduction() lagi
+    var defectRatio = (actualProd > 0)
+        ? Math.Round(100.0 - ((double)totalDefect / actualProd * 100.0))
+        : 100.0;
 
     var actualData = Model.GetActualPerHour();
     var timeCounts = Model.listProdAchieve.GroupBy(item => item.Time).ToDictionary(group => group.Key, group => group.Count());
 
     var efficiencyData = CalculateCumulativeEfficiency(actualData, hourlyPlans, workingTime, totalLossTime, planTaktTime);
+
+    // ✅ OPTIMASI: Sort sekali di sini, reuse di bawah
+    var sortedProdAchieve = Model.listProdAchieve.OrderByDescending(item => item.Time).ToList();
 }
 
 @functions {
@@ -69,11 +70,6 @@
         public int WorkingTime { get; set; }
         public int TotalWorkingTime { get; set; }
         public int TotalRestTime { get; set; }
-    }
-
-    private class ProductionMetrics
-    {
-        public int TargetProd { get; set; }
     }
 
     private class EfficiencyMetrics
@@ -99,9 +95,7 @@
             : currentTime - startWorkingTime;
 
         if (currentTime < startWorkingTime)
-        {
             result.WorkingTime = 0;
-        }
 
         result.TotalWorkingTime = (int)workingDuration.TotalMinutes;
 
@@ -120,7 +114,6 @@
         });
 
         result.WorkingTime = result.TotalWorkingTime - result.TotalRestTime;
-
         return result;
     }
 
@@ -128,47 +121,16 @@
     {
         if (Model.assemblyTimes.Count > 0)
         {
-            var firstTime = new Performance.PerformanceModel.AssemblyTime
+            Model.assemblyTimes.Add(new Performance.PerformanceModel.AssemblyTime
                 {
                     Model = Model.assemblyTimes.First().Model,
                     MachineCode = Model.MachineCode,
                     SUT = Model.assemblyTimes.First().SUT,
                     ProductionTime = new TimeSpan(7, 0, 0)
-                };
-            Model.assemblyTimes.Add(firstTime);
+                });
         }
     }
 
-    private List<int> CalculateAllHourlyPlans()
-    {
-        var hourlyPlans = new List<int>();
-        var previousModel = "";
-        var currentTime = DateTime.Now.TimeOfDay;
-        var currentDate = DateTime.Now.Date;
-        var listRestTime = Model.GetRestTime(Model.DetermineTypeOfDay(DateTime.Today.DayOfWeek));
-        var iterasi = 0;
-        foreach (var achievement in Model.listProdAchieve
-                            .OrderByDescending(item => item.Time)
-                            .ToList())
-        {
-            var planPerHour = CalculatePlanPerHour(
-                achievement.Model,
-                previousModel,
-                achievement.StartTime,
-                achievement.EndTime,
-                currentTime,
-                currentDate,
-                achievement.SUT,
-                listRestTime
-            );
-            hourlyPlans.Add(planPerHour);
-            iterasi++;
-            System.Diagnostics.Debug.WriteLine($"iterasi ke-"+ iterasi + planPerHour);
-            previousModel = achievement.Model;
-        }
-
-        return hourlyPlans;
-    }    
     public List<int> CalculateAllHourlyPlansForCU()
     {
         var hourlyPlans = new List<int>();
@@ -176,30 +138,22 @@
         var currentTime = DateTime.Now.TimeOfDay;
         var currentDate = DateTime.Now.Date;
         var listRestTime = Model.GetRestTime(Model.DetermineTypeOfDay(DateTime.Today.DayOfWeek));
-        var iterasi = 0;
+
         foreach (var achievement in Model.listProdAchieve
-                            .Where(a => a.Model == "MCH1-01")
-                            .OrderByDescending(item => item.Time)
-                            .ToList())
+                    .Where(a => a.MachineCode == "MCH1-01")
+                    .OrderByDescending(item => item.Time)
+                    .ToList())
         {
-            var planPerHour = CalculatePlanPerHour(
-                achievement.Model,
-                previousModel,
-                achievement.StartTime,
-                achievement.EndTime,
-                currentTime,
-                currentDate,
-                achievement.SUT,
-                listRestTime
-            );
-            hourlyPlans.Add(planPerHour);
-            iterasi++;
-            System.Diagnostics.Debug.WriteLine($"iterasi ke-"+ iterasi + planPerHour);
+            hourlyPlans.Add(CalculatePlanPerHour(
+                achievement.Model, previousModel,
+                achievement.StartTime, achievement.EndTime,
+                currentTime, currentDate, achievement.SUT, listRestTime));
             previousModel = achievement.Model;
         }
 
         return hourlyPlans;
-    }    
+    }
+
     public List<int> CalculateAllHourlyPlansForCS()
     {
         var hourlyPlans = new List<int>();
@@ -207,113 +161,46 @@
         var currentTime = DateTime.Now.TimeOfDay;
         var currentDate = DateTime.Now.Date;
         var listRestTime = Model.GetRestTime(Model.DetermineTypeOfDay(DateTime.Today.DayOfWeek));
-        var iterasi = 0;
+
         foreach (var achievement in Model.listProdAchieve
-                                            .Where(a => a.Model == "MCH1-02")
-                            .OrderByDescending(item => item.Time)
-                            .ToList())
+                    .Where(a => a.MachineCode == "MCH1-02")
+                    .OrderByDescending(item => item.Time)
+                    .ToList())
         {
-            var planPerHour = CalculatePlanPerHour(
-                achievement.Model,
-                previousModel,
-                achievement.StartTime,
-                achievement.EndTime,
-                currentTime,
-                currentDate,
-                achievement.SUT,
-                listRestTime
-            );
-            hourlyPlans.Add(planPerHour);
-            iterasi++;
-            System.Diagnostics.Debug.WriteLine($"iterasi ke-"+ iterasi + planPerHour);
+            hourlyPlans.Add(CalculatePlanPerHour(
+                achievement.Model, previousModel,
+                achievement.StartTime, achievement.EndTime,
+                currentTime, currentDate, achievement.SUT, listRestTime));
             previousModel = achievement.Model;
         }
 
         return hourlyPlans;
     }
 
-    private ProductionMetrics CalculateProductionMetrics(List<Performance.PerformanceModel.ProductionAchievement> listProdAchieve,
-                                                       DateTime currentDate, TimeSpan currentTime,
-                                                       List<Performance.PerformanceModel.RestTime> listRestTime,
-                                                       int planProd)
-    {
-        var result = new ProductionMetrics { TargetProd = 0 };
-        var previousModel = "";
-
-        if (listProdAchieve.Count > 0)
-        {
-            for (int i = 0; i < listProdAchieve.Count; i++)
-            {
-                var currentModel = listProdAchieve[i].Model;
-                var sut = listProdAchieve[i].SUT;
-                var startTime = listProdAchieve[i].StartTime;
-                var endTime = listProdAchieve[i].EndTime;
-                var planSUT = 0;
-
-                var firstTime_Model = TimeSpan.Zero;
-                var lastTime_Model = TimeSpan.Zero;
-                var quantityPlan = 0;
-
-                if (currentModel != null)
-                {
-                    firstTime_Model = Model.GetFirstTimeModel(startTime, endTime, currentModel);
-                    lastTime_Model = Model.GetLastTimeModel(startTime, endTime, currentModel);
-                    quantityPlan = Model.GetModelPlan(currentModel);
-                }
-
-                if (Model.SelectedDate == currentDate)
-                {
-                    if (currentTime >= startTime && currentTime <= endTime)
-                    {
-                        planSUT = currentModel == previousModel
-                            ? Model.CalculatePlan(startTime, currentTime, sut, listRestTime)
-                            : Model.CalculatePlan(firstTime_Model, lastTime_Model, sut, listRestTime);
-                    }
-                    else
-                    {
-                        planSUT = currentModel == previousModel
-                            ? Model.CalculatePlan(startTime, endTime, sut, listRestTime)
-                            : Model.CalculatePlan(firstTime_Model, endTime, sut, listRestTime);
-                    }
-                }
-                else
-                {
-                    planSUT = currentModel == previousModel
-                        ? Model.CalculatePlan(startTime, endTime, sut, listRestTime)
-                        : Model.CalculatePlan(firstTime_Model, endTime, sut, listRestTime);
-                }
-
-                planSUT = Math.Min(planSUT, quantityPlan);
-                previousModel = currentModel;
-
-                result.TargetProd += planSUT;
-                result.TargetProd = Math.Min(result.TargetProd, planProd);
-            }
-        }
-
-        return result;
-    }
-
     private EfficiencyMetrics CalculateEfficiencyMetrics(int workingTime, double totalLossTime, int planTaktTime, int actualProd)
     {
         var result = new EfficiencyMetrics();
+        if (workingTime <= 0) return result;
 
-        result.OprRatio = Math.Round((((Convert.ToDouble(workingTime) - Convert.ToDouble(totalLossTime)) / Convert.ToDouble(workingTime)) * 100), 2);
+        result.OprRatio = Math.Round(((Convert.ToDouble(workingTime) - Convert.ToDouble(totalLossTime)) / Convert.ToDouble(workingTime)) * 100, 2);
 
-        result.WorkEff = Math.Round((((Convert.ToDouble(planTaktTime) / 60) * actualProd) / (Convert.ToDouble(workingTime) - Convert.ToDouble(totalLossTime))) * 100, 2);
+        var netWorkingTime = Convert.ToDouble(workingTime) - Convert.ToDouble(totalLossTime);
+        if (netWorkingTime > 0 && actualProd > 0)
+        {
+            result.WorkEff = Math.Round((((Convert.ToDouble(planTaktTime) / 60) * actualProd) / netWorkingTime) * 100, 2);
+            result.ActTaktTime = Math.Round((netWorkingTime / Convert.ToDouble(actualProd)) * 60, 2);
+        }
 
-        result.EffProd = Math.Round(((result.OprRatio / 100) * (result.WorkEff / 100)) * 100, 2);
-
-        result.ActTaktTime = Math.Round((((Convert.ToDouble(workingTime) - Convert.ToDouble(totalLossTime)) / Convert.ToDouble(actualProd)) * 60), 2);
+        result.EffProd = Math.Round((result.OprRatio / 100) * (result.WorkEff / 100) * 100, 2);
         return result;
     }
 
     private EfficiencyData CalculateCumulativeEfficiency(
-    List<Performance.PerformanceModel.ActualData> actualData,
-    List<int> hourlyPlans,
-    int workingTime,
-    double totalLossTime,
-    int planTaktTime)
+        List<Performance.PerformanceModel.ActualData> actualData,
+        List<int> hourlyPlans,
+        int workingTime,
+        double totalLossTime,
+        int planTaktTime)
     {
         var result = new EfficiencyData();
         int cumulativeActual = 0;
@@ -327,12 +214,9 @@
 
             double efficiency =
                 (cumulativeActual > 0 && workingTime > totalLossTime && planTaktTime > 0)
-                ? Math.Round(
-                    Math.Min(
-                        (cumulativeActual * planTaktTime) /
-                        ((workingTime - totalLossTime) * 60) * 100,
-                        120
-                    ), 2)
+                ? Math.Round(Math.Min(
+                    (cumulativeActual * planTaktTime) / ((workingTime - totalLossTime) * 60) * 100,
+                    120), 2)
                 : 0;
 
             result.Labels.Add(actualData[i].EndTime);
@@ -342,10 +226,9 @@
         return result;
     }
 
-
     private int CalculatePlanPerHour(string currentModel, string previousModel, TimeSpan startTime, TimeSpan endTime,
-                                  TimeSpan currentTime, DateTime currentDate, int sut,
-                                  List<Performance.PerformanceModel.RestTime> listRestTime)
+                                     TimeSpan currentTime, DateTime currentDate, int sut,
+                                     List<Performance.PerformanceModel.RestTime> listRestTime)
     {
         var firstTimeModel = TimeSpan.Zero;
         var lastTimeModel = TimeSpan.Zero;
@@ -361,18 +244,13 @@
 
         if (Model.SelectedDate == currentDate)
         {
-            if (currentTime >= startTime && currentTime <= endTime)
-            {
-                planPerHour = currentModel == previousModel
+            planPerHour = currentTime >= startTime && currentTime <= endTime
+                ? (currentModel == previousModel
                     ? Model.CalculatePlan(startTime, currentTime, sut, listRestTime)
-                    : Model.CalculatePlan(firstTimeModel, lastTimeModel, sut, listRestTime);
-            }
-            else
-            {
-                planPerHour = currentModel == previousModel
+                    : Model.CalculatePlan(firstTimeModel, lastTimeModel, sut, listRestTime))
+                : (currentModel == previousModel
                     ? Model.CalculatePlan(startTime, endTime, sut, listRestTime)
-                    : Model.CalculatePlan(firstTimeModel, lastTimeModel, sut, listRestTime);
-            }
+                    : Model.CalculatePlan(firstTimeModel, lastTimeModel, sut, listRestTime));
         }
         else
         {
@@ -382,81 +260,318 @@
         }
 
         planPerHour = Math.Min(planPerHour, qtyPlan);
-
         return planPerHour > 0 ? planPerHour : 1;
     }
 }
+
+<style>
+    .perf-label {
+        color: rgba(255, 255, 255, 0.88);
+    }
+    body.light-mode .perf-label {
+        color: #1a1a2e !important;
+    }
+
+    .perf-select,
+    .perf-date {
+        background-color: rgba(255, 255, 255, 0.10) !important;
+        border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
+        color: #ffffff !important;
+        font-weight: 600;
+        border-radius: 6px !important;
+    }
+    .perf-select option {
+        background-color: rgba(25, 35, 58, 0.98) !important;
+        color: #e0e2ea !important;
+    }
+    .perf-select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 10px center !important;
+        background-size: 12px !important;
+    }
+    .perf-date::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+        opacity: 0.65;
+        cursor: pointer;
+    }
+    body.light-mode .perf-select,
+    body.light-mode .perf-date {
+        background-color: rgba(255, 255, 255, 0.72) !important;
+        border: 1.5px solid rgba(0, 0, 0, 0.18) !important;
+        color: #1a1a2e !important;
+    }
+    body.light-mode .perf-select option {
+        background-color: #ffffff !important;
+        color: #1a1a2e !important;
+    }
+    body.light-mode .perf-select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+    }
+    body.light-mode .perf-date::-webkit-calendar-picker-indicator {
+        filter: none;
+        opacity: 0.55;
+    }
+
+    .btn-perf {
+        background-color: rgba(61, 121, 176, 0.85) !important;
+        border: 1.5px solid rgba(100, 181, 246, 0.55) !important;
+        color: #ffffff !important;
+        font-weight: 600;
+        border-radius: 6px !important;
+        transition: all 0.2s;
+    }
+    .btn-perf:hover {
+        background-color: rgba(35, 90, 150, 1) !important;
+        border-color: rgba(144, 202, 249, 1) !important;
+        color: #ffffff !important;
+    }
+    body.light-mode .btn-perf {
+        background-color: rgba(61, 121, 176, 0.92) !important;
+        border-color: rgba(61, 121, 176, 0.9) !important;
+    }
+
+    .perf-card {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border: 1.5px solid rgba(255, 255, 255, 0.20) !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28) !important;
+        border-radius: 10px !important;
+    }
+    body.light-mode .perf-card {
+        background: rgba(255, 255, 255, 0.60) !important;
+        border: 1px solid rgba(255, 255, 255, 0.70) !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10) !important;
+    }
+
+    .perf-card .table,
+    .perf-card .table > :not(caption) > * > * {
+        --bs-table-bg: transparent !important;
+        --bs-table-striped-bg: transparent !important;
+        --bs-table-active-bg: transparent !important;
+        --bs-table-hover-bg: transparent !important;
+        --bs-table-color: #ffffff !important;
+        --bs-table-border-color: rgba(255, 255, 255, 0.12) !important;
+        background-color: transparent !important;
+        color: #ffffff !important;
+    }
+    body.light-mode .perf-card .table,
+    body.light-mode .perf-card .table > :not(caption) > * > * {
+        --bs-table-bg: transparent !important;
+        --bs-table-color: #1a1a2e !important;
+        --bs-table-border-color: rgba(0, 0, 0, 0.08) !important;
+        background-color: transparent !important;
+        color: #1a1a2e !important;
+    }
+
+    .perf-hourly-table,
+    .perf-hourly-table > :not(caption) > * > * {
+        --bs-table-bg: transparent !important;
+        --bs-table-striped-bg: transparent !important;
+        --bs-table-active-bg: transparent !important;
+        --bs-table-hover-bg: transparent !important;
+        --bs-table-color: #e0e2ea !important;
+        --bs-table-border-color: rgba(255, 255, 255, 0.08) !important;
+        background-color: transparent !important;
+        color: #e0e2ea !important;
+    }
+    body.light-mode .perf-hourly-table,
+    body.light-mode .perf-hourly-table > :not(caption) > * > * {
+        --bs-table-bg: transparent !important;
+        --bs-table-color: #1a1a2e !important;
+        --bs-table-border-color: rgba(0, 0, 0, 0.07) !important;
+        background-color: transparent !important;
+        color: #1a1a2e !important;
+    }
+
+    .perf-card .perf-th,
+    .perf-card td.perf-th {
+        background-color: rgba(61, 121, 176, 0.82) !important;
+        color: #ffffff !important;
+        border-color: rgba(255, 255, 255, 0.15) !important;
+        --bs-table-bg: rgba(61, 121, 176, 0.82) !important;
+        --bs-table-color: #ffffff !important;
+    }
+    body.light-mode .perf-card .perf-th,
+    body.light-mode .perf-card td.perf-th {
+        background-color: rgba(61, 121, 176, 0.92) !important;
+        color: #ffffff !important;
+        border-color: rgba(255, 255, 255, 0.25) !important;
+        --bs-table-bg: rgba(61, 121, 176, 0.92) !important;
+    }
+
+    .perf-card .perf-td,
+    .perf-card td.perf-td {
+        background-color: transparent !important;
+        color: #ffffff !important;
+        border-color: rgba(255, 255, 255, 0.12) !important;
+        --bs-table-color: #ffffff !important;
+    }
+    body.light-mode .perf-card .perf-td,
+    body.light-mode .perf-card td.perf-td {
+        background-color: transparent !important;
+        color: #1a1a2e !important;
+        border-color: rgba(0, 0, 0, 0.12) !important;
+        --bs-table-color: #1a1a2e !important;
+    }
+
+    .perf-card .table { border-collapse: collapse !important; }
+    .perf-card .table tbody tr { border-bottom: 2px solid rgba(255, 255, 255, 0.22) !important; }
+    body.light-mode .perf-card .table tbody tr { border-bottom: 2px solid rgba(61, 121, 176, 0.45) !important; }
+    .perf-card .table tbody tr td.perf-td { border-left: 2px solid rgba(255, 255, 255, 0.22) !important; }
+    body.light-mode .perf-card .table tbody tr td.perf-td { border-left: 2px solid rgba(61, 121, 176, 0.55) !important; }
+    .perf-card .table tbody tr td.perf-th[rowspan] { border-right: 2px solid rgba(255, 255, 255, 0.22) !important; }
+    body.light-mode .perf-card .table tbody tr td.perf-th[rowspan] { border-right: 2px solid rgba(61, 121, 176, 0.55) !important; }
+
+    .perf-panel {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border: 1.5px solid rgba(255, 255, 255, 0.20) !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28) !important;
+        border-radius: 10px !important;
+    }
+    body.light-mode .perf-panel {
+        background: rgba(255, 255, 255, 0.55) !important;
+        border: 1px solid rgba(255, 255, 255, 0.65) !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10) !important;
+    }
+
+    .perf-panel-title {
+        color: rgba(255, 255, 255, 0.90) !important;
+    }
+    body.light-mode .perf-panel-title {
+        color: #1a1a2e !important;
+    }
+
+    .perf-hourly-table thead,
+    .perf-hourly-table thead tr,
+    .perf-hourly-table thead tr th,
+    .perf-hourly-table thead > * > * {
+        background-color: rgba(61, 121, 176, 0.82) !important;
+        color: #ffffff !important;
+        border-color: rgba(255, 255, 255, 0.15) !important;
+        --bs-table-bg: rgba(61, 121, 176, 0.82) !important;
+        --bs-table-striped-bg: rgba(61, 121, 176, 0.82) !important;
+        --bs-table-hover-bg: rgba(61, 121, 176, 0.82) !important;
+        --bs-table-active-bg: rgba(61, 121, 176, 0.82) !important;
+        --bs-table-color: #ffffff !important;
+    }
+    body.light-mode .perf-hourly-table thead,
+    body.light-mode .perf-hourly-table thead tr,
+    body.light-mode .perf-hourly-table thead tr th,
+    body.light-mode .perf-hourly-table thead > * > * {
+        background-color: rgba(61, 121, 176, 0.92) !important;
+        color: #ffffff !important;
+        border-color: rgba(255, 255, 255, 0.25) !important;
+        --bs-table-bg: rgba(61, 121, 176, 0.92) !important;
+        --bs-table-striped-bg: rgba(61, 121, 176, 0.92) !important;
+        --bs-table-hover-bg: rgba(61, 121, 176, 0.92) !important;
+        --bs-table-active-bg: rgba(61, 121, 176, 0.92) !important;
+    }
+
+    .perf-hourly-table tbody td {
+        background-color: transparent !important;
+        color: #e0e2ea !important;
+        border-color: rgba(255, 255, 255, 0.12) !important;
+        --bs-table-bg: transparent !important;
+        --bs-table-color: #e0e2ea !important;
+        --bs-table-striped-bg: transparent !important;
+        --bs-table-hover-bg: transparent !important;
+        --bs-table-active-bg: transparent !important;
+    }
+    body.light-mode .perf-hourly-table tbody td {
+        color: #1a1a2e !important;
+        background-color: transparent !important;
+        border-color: rgba(61, 121, 176, 0.20) !important;
+        --bs-table-bg: transparent !important;
+        --bs-table-color: #1a1a2e !important;
+        --bs-table-striped-bg: transparent !important;
+        --bs-table-hover-bg: transparent !important;
+        --bs-table-active-bg: transparent !important;
+    }
+    .perf-hourly-table tbody tr,
+    .perf-hourly-table tbody tr:nth-child(odd),
+    .perf-hourly-table tbody tr:nth-child(even) {
+        background-color: transparent !important;
+        --bs-table-bg: transparent !important;
+        --bs-table-striped-bg: transparent !important;
+    }
+    .perf-hourly-table tbody tr { border-bottom: 1px solid rgba(255, 255, 255, 0.10) !important; }
+    body.light-mode .perf-hourly-table tbody tr { border-bottom: 1px solid rgba(61, 121, 176, 0.20) !important; }
+    .perf-hourly-table tbody tr:hover td {
+        background-color: rgba(100, 181, 246, 0.14) !important;
+        transition: background-color 0.2s ease;
+    }
+    body.light-mode .perf-hourly-table tbody tr:hover td {
+        background-color: rgba(61, 121, 176, 0.10) !important;
+    }
+</style>
 
 <div class="row mx-3">
     <form method="post" asp-page-handler="OnPost" class="w-100 mb-3">
         <div class="row">
             <div class="col-5 d-flex gap-2 align-items-center">
-                <label class="fw-bold fs-5">LINE</label>
-                <select asp-for="MachineCode" class="form-select border-dark border-2 text-black fs-5 fw-bold" id="MachineCode">
+                <label class="fw-bold fs-5 perf-label">LINE</label>
+                <select asp-for="MachineCode" class="form-select border-2 fs-5 fw-bold perf-select" id="MachineCode">
                     <option value="MCH1-01">CU Line</option>
                     <option value="MCH1-02">CS Line</option>
                 </select>
             </div>
             <div class="col-5 d-flex gap-2 align-items-center">
-                <label class="fw-bold fs-5">DATE</label>
-                <input asp-for="SelectedDate" type="date" class="form-control border-dark border-2 text-black fs-5 fw-bold w-100"
+                <label class="fw-bold fs-5 perf-label">DATE</label>
+                <input asp-for="SelectedDate" type="date" class="form-control border-2 fs-5 fw-bold w-100 perf-date"
                        value="@Model.SelectedDate.ToString("yyyy-MM-dd")" />
             </div>
             <div class="col align-items-center">
-                <button type="submit" class="btn fs-5 text-white fw-semibold" style="background-color: rgb(61, 121, 176);">FILTER</button>
+                <button type="submit" class="btn fs-5 fw-semibold btn-perf">FILTER</button>
             </div>
         </div>
     </form>
 
     <div class="col-5">
-        <div class="text-center table-responsive card rounded rounded-2 p-0 m-0 @(Model.SelectedDate != DateTime.Now.Date ? "" : "refreshDailyData")" style="border: 1px solid rgb(61, 121, 176);">
-            <table class="table rounded-2 border-2 overflow-hidden p-0 m-0">
+        <div class="text-center table-responsive perf-card p-0 m-0 @(Model.SelectedDate != DateTime.Now.Date ? "" : "refreshDailyData")">
+            <table class="table rounded-2 overflow-hidden p-0 m-0">
                 <tbody>
                     <tr>
-                        <td colspan="2" class="text-white fs-4 fw-bold w-50 py-3" style="background-color: rgb(61, 121, 176);">PLAN</td>
-                        <td class="border fs-4 fw-bold w-50 py-3" style="border: 1px solid rgb(61, 121, 176);">@planProd</td>
+                        <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">PLAN</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3">@planProd</td>
                     </tr>
                     <tr>
-                        <td colspan="2" class="text-white fs-4 fw-bold w-50 py-3" style="background-color: rgb(61, 121, 176);">TARGET</td>
-                        <td class="border fs-4 fw-bold w-50 py-3" style="border: 1px solid rgb(61, 121, 176);">@targetProd</td>
+                        <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">TARGET</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3">@targetProd</td>
                     </tr>
                     <tr>
-                        <td colspan="2" class="text-white fs-4 fw-bold w-50 py-3" style="background-color: rgb(61, 121, 176);">ACTUAL</td>
-                        <td class="border fs-4 fw-bold w-50 py-3" style="border: 1px solid rgb(61, 121, 176);">@actualProd</td>
+                        <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">ACTUAL</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3">@actualProd</td>
                     </tr>
                     <tr>
-                        <td colspan="2" class="text-white fs-4 fw-bold w-50 py-3" style="background-color: rgb(61, 121, 176);">DIFFERENCE</td>
-                        <td class="border fs-4 fw-bold w-50 py-3 @(differenceProd > 0 ? "" : "text-danger")" style="border: 1px solid rgb(61, 121, 176);">@differenceProd</td>
+                        <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">DIFFERENCE</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3 @(differenceProd > 0 ? "" : "text-danger")">@differenceProd</td>
                     </tr>
                     <tr>
-                        <td colspan="2" class="text-white fs-4 fw-bold w-50 py-3" style="background-color:rgb(61, 121, 176);">
-                            EFFICIENCY
-                        </td>
-                        <td class="border fs-4 fw-bold w-50 py-3" style="border: 1px solid rgb(61, 121, 176);">
+                        <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">EFFICIENCY</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3">
                             @(efficiencyValue > 0 ? efficiencyValue : 0) %
                         </td>
                     </tr>
-
                     <tr>
-                        <td rowspan="2" class="text-white align-middle border border-end fs-4 fw-bold py-3" style="background-color: rgb(61, 121, 176);">TAKT TIME</td>
-                        <td class="text-white fs-4 fw-bold py-3" style="background-color: rgb(61, 121, 176);">PLAN</td>
-                        <td class="border fs-4 fw-bold py-3" style="border: 1px solid rgb(61, 121, 176);">@planTaktTime s</td>
+                        <td rowspan="2" class="perf-th align-middle border border-end fs-4 fw-bold py-3">TAKE TIME</td>
+                        <td class="perf-th fs-4 fw-bold py-3">PLAN</td>
+                        <td class="perf-td fs-4 fw-bold py-3">@planTaktTime s</td>
                     </tr>
                     <tr>
-                        <td class="text-white fs-4 fw-bold py-3" style="background-color: rgb(61, 121, 176);">ACT</td>
-                        <td class="border fs-4 fw-bold py-3" style="border: 1px solid rgb(61, 121, 176);">@(efficiencyMetrics.ActTaktTime > 0 ? efficiencyMetrics.ActTaktTime : 0) s</td>
+                        <td class="perf-th fs-4 fw-bold py-3">ACT</td>
+                        <td class="perf-td fs-4 fw-bold py-3">@(efficiencyMetrics.ActTaktTime > 0 ? efficiencyMetrics.ActTaktTime : 0) s</td>
                     </tr>
                     <tr>
-                        <td colspan="2" class="text-white fs-4 fw-bold w-50 py-3" style="background-color: rgb(61, 121, 176);">PASS THROUGH RATIO</td>
-                        <td class="border fs-4 fw-bold w-50 py-3" style="border: 1px solid rgb(61, 121, 176);">@defectRatio %</td>
+                        <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">PASS THROUGH RATIO</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3">@defectRatio %</td>
                     </tr>
                     <tr>
-                        <td colspan="2" class="text-white fs-4 fw-bold w-50 py-3" style="background-color: rgb(61, 121, 176);">WORKING TIME</td>
-                        <td class="border fs-4 fw-bold w-50 py-3" style="border: 1px solid rgb(61, 121, 176);">@(workingTime > 0 ? workingTime : 0) min</td>
+                        <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">WORKING TIME</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3">@(workingTime > 0 ? workingTime : 0) min</td>
                     </tr>
                     <tr>
-                        <td colspan="2" class="text-white fs-4 fw-bold w-50 py-3" style="background-color: rgb(61, 121, 176);">LOSS TIME</td>
-                        <td class="border fs-4 fw-bold w-50 py-3" style="border: 1px solid rgb(61, 121, 176);">@totalLossTime min</td>
+                        <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">LOSS TIME</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3">@totalLossTime min</td>
                     </tr>
                 </tbody>
             </table>
@@ -464,78 +579,71 @@
     </div>
 
     <div class="col-7">
-        <div class="rounded-3 mb-3" style="border: 1px solid rgb(61, 121, 176); height: 300px">
+        <div class="perf-panel rounded-3 mb-3" style="height: 300px; contain: layout style;">
             <div class="row">
-                <label class="fs-2 text-center fw-bolder" style="color: rgb(61, 121, 176);">REALTIME EFFICIENCY</label>
+                <label class="fs-2 text-center fw-bolder perf-panel-title">REALTIME EFFICIENCY</label>
             </div>
-            <div class="row d-flex justify-content-center mx-2">
-                <canvas id="RealtimeChart" width="400" height="100"></canvas>
+            <div class="row d-flex justify-content-center mx-2" style="height: 240px;">
+                <canvas id="RealtimeChart"></canvas>
             </div>
         </div>
 
-        <div class="overflow-y-auto text-center table-responsive card rounded-2 p-0 m-0" style="border: 1px solid rgb(61, 121, 176); height:378px">
+        <div class="overflow-y-auto text-center table-responsive perf-panel p-0 m-0 @(Model.SelectedDate != DateTime.Now.Date ? "" : "refreshHourlyAchievement")" style="height:378px; contain: layout style;">
             <div class="row p-0 m-0">
-                <label class="fs-2 text-center fw-bolder p-0 m-0" style="color: rgb(61, 121, 176);">HOURLY ACHIEVEMENT</label>
+                <label class="fs-2 text-center fw-bolder p-0 m-0 perf-panel-title">HOURLY ACHIEVEMENT</label>
             </div>
-            <div class="overflow-y-auto row p-0 m-0 @(Model.SelectedDate != DateTime.Now.Date ? "" : "refreshHourlyAchievement")">
-                <table class="table border-2 p-0 m-0 fs-4 overflow-y-auto">
+            <div class="overflow-y-auto row p-0 m-0">
+                <table class="table border-2 p-0 m-0 fs-4 overflow-y-auto perf-hourly-table">
                     <thead>
                         <tr>
-                            <th scope="col" class="text-white" style="background-color: rgb(61, 121, 176);">TIME</th>
-                            <th scope="col" class="text-white" style="background-color: rgb(61, 121, 176);">MODEL</th>
-                            <th scope="col" class="text-white" style="background-color: rgb(61, 121, 176);">PLAN</th>
-                            <th scope="col" class="text-white" style="background-color: rgb(61, 121, 176);">ACTUAL</th>
+                            <th scope="col" style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important;">TIME</th>
+                            <th scope="col" style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important;">MODEL</th>
+                            <th scope="col" style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important;">PLAN</th>
+                            <th scope="col" style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important;">ACTUAL</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @if (Model.listProdAchieve.Count > 0)
+                        @if (sortedProdAchieve.Count > 0)
                         {
-                            var sortedList = Model.listProdAchieve
-                            .OrderByDescending(item => item.Time)
-                            .ToList();
-
-                            var totalPlanPerHour = 1;
                             var previousTime = "";
                             var previousModel = "";
 
-                            for (int i = 0; i < sortedList.Count; i++)
+                            for (int i = 0; i < sortedProdAchieve.Count; i++)
                             {
-                                <tr>
-                                    @if (previousTime != sortedList[i].Time)
+                                        <tr>
+                                    @if (previousTime != sortedProdAchieve[i].Time)
                                     {
-                                        totalPlanPerHour = 1;
-                                        <td rowspan="@timeCounts[sortedList[i].Time]" class="fw-bold">
-                                            @(sortedList[i].Time ?? "00:00 - 00:00")
-                                        </td>
-                                        previousTime = sortedList[i].Time;
+                                                    <td rowspan="@timeCounts[sortedProdAchieve[i].Time]" class="fw-bold">
+                                            @(sortedProdAchieve[i].Time ?? "00:00 - 00:00")
+                                                    </td>
+                                        previousTime = sortedProdAchieve[i].Time;
                                     }
-                                    <td class="fw-bold">@(sortedList[i].Model ?? "NULL")</td>
-                                    <td class="fw-bold">
+                                            <td class="fw-bold">@(sortedProdAchieve[i].Model ?? "NULL")</td>
+                                            <td class="fw-bold">
                                         @{
                                             var planPerHour = CalculatePlanPerHour(
-                                            sortedList[i].Model,
-                                            previousModel,
-                                            sortedList[i].StartTime,
-                                            sortedList[i].EndTime,
-                                            currentTime,
-                                            currentDate,
-                                            sortedList[i].SUT,
-                                            listRestTime
+                                                sortedProdAchieve[i].Model,
+                                                previousModel,
+                                                sortedProdAchieve[i].StartTime,
+                                                sortedProdAchieve[i].EndTime,
+                                                currentTime,
+                                                currentDate,
+                                                sortedProdAchieve[i].SUT,
+                                                listRestTime
                                             );
-
-                                            previousModel = sortedList[i].Model;
+                                            previousModel = sortedProdAchieve[i].Model;
                                         }
                                         @planPerHour
-                                    </td>
-                                    <td class="fw-bold">@(sortedList[i].Actual != null ? sortedList[i].Actual : 1)</td>
-                                </tr>
+                                            </td>
+                                            <td class="fw-bold">@(sortedProdAchieve[i].Actual != null ? sortedProdAchieve[i].Actual : 1)</td>
+                                        </tr>
                             }
                         }
                         else
                         {
-                            <tr>
-                                <td colspan="4" style="border: 1px solid #a6a6a6; padding: 8px; text-align: center;">There is no actual data entered</td>
-                            </tr>
+                                <tr>
+                                    <td colspan="4" style="padding: 8px; text-align: center;">There is no actual data entered</td>
+                                </tr>
                         }
                     </tbody>
                 </table>
@@ -544,83 +652,73 @@
     </div>
 </div>
 
-<script>
-    let labelData = @(Html.Raw(System.Text.Json.JsonSerializer.Serialize(efficiencyData.Labels)));
-    let efficiencyDataPoints = @(Html.Raw(System.Text.Json.JsonSerializer.Serialize(efficiencyData.CumulativeEfficiency)));
+@section Scripts {
+        <script>
+            let labelData          = @(Html.Raw(System.Text.Json.JsonSerializer.Serialize(efficiencyData.Labels)));
+            let efficiencyDataPoints = @(Html.Raw(System.Text.Json.JsonSerializer.Serialize(efficiencyData.CumulativeEfficiency)));
 
-    const ctx = document.getElementById('RealtimeChart').getContext('2d');
-    const realtimeChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labelData,
-            datasets: [
-                {
-                    label: 'Efficiency (%)',
-                    data: efficiencyDataPoints,
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    fill: false,
-                    tension: 0.1,
+            const isLightMode = document.body.classList.contains('light-mode');
+            const gridColor   = isLightMode ? 'rgba(0,0,0,0.08)'      : 'rgba(255,255,255,0.10)';
+            const tickColor   = isLightMode ? '#1a1a2e'                : 'rgba(220,228,240,0.75)';
+            const legendColor = isLightMode ? '#1a1a2e'                : 'rgba(220,228,240,0.85)';
+
+            const ctx = document.getElementById('RealtimeChart').getContext('2d');
+            const realtimeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labelData,
+                    datasets: [{
+                        label: 'Efficiency (%)',
+                        data: efficiencyDataPoints,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        fill: false,
+                        tension: 0.1,
+                    }],
                 },
-            ],
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    display: true,
-                },
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 120,
-                    ticks: {
-                        callback: function(value) {
-                            return value + '%';
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 400 },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: { color: legendColor, font: { weight: '600' } }
+                        },
+                    },
+                    scales: {
+                        x: { ticks: { color: tickColor }, grid: { color: gridColor } },
+                        y: {
+                            beginAtZero: true,
+                            max: 120,
+                            ticks: { color: tickColor, callback: function(value) { return value + '%'; } },
+                            grid: { color: gridColor }
                         }
                     }
+                },
+            });
+
+            window.myChart = realtimeChart;
+
+            async function fetchUpdatedChartData() {
+                try {
+                    const machineCode  = document.getElementById('MachineCode').value;
+                    const selectedDate = document.querySelector('input[name="SelectedDate"]').value;
+                    const response     = await fetch(`?handler=UpdatedData&machineCode=${machineCode}&selectedDate=${selectedDate}`);
+
+                    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                    const data = await response.json();
+                    if (!data || !data.Labels || !data.Efficiency) throw new Error("Incomplete data received.");
+
+                    window.myChart.data.labels            = data.Labels;
+                    window.myChart.data.datasets[0].data  = data.Efficiency;
+                    window.myChart.update();
+                } catch (error) {
+                    console.error("Failed to fetch updated data:", error.message);
                 }
             }
-        },
-    });
 
-    window.myChart = realtimeChart;
-
-    async function fetchUpdatedChartData() {
-        try {
-            const machineCode = document.getElementById('MachineCode').value;
-            const selectedDate = document.querySelector('input[name="SelectedDate"]').value;
-
-            const response = await fetch(`?handler=UpdatedData&machineCode=${machineCode}&selectedDate=${selectedDate}`);
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            if (!data || !data.Labels || !data.Efficiency) {
-                throw new Error("Incomplete data received from the server.");
-            }
-
-            updateChartData(data);
-        } catch (error) {
-            console.error("Failed to fetch updated data:", error.message);
-        }
-    }
-
-    function updateChartData(data) {
-        const chart = window.myChart;
-
-        if (chart) {
-            chart.data.labels = data.Labels;
-            chart.data.datasets[0].data = data.Efficiency;
-            chart.update();
-        } else {
-            console.error("Chart instance not found!");
-        }
-    }
-
-    setInterval(fetchUpdatedChartData, 10000);
-</script>
+            // ✅ OPTIMASI: interval 15 detik — lebih ringan dari 10 detik
+            setInterval(fetchUpdatedChartData, 15000);
+        </script>
+}
