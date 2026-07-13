@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace MonitoringSystem.Models;
@@ -26,6 +26,14 @@ public partial class ProductionRecord
     public int? NoDirectOfWorker { get; set; }
 
     public int? NoDirectOfWorkerOvertime { get; set; }
+
+    public int? QtyShift1 { get; set; }
+
+    public int? QtyShift2 { get; set; }
+
+    public int? QtyShift3 { get; set; }
+
+    public int? QtyShiftNS { get; set; }
 
     public virtual ProductionPlan Plan { get; set; } = null!;
 }

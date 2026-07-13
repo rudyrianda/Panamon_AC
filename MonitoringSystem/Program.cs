@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MonitoringSystem.Hubs;
 using MonitoringSystem.Data;
@@ -62,6 +62,26 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.ExecuteSqlRawAsync("SELECT 1");
+
+    // Auto-migrate database columns for shift quantities in ProductionRecords table
+    string addColumnsSql = @"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ProductionRecords') AND name = 'QtyShift1')
+        BEGIN
+            ALTER TABLE ProductionRecords ADD QtyShift1 INT NULL;
+        END
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ProductionRecords') AND name = 'QtyShift2')
+        BEGIN
+            ALTER TABLE ProductionRecords ADD QtyShift2 INT NULL;
+        END
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ProductionRecords') AND name = 'QtyShift3')
+        BEGIN
+            ALTER TABLE ProductionRecords ADD QtyShift3 INT NULL;
+        END
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ProductionRecords') AND name = 'QtyShiftNS')
+        BEGIN
+            ALTER TABLE ProductionRecords ADD QtyShiftNS INT NULL;
+        END";
+    await db.Database.ExecuteSqlRawAsync(addColumnsSql);
 }
 
 if (!app.Environment.IsDevelopment())

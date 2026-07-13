@@ -1,4 +1,4 @@
-﻿@page
+@page
 @using System.Globalization;
 @model MonitoringSystem.Pages.ProductionReport.IndexModel
 @{
@@ -1013,11 +1013,23 @@
             const originalPlanOvertimeData = @Html.Raw(Json.Serialize(Model.OriginalPlanOvertimeData));
             const effectivePlanData = @Html.Raw(Json.Serialize(Model.EffectivePlanData));
             const effectivePlanOtData = @Html.Raw(Json.Serialize(Model.EffectivePlanOvertimeData));
-            const chartChangePlanData = planData.map((v, i) => v > 0 ? effectivePlanData[i] : null);
-            const chartChangePlanOtData = planOvertimeData.map((v, i) => v > 0 ? effectivePlanOtData[i] : null);
             const chartLabels = @Html.Raw(Json.Serialize(Model.ChartLabels));
             const isCurrentMonth = @Html.Raw(Json.Serialize(Model.IsCurrentMonthView));
             const today = new Date().getDate();
+            
+            const chartChangePlanData = planData.map((v, i) => {
+                const dayIndex = i + 1;
+                if (v > 0) {
+                    return effectivePlanData[i];
+                } else {
+                    if (isCurrentMonth && (dayIndex === today || dayIndex === today + 1)) {
+                        return (originalPlanData[i] || 0) + (originalPlanOvertimeData[i] || 0);
+                    }
+                    return null;
+                }
+            });
+            
+            const chartChangePlanOtData = planOvertimeData.map((v, i) => v > 0 ? effectivePlanOtData[i] : null);
             const daysInMonth = @Model.DaysInMonth;
             const anchorDay = isCurrentMonth ? today : daysInMonth;
 
