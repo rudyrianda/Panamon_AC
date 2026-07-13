@@ -1,4 +1,4 @@
-﻿using Azure;
+using Azure;
 using DocumentFormat.OpenXml.Bibliography;
 using DocumentFormat.OpenXml.Math;
 using DocumentFormat.OpenXml.Spreadsheet;
@@ -148,16 +148,67 @@ namespace MonitoringSystem.Pages.ProductionReport
             }
 
             string planShiftFilter = "";
+            string selectQuantityColumn = "SUM(ISNULL(pr.Quantity, 0))";
+            string selectOvertimeColumn = "SUM(ISNULL(pr.Overtime, 0))";
+            
             if (!SelectedShifts.Contains("All") && SelectedShifts.Any())
             {
-                var conditions = SelectedShifts.Select(s => $"pr.shift LIKE '%{s}%'");
+                var conditions = SelectedShifts.Select(s => {
+                    string suffix = s == "NS" ? "NS" : s;
+                    return $"(pr.Shift LIKE '%{s}%' OR pr.QtyShift{suffix} > 0 OR pr.OvtShift{suffix} > 0)";
+                });
                 planShiftFilter = $"AND ({string.Join(" OR ", conditions)})";
+
+                var shiftSumTerms = new List<string>();
+                var ovtShiftSumTerms = new List<string>();
+                
+                foreach (var shift in SelectedShifts)
+                {
+                    string colName = "";
+                    string colNameOvt = "";
+                    if (shift == "1") { colName = "QtyShift1"; colNameOvt = "OvtShift1"; }
+                    else if (shift == "2") { colName = "QtyShift2"; colNameOvt = "OvtShift2"; }
+                    else if (shift == "3") { colName = "QtyShift3"; colNameOvt = "OvtShift3"; }
+                    else if (shift == "NS") { colName = "QtyShiftNS"; colNameOvt = "OvtShiftNS"; }
+
+                    if (!string.IsNullOrEmpty(colName))
+                    {
+                        shiftSumTerms.Add($@"
+                            ISNULL(pr.{colName}, 
+                                CASE 
+                                    WHEN pr.Shift LIKE '%{shift}%' 
+                                    THEN ISNULL(pr.Quantity, 0) / NULLIF((LEN(pr.Shift) - LEN(REPLACE(pr.Shift, ',', '')) + 1), 0) 
+                                    ELSE 0 
+                                END
+                            )
+                        ");
+                        
+                        ovtShiftSumTerms.Add($@"
+                            ISNULL(pr.{colNameOvt}, 
+                                CASE 
+                                    WHEN pr.Shift LIKE '%{shift}%' 
+                                    THEN ISNULL(pr.Overtime, 0) / NULLIF((LEN(pr.Shift) - LEN(REPLACE(pr.Shift, ',', '')) + 1), 0) 
+                                    ELSE 0 
+                                END
+                            )
+                        ");
+                    }
+                }
+                
+                if (shiftSumTerms.Any())
+                {
+                    selectQuantityColumn = $"SUM({string.Join(" + ", shiftSumTerms)})";
+                }
+                if (ovtShiftSumTerms.Any())
+                {
+                    selectOvertimeColumn = $"SUM({string.Join(" + ", ovtShiftSumTerms)})";
+                }
             }
 
             string planSql = $@"
     SELECT DAY(pp.CurrentDate) as Day, 
-           SUM(ISNULL(pr.Quantity, 0)) as TotalPlanQuantity, 
-           SUM(ISNULL(pr.Overtime, 0)) as TotalPlanOvertime
+           {selectQuantityColumn} as TotalPlanQuantity, 
+           {selectOvertimeColumn} as TotalPlanOvertime
     FROM ProductionPlan pp
     INNER JOIN ProductionRecords pr ON pp.Id = pr.PlanId
     WHERE YEAR(pp.CurrentDate) = @SelectedYear 

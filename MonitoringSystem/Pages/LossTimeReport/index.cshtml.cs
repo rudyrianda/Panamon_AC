@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -249,7 +249,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
                     {
                         Month = item.Month,
                         Category = NormalizeCategoryName(item.Category),
-                        Total = Math.Round(item.Total, 1)
+                        Total = item.Total
                     });
                 }
             }

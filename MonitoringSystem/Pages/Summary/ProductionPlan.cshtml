@@ -1,4 +1,4 @@
-﻿    @page
+    @page
     @model MonitoringSystem.Pages.Shared.ProductionPlanModel
     @{
         ViewData["Title"] = "Production Plan";
@@ -99,6 +99,14 @@
 
             body.light-mode .dropdown.custom-dropdown::-webkit-scrollbar-thumb:hover {
                 background: rgba(61, 121, 176, 0.45);
+            }
+
+            /* Perampingan kotak input per shift */
+            .shift-qty-input, .ovt-shift-qty-input, .edit-shift-qty, .edit-ovt-shift-qty {
+                height: 27px !important;
+                padding: 3px 8px !important;
+                font-size: 13.5px !important;
+                border-radius: 4px !important;
             }
 
             /* ===== FILTER AREA ===== */
@@ -700,11 +708,11 @@
                         </div>
                     </div>
                 </div>
-                <table class="table table-bordered">
+                <table class="table table-bordered" style="border-width: 3px !important;">
                     <thead>
                         <tr class="text-center">
                             <th colspan="3">Original</th>
-                            <th colspan="8">Current</th>
+                            <th colspan="7">Current</th>
                              <th rowspan="3">Action</th>
                         </tr>
 
@@ -718,7 +726,6 @@
 
                             <th colspan="2">No Of Direct Worker</th>
 
-                            <th rowspan="2">Shift</th>
                             <th rowspan="2">Qty/Hour</th>
                             <th rowspan="2">Hour</th>
 
@@ -756,7 +763,7 @@
 
                         int? originalQty = sapPlan != null ? (sapPlan.SapPlanNormal + sapPlan.SapPlanOvertime) : (int?)null;
 
-                <tr>
+                <tr style="border-bottom-width: 2px !important;">
                     <th scope="row" class="text-center align-middle row-number">@(i + 1)</th>
 
                     <td>
@@ -784,16 +791,54 @@
                         </div>
                     </td>
 
-                    <td>
-                        <input type="text" class="form-control" name="Quantity[@i]"
-                                  value="@(record?.Quantity?.ToString())"
-                               placeholder="Qty" autocomplete="off" />
+                    <td style="min-width: 150px;">
+                        <input type="hidden" class="row-total-qty" name="Quantity[@i]"
+                                  value="@(record?.Quantity?.ToString())" />
+                        <div class="d-flex align-items-center mb-1 mt-1">
+                            <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="1" name="Shift[@i]" value="1" @(record?.Shift?.Contains("1") == true ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">S1</label>
+                            <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="1" name="QtyShift1[@i]" value="@(record?.QtyShift1)" placeholder="Qty" @(record?.Shift?.Contains("1") == true ? "" : "disabled") />
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="2" name="Shift[@i]" value="2" @(record?.Shift?.Contains("2") == true ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">S2</label>
+                            <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="2" name="QtyShift2[@i]" value="@(record?.QtyShift2)" placeholder="Qty" @(record?.Shift?.Contains("2") == true ? "" : "disabled") />
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="3" name="Shift[@i]" value="3" @(record?.Shift?.Contains("3") == true ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">S3</label>
+                            <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="3" name="QtyShift3[@i]" value="@(record?.QtyShift3)" placeholder="Qty" @(record?.Shift?.Contains("3") == true ? "" : "disabled") />
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="NS" name="Shift[@i]" value="NS" @(record?.Shift?.Contains("NS") == true ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">NS</label>
+                            <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="NS" name="QtyShiftNS[@i]" value="@(record?.QtyShiftNS)" placeholder="Qty" @(record?.Shift?.Contains("NS") == true ? "" : "disabled") />
+                        </div>
                     </td>
 
-                    <td>
-                        <input type="text" class="form-control" name="Overtime[@i]"
-                                   value="@(record?.Overtime?.ToString())"
-                               placeholder="Ovt" autocomplete="off" />
+                    <td style="min-width: 150px;">
+                        <input type="hidden" class="row-total-ovt" name="Overtime[@i]"
+                                   value="@(record?.Overtime?.ToString())" />
+                        <div class="d-flex align-items-center mb-1 mt-1">
+                            <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="1" name="OvtShiftCb[@i]" value="1" @(record?.OvtShift1 != null ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">S1</label>
+                            <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="1" name="OvtShift1[@i]" value="@(record?.OvtShift1)" placeholder="Ovt" @(record?.OvtShift1 != null ? "" : "disabled") />
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="2" name="OvtShiftCb[@i]" value="2" @(record?.OvtShift2 != null ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">S2</label>
+                            <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="2" name="OvtShift2[@i]" value="@(record?.OvtShift2)" placeholder="Ovt" @(record?.OvtShift2 != null ? "" : "disabled") />
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="3" name="OvtShiftCb[@i]" value="3" @(record?.OvtShift3 != null ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">S3</label>
+                            <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="3" name="OvtShift3[@i]" value="@(record?.OvtShift3)" placeholder="Ovt" @(record?.OvtShift3 != null ? "" : "disabled") />
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="NS" name="OvtShiftCb[@i]" value="NS" @(record?.OvtShiftNS != null ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">NS</label>
+                            <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="NS" name="OvtShiftNS[@i]" value="@(record?.OvtShiftNS)" placeholder="Ovt" @(record?.OvtShiftNS != null ? "" : "disabled") />
+                        </div>
                     </td>
 
                     <td>
@@ -806,31 +851,6 @@
                         <input type="number" class="form-control" name="NoOfDirectWorkerOvertime[@i]"
                                value="@(record?.NoDirectOfWorkerOvertime?.ToString())"
                                placeholder="Ovt" autocomplete="off" />
-                    </td>
-
-                    <td class="align-middle">
-                        <div class="d-flex flex-wrap gap-2">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="Shift[@i]" value="1"
-                                            @(record?.Shift?.Contains("1") == true ? "checked" : "")>
-                                <label class="form-check-label">S1</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="Shift[@i]" value="2"
-                                            @(record?.Shift?.Contains("2") == true ? "checked" : "")>
-                                <label class="form-check-label">S2</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="Shift[@i]" value="3"
-                                            @(record?.Shift?.Contains("3") == true ? "checked" : "")>
-                                <label class="form-check-label">S3</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="Shift[@i]" value="NS"
-                                            @(record?.Shift?.Contains("NS") == true ? "checked" : "")>
-                                <label class="form-check-label">NS</label>
-                            </div>
-                        </div>
                     </td>
 
                     <td>
@@ -927,15 +947,63 @@
                                 <div id="dropdown" class="dropdown"></div>
                             </div>
                             <div class="mb-3">
-                                <label for="message-text" class="col-form-label">Quantity:</label>
-                                <input type="text" class="form-control" name="Quantity" id="quantity" placeholder="Masukkan Quantity" autocomplete="off" />
+                                <label class="col-form-label fw-bold">Quantity (Normal):</label>
+                                <input type="text" class="form-control mb-2" name="Quantity" id="quantity" placeholder="Total Quantity" autocomplete="off" readonly />
+                                
+                                <div class="d-flex flex-column gap-2 ms-3">
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-shift" type="checkbox" name="Shift" value="1" id="editShift1" data-shift="1">
+                                        <label class="form-check-label me-2" for="editShift1" style="width: 30px;">S1</label>
+                                        <input type="number" class="form-control form-control-sm edit-shift-qty w-50" name="QtyShift1" id="editQtyShift1" placeholder="Qty S1" disabled />
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-shift" type="checkbox" name="Shift" value="2" id="editShift2" data-shift="2">
+                                        <label class="form-check-label me-2" for="editShift2" style="width: 30px;">S2</label>
+                                        <input type="number" class="form-control form-control-sm edit-shift-qty w-50" name="QtyShift2" id="editQtyShift2" placeholder="Qty S2" disabled />
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-shift" type="checkbox" name="Shift" value="3" id="editShift3" data-shift="3">
+                                        <label class="form-check-label me-2" for="editShift3" style="width: 30px;">S3</label>
+                                        <input type="number" class="form-control form-control-sm edit-shift-qty w-50" name="QtyShift3" id="editQtyShift3" placeholder="Qty S3" disabled />
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-shift" type="checkbox" name="Shift" value="NS" id="editShiftNS" data-shift="NS">
+                                        <label class="form-check-label me-2" for="editShiftNS" style="width: 30px;">NS</label>
+                                        <input type="number" class="form-control form-control-sm edit-shift-qty w-50" name="QtyShiftNS" id="editQtyShiftNS" placeholder="Qty NS" disabled />
+                                    </div>
+                                </div>
                             </div>
+                            
                             <div class="mb-3">
-                                <label for="message-text" class="col-form-label">Overtime:</label>
-                                <input type="text" class="form-control" name="Overtime" id="overtime" placeholder="Masukkan Overtime" autocomplete="off" />
+                                <label class="col-form-label fw-bold">Overtime:</label>
+                                <input type="text" class="form-control mb-2" name="Overtime" id="overtime" placeholder="Total Overtime" autocomplete="off" readonly />
+                                
+                                <div class="d-flex flex-column gap-2 ms-3">
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-ovt-shift" type="checkbox" name="OvtShiftCb" value="1" id="editOvtShift1" data-shift="1">
+                                        <label class="form-check-label me-2" for="editOvtShift1" style="width: 30px;">S1</label>
+                                        <input type="number" class="form-control form-control-sm edit-ovt-shift-qty w-50" name="OvtShift1" id="editOvtQtyShift1" placeholder="Ovt S1" disabled />
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-ovt-shift" type="checkbox" name="OvtShiftCb" value="2" id="editOvtShift2" data-shift="2">
+                                        <label class="form-check-label me-2" for="editOvtShift2" style="width: 30px;">S2</label>
+                                        <input type="number" class="form-control form-control-sm edit-ovt-shift-qty w-50" name="OvtShift2" id="editOvtQtyShift2" placeholder="Ovt S2" disabled />
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-ovt-shift" type="checkbox" name="OvtShiftCb" value="3" id="editOvtShift3" data-shift="3">
+                                        <label class="form-check-label me-2" for="editOvtShift3" style="width: 30px;">S3</label>
+                                        <input type="number" class="form-control form-control-sm edit-ovt-shift-qty w-50" name="OvtShift3" id="editOvtQtyShift3" placeholder="Ovt S3" disabled />
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-ovt-shift" type="checkbox" name="OvtShiftCb" value="NS" id="editOvtShiftNS" data-shift="NS">
+                                        <label class="form-check-label me-2" for="editOvtShiftNS" style="width: 30px;">NS</label>
+                                        <input type="number" class="form-control form-control-sm edit-ovt-shift-qty w-50" name="OvtShiftNS" id="editOvtQtyShiftNS" placeholder="Ovt NS" disabled />
+                                    </div>
+                                </div>
                             </div>
+                            
                             <div class="mb-3">
-                                <label for="message-text" class="col-form-label">QtyHour:</label>
+                                <label for="message-text" class="col-form-label fw-bold">QtyHour:</label>
                                 <input type="text" class="form-control" name="QtyHour" id="qtyhour" placeholder="Masukkan Quantity/Hour" autocomplete="off" />
                             </div>
                             <div class="mb-3">
@@ -960,47 +1028,6 @@
                                                id="noOfDirectWorkerOvertime"
                                                placeholder="Overtime"
                                                autocomplete="off" />
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="col-form-label fw-bold">Shift:</label>
-
-                                <div class="d-flex gap-3 flex-wrap">
-                                    <div class="form-check">
-                                        <input class="form-check-input edit-shift"
-                                               type="checkbox"
-                                               name="Shift"
-                                               value="1"
-                                               id="editShift1">
-                                        <label class="form-check-label" for="editShift1">S1</label>
-                                    </div>
-
-                                    <div class="form-check">
-                                        <input class="form-check-input edit-shift"
-                                               type="checkbox"
-                                               name="Shift"
-                                               value="2"
-                                               id="editShift2">
-                                        <label class="form-check-label" for="editShift2">S2</label>
-                                    </div>
-
-                                    <div class="form-check">
-                                        <input class="form-check-input edit-shift"
-                                               type="checkbox"
-                                               name="Shift"
-                                               value="3"
-                                               id="editShift3">
-                                        <label class="form-check-label" for="editShift3">S3</label>
-                                    </div>
-
-                                    <div class="form-check">
-                                        <input class="form-check-input edit-shift"
-                                               type="checkbox"
-                                               name="Shift"
-                                               value="NS"
-                                               id="editShiftNS">
-                                        <label class="form-check-label" for="editShiftNS">NS</label>
                                     </div>
                                 </div>
                             </div>
@@ -1155,7 +1182,7 @@
                 const tableBody = document.getElementById('production-table-body');
 
                 const newRowHtml = `
-                        <tr>
+                        <tr style="border-bottom-width: 2px !important;">
                             <th scope="row" class="text-center align-middle row-number">${currentIndex + 1}</th>
                             <td><input disabled type="text" class="form-control" placeholder="-" /></td>
                             <td><input disabled type="text" class="form-control" placeholder="-" /></td>
@@ -1169,28 +1196,56 @@
                                 </div>
                             </td>
 
-                            <td><input type="number" class="form-control" name="Quantity[${currentIndex}]" placeholder="Qty" /></td>
-                            <td><input type="number" class="form-control" name="Overtime[${currentIndex}]" placeholder="Ovt" /></td>
+                            <td style="min-width: 150px;">
+                                <input type="hidden" class="row-total-qty" name="Quantity[${currentIndex}]" />
+                                <div class="d-flex align-items-center mb-1 mt-1">
+                                    <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="1" name="Shift[${currentIndex}]" value="1">
+                                    <label class="form-check-label me-2" style="width: 30px;">S1</label>
+                                    <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="1" name="QtyShift1[${currentIndex}]" placeholder="Qty" disabled />
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="2" name="Shift[${currentIndex}]" value="2">
+                                    <label class="form-check-label me-2" style="width: 30px;">S2</label>
+                                    <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="2" name="QtyShift2[${currentIndex}]" placeholder="Qty" disabled />
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="3" name="Shift[${currentIndex}]" value="3">
+                                    <label class="form-check-label me-2" style="width: 30px;">S3</label>
+                                    <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="3" name="QtyShift3[${currentIndex}]" placeholder="Qty" disabled />
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="NS" name="Shift[${currentIndex}]" value="NS">
+                                    <label class="form-check-label me-2" style="width: 30px;">NS</label>
+                                    <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="NS" name="QtyShiftNS[${currentIndex}]" placeholder="Qty" disabled />
+                                </div>
+                            </td>
+
+                            <td style="min-width: 150px;">
+                                <input type="hidden" class="row-total-ovt" name="Overtime[${currentIndex}]" />
+                                <div class="d-flex align-items-center mb-1 mt-1">
+                                    <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="1" name="OvtShiftCb[${currentIndex}]" value="1">
+                                    <label class="form-check-label me-2" style="width: 30px;">S1</label>
+                                    <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="1" name="OvtShift1[${currentIndex}]" placeholder="Ovt" disabled />
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="2" name="OvtShiftCb[${currentIndex}]" value="2">
+                                    <label class="form-check-label me-2" style="width: 30px;">S2</label>
+                                    <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="2" name="OvtShift2[${currentIndex}]" placeholder="Ovt" disabled />
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="3" name="OvtShiftCb[${currentIndex}]" value="3">
+                                    <label class="form-check-label me-2" style="width: 30px;">S3</label>
+                                    <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="3" name="OvtShift3[${currentIndex}]" placeholder="Ovt" disabled />
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="NS" name="OvtShiftCb[${currentIndex}]" value="NS">
+                                    <label class="form-check-label me-2" style="width: 30px;">NS</label>
+                                    <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="NS" name="OvtShiftNS[${currentIndex}]" placeholder="Ovt" disabled />
+                                </div>
+                            </td>
 
                             <td><input type="number" class="form-control" name="NoOfDirectWorker[${currentIndex}]" placeholder="Normal" /></td>
                             <td><input type="number" class="form-control" name="NoOfDirectWorkerOvertime[${currentIndex}]" placeholder="Overtime" /></td>
-
-                            <td class="align-middle">
-                                <div class="d-flex flex-wrap gap-2">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="Shift[${currentIndex}]" value="1"><label class="form-check-label">S1</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="Shift[${currentIndex}]" value="2"><label class="form-check-label">S2</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="Shift[${currentIndex}]" value="3"><label class="form-check-label">S3</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="Shift[${currentIndex}]" value="NS"><label class="form-check-label">NS</label>
-                                    </div>
-                                </div>
-                            </td>
 
                             <td><input type="number" class="form-control" name="QtyHour[${currentIndex}]" placeholder="Qty/Hr" /></td>
                             <td><input type="text" class="form-control" name="Hour[${currentIndex}]" value="0" readonly /></td>
@@ -1253,6 +1308,26 @@
                         div.onclick = () => {
                             input.value = name;
                             dropdown.style.display = 'none';
+
+                            const product = productNames.find(p => p.Name === name);
+                            if (product) {
+                                const row = input.closest('tr');
+                                if (row) {
+                                    const qtyHourInput = row.querySelector('input[name^="QtyHour["]');
+                                    if (qtyHourInput) {
+                                        qtyHourInput.value = product.QtyHour || '';
+                                        calculateHourForRow(row);
+                                    }
+                                } else {
+                                    const modal = input.closest('form');
+                                    if (modal) {
+                                        const qtyHourInput = modal.querySelector('input[name="QtyHour"]');
+                                        if (qtyHourInput) {
+                                            qtyHourInput.value = product.QtyHour || '';
+                                        }
+                                    }
+                                }
+                            }
                         };
                         dropdown.appendChild(div);
                     });
@@ -1283,6 +1358,11 @@
                         attachDropdownEvent(input, dropdown);
                     }
                 });
+
+                const rows = document.querySelectorAll('#production-table-body tr');
+                rows.forEach(row => {
+                    validateRowShifts(row);
+                });
             });
 
             document.addEventListener('click', (event) => {
@@ -1296,14 +1376,12 @@
 
             function setModalData(button) {
                 const row = button.closest('tr');
-
                 const getVal = name => {
                     const input = row.querySelector(`input[name^="${name}"]`);
                     return input ? input.value : '';
                 };
 
                 const modal = document.querySelector('#edit-model form');
-
                 modal.querySelector('input[name="Id"]').value = getVal("IdModel");
                 modal.querySelector('input[name="ProductName"]').value = getVal("ModelName");
                 modal.querySelector('input[name="Quantity"]').value = getVal("Quantity");
@@ -1316,81 +1394,308 @@
                 const wOvt = modal.querySelector('input[name="NoOfDirectWorkerOvertime"]');
                 if (wOvt) wOvt.value = getVal("NoOfDirectWorkerOvertime");
 
-                modal.querySelectorAll('.edit-shift').forEach(cb => cb.checked = false);
-
-                const checkedShiftsInRow = row.querySelectorAll('input[name^="Shift"]:checked');
-                checkedShiftsInRow.forEach(cb => {
-                    const val = cb.value;
-                    const modalCb = modal.querySelector(`.edit-shift[value="${val}"]`);
-                    if (modalCb) modalCb.checked = true;
+                modal.querySelectorAll('.edit-shift').forEach(cb => {
+                    cb.checked = false;
+                    const shift = cb.getAttribute('data-shift');
+                    const qtyInput = modal.querySelector(`#editQtyShift${shift}`);
+                    if (qtyInput) {
+                        qtyInput.value = '';
+                        qtyInput.disabled = true;
+                    }
                 });
+
+                const rowShiftCheckboxes = row.querySelectorAll('.shift-checkbox');
+                rowShiftCheckboxes.forEach(cb => {
+                    if (cb.checked) {
+                        const val = cb.value;
+                        const modalCb = modal.querySelector(`.edit-shift[value="${val}"]`);
+                        if (modalCb) {
+                            modalCb.checked = true;
+                            const shift = modalCb.getAttribute('data-shift');
+                            const modalQtyInput = modal.querySelector(`#editQtyShift${shift}`);
+                            if (modalQtyInput) {
+                                modalQtyInput.disabled = false;
+                                const rowQtyInput = row.querySelector(`.shift-qty-input[data-shift="${shift}"]`);
+                                if (rowQtyInput) {
+                                    modalQtyInput.value = rowQtyInput.value;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                modal.querySelectorAll('.edit-ovt-shift').forEach(cb => {
+                    cb.checked = false;
+                    const shift = cb.getAttribute('data-shift');
+                    const qtyInput = modal.querySelector(`#editOvtQtyShift${shift}`);
+                    if (qtyInput) {
+                        qtyInput.value = '';
+                        qtyInput.disabled = true;
+                    }
+                });
+
+                const rowOvtShiftCheckboxes = row.querySelectorAll('.ovt-shift-checkbox');
+                rowOvtShiftCheckboxes.forEach(cb => {
+                    if (cb.checked) {
+                        const val = cb.value;
+                        const modalCb = modal.querySelector(`.edit-ovt-shift[value="${val}"]`);
+                        if (modalCb) {
+                            modalCb.checked = true;
+                            const shift = modalCb.getAttribute('data-shift');
+                            const modalQtyInput = modal.querySelector(`#editOvtQtyShift${shift}`);
+                            if (modalQtyInput) {
+                                modalQtyInput.disabled = false;
+                                const rowQtyInput = row.querySelector(`.ovt-shift-qty-input[data-shift="${shift}"]`);
+                                if (rowQtyInput) {
+                                    modalQtyInput.value = rowQtyInput.value;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                validateEditModalShifts();
             }
 
             function setDeleteRecordId(recordId) {
                 document.getElementById("delete-record-id").value = recordId;
             }
 
-            // BOLD EFFECT - SAMA SEPERTI PRODUCTION REPORT
             document.addEventListener('DOMContentLoaded', function() {
                 function updateDropdownStyle() {
                     const dropdowns = document.querySelectorAll('.filter-content .form-select-sm');
-
                     dropdowns.forEach(dropdown => {
-                        const dropdownName = dropdown.name;
-                        const dropdownValue = dropdown.value;
-
-                        if (dropdownName === 'FilterMachineCode') {
-                            if (dropdownValue) {
-                                dropdown.classList.add('selected');
-                            }
+                        if (dropdown.name === 'FilterMachineCode' && dropdown.value) {
+                            dropdown.classList.add('selected');
                         }
                     });
                 }
-
                 updateDropdownStyle();
-
                 const dropdowns = document.querySelectorAll('.filter-content .form-select-sm');
                 dropdowns.forEach(dropdown => {
                     dropdown.addEventListener('change', updateDropdownStyle);
                 });
             });
 
-        // ── AUTO-FILL + REALTIME TOTAL QTY + HOUR ──
-        document.addEventListener('DOMContentLoaded', function () {
-            const tableBody = document.getElementById('production-table-body');
+            document.addEventListener('change', function(e) {
+                if (e.target.classList.contains('shift-checkbox') && !e.target.classList.contains('edit-shift')) {
+                    const row = e.target.closest('tr');
+                    const shift = e.target.getAttribute('data-shift');
+                    const qtyInput = row.querySelector(`.shift-qty-input[data-shift="${shift}"]`);
+                    
+                    if (e.target.checked) {
+                        qtyInput.disabled = false;
+                        qtyInput.focus();
+                    } else {
+                        qtyInput.disabled = true;
+                        qtyInput.value = '';
+                        updateRowTotalQty(row);
+                    }
+                    validateRowShifts(row);
+                } else if (e.target.classList.contains('ovt-shift-checkbox') && !e.target.classList.contains('edit-ovt-shift')) {
+                    const row = e.target.closest('tr');
+                    const shift = e.target.getAttribute('data-shift');
+                    const qtyInput = row.querySelector(`.ovt-shift-qty-input[data-shift="${shift}"]`);
+                    
+                    if (e.target.checked) {
+                        qtyInput.disabled = false;
+                        qtyInput.focus();
+                    } else {
+                        qtyInput.disabled = true;
+                        qtyInput.value = '';
+                        updateRowTotalOvt(row);
+                    }
+                    validateRowShifts(row);
+                }
+            });
 
-            // Hitung Total Quantity dari semua input Quantity
+            document.addEventListener('input', function(e) {
+                if (e.target.classList.contains('shift-qty-input') && !e.target.classList.contains('edit-shift-qty')) {
+                    const row = e.target.closest('tr');
+                    updateRowTotalQty(row);
+                    validateRowShifts(row);
+                } else if (e.target.classList.contains('ovt-shift-qty-input') && !e.target.classList.contains('edit-ovt-shift-qty')) {
+                    const row = e.target.closest('tr');
+                    updateRowTotalOvt(row);
+                    validateRowShifts(row);
+                }
+            });
+
+            function updateRowTotalQty(row) {
+                const qtyInputs = row.querySelectorAll('.shift-qty-input');
+                let total = 0;
+                qtyInputs.forEach(input => {
+                    if (!input.disabled && input.value) {
+                        total += parseInt(input.value) || 0;
+                    }
+                });
+                const totalInput = row.querySelector('.row-total-qty');
+                if (totalInput) {
+                    totalInput.value = total > 0 ? total : '';
+                }
+                calculateHourForRow(row);
+                calculateTotalQty();
+            }
+
+            function updateRowTotalOvt(row) {
+                const qtyInputs = row.querySelectorAll('.ovt-shift-qty-input');
+                let total = 0;
+                qtyInputs.forEach(input => {
+                    if (!input.disabled && input.value) {
+                        total += parseInt(input.value) || 0;
+                    }
+                });
+                const totalInput = row.querySelector('.row-total-ovt');
+                if (totalInput) {
+                    totalInput.value = total > 0 ? total : '';
+                }
+            }
+
+            function validateRowShifts(row) {
+                const checkboxes = row.querySelectorAll('.shift-checkbox');
+                let hasCheckedEmpty = false;
+                checkboxes.forEach(cb => {
+                    if (cb.checked) {
+                        const shift = cb.getAttribute('data-shift');
+                        const qtyInput = row.querySelector(`.shift-qty-input[data-shift="${shift}"]`);
+                        if (qtyInput && !qtyInput.value) hasCheckedEmpty = true;
+                    }
+                });
+                checkboxes.forEach(cb => {
+                    cb.disabled = !cb.checked && hasCheckedEmpty;
+                });
+
+                const ovtCheckboxes = row.querySelectorAll('.ovt-shift-checkbox');
+                let hasOvtCheckedEmpty = false;
+                ovtCheckboxes.forEach(cb => {
+                    if (cb.checked) {
+                        const shift = cb.getAttribute('data-shift');
+                        const qtyInput = row.querySelector(`.ovt-shift-qty-input[data-shift="${shift}"]`);
+                        if (qtyInput && !qtyInput.value) hasOvtCheckedEmpty = true;
+                    }
+                });
+                ovtCheckboxes.forEach(cb => {
+                    cb.disabled = !cb.checked && hasOvtCheckedEmpty;
+                });
+            }
+
+            document.addEventListener('change', function(e) {
+                if (e.target.classList.contains('edit-shift')) {
+                    const modal = e.target.closest('form');
+                    const shift = e.target.getAttribute('data-shift');
+                    const qtyInput = modal.querySelector(`#editQtyShift${shift}`);
+                    if (e.target.checked) {
+                        qtyInput.disabled = false;
+                        qtyInput.focus();
+                    } else {
+                        qtyInput.disabled = true;
+                        qtyInput.value = '';
+                        updateModalTotalQty(modal);
+                    }
+                    validateEditModalShifts();
+                } else if (e.target.classList.contains('edit-ovt-shift')) {
+                    const modal = e.target.closest('form');
+                    const shift = e.target.getAttribute('data-shift');
+                    const qtyInput = modal.querySelector(`#editOvtQtyShift${shift}`);
+                    if (e.target.checked) {
+                        qtyInput.disabled = false;
+                        qtyInput.focus();
+                    } else {
+                        qtyInput.disabled = true;
+                        qtyInput.value = '';
+                        updateModalTotalOvt(modal);
+                    }
+                    validateEditModalShifts();
+                }
+            });
+
+            document.addEventListener('input', function(e) {
+                if (e.target.classList.contains('edit-shift-qty')) {
+                    const modal = e.target.closest('form');
+                    updateModalTotalQty(modal);
+                    validateEditModalShifts();
+                } else if (e.target.classList.contains('edit-ovt-shift-qty')) {
+                    const modal = e.target.closest('form');
+                    updateModalTotalOvt(modal);
+                    validateEditModalShifts();
+                }
+            });
+
+            function updateModalTotalQty(modal) {
+                const qtyInputs = modal.querySelectorAll('.edit-shift-qty');
+                let total = 0;
+                qtyInputs.forEach(input => {
+                    if (!input.disabled && input.value) total += parseInt(input.value) || 0;
+                });
+                const totalInput = modal.querySelector('#quantity');
+                if (totalInput) totalInput.value = total > 0 ? total : '';
+            }
+
+            function updateModalTotalOvt(modal) {
+                const qtyInputs = modal.querySelectorAll('.edit-ovt-shift-qty');
+                let total = 0;
+                qtyInputs.forEach(input => {
+                    if (!input.disabled && input.value) total += parseInt(input.value) || 0;
+                });
+                const totalInput = modal.querySelector('#overtime');
+                if (totalInput) totalInput.value = total > 0 ? total : '';
+            }
+
+            function validateEditModalShifts() {
+                const modal = document.querySelector('#edit-model form');
+                if (!modal) return;
+                const checkboxes = modal.querySelectorAll('.edit-shift');
+                let hasCheckedEmpty = false;
+                checkboxes.forEach(cb => {
+                    if (cb.checked) {
+                        const shift = cb.getAttribute('data-shift');
+                        const qtyInput = modal.querySelector(`#editQtyShift${shift}`);
+                        if (qtyInput && !qtyInput.value) hasCheckedEmpty = true;
+                    }
+                });
+                checkboxes.forEach(cb => {
+                    cb.disabled = !cb.checked && hasCheckedEmpty;
+                });
+
+                const ovtCheckboxes = modal.querySelectorAll('.edit-ovt-shift');
+                let hasOvtCheckedEmpty = false;
+                ovtCheckboxes.forEach(cb => {
+                    if (cb.checked) {
+                        const shift = cb.getAttribute('data-shift');
+                        const qtyInput = modal.querySelector(`#editOvtQtyShift${shift}`);
+                        if (qtyInput && !qtyInput.value) hasOvtCheckedEmpty = true;
+                    }
+                });
+                ovtCheckboxes.forEach(cb => {
+                    cb.disabled = !cb.checked && hasOvtCheckedEmpty;
+                });
+            }
+
             function calculateTotalQty() {
+                const tableBody = document.getElementById('production-table-body');
+                if (!tableBody) return;
                 let total = 0;
                 tableBody.querySelectorAll('input[name^="Quantity["]').forEach(input => {
-                    const val = parseFloat(input.value) || 0;
-                    total += val;
+                    total += parseFloat(input.value) || 0;
                 });
-                // Update display Grand Total
                 const grandTotalEl = document.querySelector('.card-header .col-6:last-child .card .fs-4');
                 if (grandTotalEl) grandTotalEl.textContent = total > 0 ? total : '0';
             }
 
-            // Hitung Hour = Quantity / QtyHour untuk satu row
             function calculateHourForRow(row) {
+                if (!row) return;
                 const qtyInput = row.querySelector('input[name^="Quantity["]');
                 const qtyHourInput = row.querySelector('input[name^="QtyHour["]');
                 const hourInput = row.querySelector('input[name^="Hour["]');
-
                 if (!qtyInput || !qtyHourInput || !hourInput) return;
-
                 const qty = parseFloat(qtyInput.value) || 0;
                 const qtyHour = parseFloat(qtyHourInput.value) || 0;
-
-                if (qtyHour > 0) {
-                    hourInput.value = (qty / qtyHour).toFixed(2);
-                } else {
-                    hourInput.value = '0';
-                }
+                hourInput.value = qtyHour > 0 ? (qty / qtyHour).toFixed(2) : '0';
             }
 
-            // Auto-fill worker ke bawah untuk baris yang ada Original Model Name
             function autoFillWorkerDown(changedInput, namePrefix) {
+                const tableBody = document.getElementById('production-table-body');
+                if (!tableBody) return;
                 const allRows = Array.from(tableBody.querySelectorAll('tr'));
                 const changedRow = changedInput.closest('tr');
                 const changedRowIndex = allRows.indexOf(changedRow);
@@ -1411,76 +1716,42 @@
                 }
             }
 
-            // Listener utama
-            tableBody.addEventListener('input', function (e) {
-                const target = e.target;
-                const row = target.closest('tr');
+            document.addEventListener('DOMContentLoaded', function () {
+                const tableBody = document.getElementById('production-table-body');
+                if (!tableBody) return;
 
-                // Quantity berubah → hitung Hour + Total Qty
-                if (target.name && target.name.startsWith('Quantity[')) {
-                    calculateHourForRow(row);
-                    calculateTotalQty();
-                }
+                // Listener utama
+                tableBody.addEventListener('input', function (e) {
+                    const target = e.target;
+                    const row = target.closest('tr');
 
-                // QtyHour berubah → hitung Hour
-                if (target.name && target.name.startsWith('QtyHour[')) {
-                    calculateHourForRow(row);
-                }
+                    // Quantity berubah → hitung Hour + Total Qty
+                    if (target.name && target.name.startsWith('Quantity[')) {
+                        calculateHourForRow(row);
+                        calculateTotalQty();
+                    }
 
-                // Normal worker
-                if (target.name && target.name.startsWith('NoOfDirectWorker[')
-                    && !target.name.startsWith('NoOfDirectWorkerOvertime[')) {
-                    autoFillWorkerDown(target, 'NoOfDirectWorker[');
-                }
+                    // QtyHour berubah → hitung Hour
+                    if (target.name && target.name.startsWith('QtyHour[')) {
+                        calculateHourForRow(row);
+                    }
 
-                // Overtime worker
-                if (target.name && target.name.startsWith('NoOfDirectWorkerOvertime[')) {
-                    autoFillWorkerDown(target, 'NoOfDirectWorkerOvertime[');
-                }
-                 // if (target.type === 'checkbox' && target.name && target.name.startsWith('Shift[')) {
-                   // autoFillShiftDown(target);
-                //}
+                    // Normal worker
+                    if (target.name && target.name.startsWith('NoOfDirectWorker[')
+                        && !target.name.startsWith('NoOfDirectWorkerOvertime[')) {
+                        autoFillWorkerDown(target, 'NoOfDirectWorker[');
+                    }
+
+                    // Overtime worker
+                    if (target.name && target.name.startsWith('NoOfDirectWorkerOvertime[')) {
+                        autoFillWorkerDown(target, 'NoOfDirectWorkerOvertime[');
+                    }
+                });
+
+                // Hitung ulang saat page load (kalau ada data existing)
+                calculateTotalQty();
+                tableBody.querySelectorAll('tr').forEach(row => calculateHourForRow(row));
             });
-                    tableBody.addEventListener('change', function (e) {
-            const target = e.target;
-            if (target.type === 'checkbox' && target.name && target.name.startsWith('Shift[')) {
-                autoFillShiftDown(target);
-            }
-        });
-            // Auto-fill Shift ke bawah
-            function autoFillShiftDown(changedCheckbox) {
-                const allRows = Array.from(tableBody.querySelectorAll('tr'));
-                const changedRow = changedCheckbox.closest('tr');
-                const changedRowIndex = allRows.indexOf(changedRow);
-
-                if (changedRowIndex === -1) return;
-
-                // Ambil semua shift yang dicentang di row ini
-                const checkedShifts = Array.from(
-                    changedRow.querySelectorAll('input[name^="Shift["]:checked')
-                ).map(cb => cb.value);
-
-                for (let i = changedRowIndex + 1; i < allRows.length; i++) {
-                    const originalInput = allRows[i].querySelector('input[name^="OriginalModelName"]');
-                    const hasOriginalData = originalInput && originalInput.value.trim() !== '';
-                    if (!hasOriginalData) continue;
-
-                    // Reset semua shift di baris bawah dulu
-                    allRows[i].querySelectorAll('input[name^="Shift["]').forEach(cb => {
-                        cb.checked = false;
-                    });
-
-                    // Centang sesuai row yang diubah
-                    checkedShifts.forEach(val => {
-                        const targetCb = allRows[i].querySelector(`input[name^="Shift["][value="${val}"]`);
-                        if (targetCb) targetCb.checked = true;
-                    });
-                }
-            }
-            // Hitung ulang saat page load (kalau ada data existing)
-            calculateTotalQty();
-            tableBody.querySelectorAll('tr').forEach(row => calculateHourForRow(row));
-        });
         </script>
     </body>
     </html>

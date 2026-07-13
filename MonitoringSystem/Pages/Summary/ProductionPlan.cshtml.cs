@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Data.SqlClient;
 using System.Text.Json;
@@ -61,7 +61,11 @@ namespace MonitoringSystem.Pages.Shared
                 using (var connection = new SqlConnection(this.connectionString))
                 {
                     connection.Open();
-                    string query = @"SELECT ProductName FROM Product WHERE MachineCode = @MachineCode;";
+                    string query = @"
+                        SELECT P.ProductName, MD.QtyHour 
+                        FROM Product P
+                        LEFT JOIN MasterData MD ON P.ProductName = MD.ProductName
+                        WHERE P.MachineCode = @MachineCode;";
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@MachineCode", FilterMachineCode ?? "MCH1-01");
@@ -69,7 +73,11 @@ namespace MonitoringSystem.Pages.Shared
                         {
                             while (dataReader.Read())
                             {
-                                listProducts.Add(new ProductName { Name = dataReader.GetString(0) });
+                                listProducts.Add(new ProductName 
+                                { 
+                                    Name = dataReader.IsDBNull(0) ? "" : dataReader.GetString(0),
+                                    QtyHour = dataReader.IsDBNull(1) ? (int?)null : dataReader.GetInt32(1)
+                                });
                             }
                         }
                     }
@@ -156,6 +164,25 @@ namespace MonitoringSystem.Pages.Shared
                         }
                     }
 
+                    // ── AUTO ADD MISSING COLUMNS (Jika Belum Ada) ──────────────────────
+                    try
+                    {
+                        string alterQuery = @"
+                            IF COL_LENGTH('ProductionRecords', 'OvtShift1') IS NULL ALTER TABLE ProductionRecords ADD OvtShift1 INT NULL;
+                            IF COL_LENGTH('ProductionRecords', 'OvtShift2') IS NULL ALTER TABLE ProductionRecords ADD OvtShift2 INT NULL;
+                            IF COL_LENGTH('ProductionRecords', 'OvtShift3') IS NULL ALTER TABLE ProductionRecords ADD OvtShift3 INT NULL;
+                            IF COL_LENGTH('ProductionRecords', 'OvtShiftNS') IS NULL ALTER TABLE ProductionRecords ADD OvtShiftNS INT NULL;
+                        ";
+                        using (SqlCommand cmdAlter = new SqlCommand(alterQuery, connection))
+                        {
+                            cmdAlter.ExecuteNonQuery();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Warning: Could not alter table ProductionRecords: " + ex.Message);
+                    }
+
                     // ── 1. AMBIL SAP PLAN (dari tabel SapPlan) ──────────────────────────
                     string querySapPlan = @"
                         SELECT SP.Id, SP.ProductName, SP.SapPlanNormal, SP.SapPlanOvertime, SP.Shift
@@ -192,7 +219,9 @@ namespace MonitoringSystem.Pages.Shared
                             PR.Id, PR.ProductName, PR.Quantity, MD.QtyHour, 
                             ROUND(CAST(PR.Quantity As float)/NULLIF(CAST(MD.QtyHour AS float),0), 2) AS Hour, 
                             PR.Lot, PR.Remark,
-                            PR.Overtime, PR.NoDirectOfWorker, PR.NoDirectOfWorkerOvertime, PR.Shift
+                            PR.Overtime, PR.NoDirectOfWorker, PR.NoDirectOfWorkerOvertime, PR.Shift,
+                            PR.QtyShift1, PR.QtyShift2, PR.QtyShift3, PR.QtyShiftNS,
+                            PR.OvtShift1, PR.OvtShift2, PR.OvtShift3, PR.OvtShiftNS
                         FROM ProductionRecords PR
                         LEFT JOIN MasterData MD ON PR.ProductName = MD.ProductName
                         INNER JOIN ProductionPlan PP ON PR.PlanId = PP.Id 
@@ -221,6 +250,14 @@ namespace MonitoringSystem.Pages.Shared
                                 record.NoDirectOfWorker = dataReader.IsDBNull(8) ? null : dataReader.GetInt32(8);
                                 record.NoDirectOfWorkerOvertime = dataReader.IsDBNull(9) ? null : dataReader.GetInt32(9);
                                 record.Shift = dataReader.IsDBNull(10) ? "" : dataReader.GetString(10);
+                                record.QtyShift1 = dataReader.IsDBNull(11) ? null : dataReader.GetInt32(11);
+                                record.QtyShift2 = dataReader.IsDBNull(12) ? null : dataReader.GetInt32(12);
+                                record.QtyShift3 = dataReader.IsDBNull(13) ? null : dataReader.GetInt32(13);
+                                record.QtyShiftNS = dataReader.IsDBNull(14) ? null : dataReader.GetInt32(14);
+                                record.OvtShift1 = dataReader.IsDBNull(15) ? null : dataReader.GetInt32(15);
+                                record.OvtShift2 = dataReader.IsDBNull(16) ? null : dataReader.GetInt32(16);
+                                record.OvtShift3 = dataReader.IsDBNull(17) ? null : dataReader.GetInt32(17);
+                                record.OvtShiftNS = dataReader.IsDBNull(18) ? null : dataReader.GetInt32(18);
 
                                 // ── Cari SAP Plan yang cocok berdasarkan ProductName ──
                                 var matchingSap = listSapPlans.FirstOrDefault(s =>
@@ -263,12 +300,24 @@ namespace MonitoringSystem.Pages.Shared
         public IActionResult OnPostInsertProduct()
         {
             string productName = Request.Form["ProductName"];
+            string machineCode = Request.Form["FilterMachineCode"];
+            if (string.IsNullOrEmpty(machineCode)) machineCode = FilterMachineCode ?? "MCH1-01";
+
+            string filterDateString = Request.Form["FilterDate"];
+            if (string.IsNullOrEmpty(filterDateString) && FilterDate.HasValue)
+            {
+                filterDateString = FilterDate.Value.ToString("yyyy-MM-dd");
+            }
+            if (string.IsNullOrEmpty(filterDateString))
+            {
+                filterDateString = DateTime.Now.ToString("yyyy-MM-dd");
+            }
 
             if (string.IsNullOrEmpty(productName))
             {
                 TempData["StatusMessage"] = "error";
                 TempData["Message"] = "Model Name is required.";
-                return RedirectToPage();
+                return RedirectToPage(new { FilterDate = filterDateString, FilterMachineCode = machineCode });
             }
 
             try
@@ -276,36 +325,28 @@ namespace MonitoringSystem.Pages.Shared
                 using (var connection = new SqlConnection(this.connectionString))
                 {
                     connection.Open();
-                    string query = @"INSERT INTO Product (ProductName, MachineCode) VALUES (@ProductName, 'MCH1-01');";
+                    string query = @"INSERT INTO Product (ProductName, MachineCode) VALUES (@ProductName, @MachineCode);";
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@ProductName", productName);
+                        command.Parameters.AddWithValue("@MachineCode", machineCode);
                         command.ExecuteNonQuery();
                     }
                 }
                 TempData["StatusMessage"] = "success";
                 TempData["Message"] = "Product Model successfully inserted!";
-                return RedirectToPage();
+                return RedirectToPage(new { FilterDate = filterDateString, FilterMachineCode = machineCode });
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Exception: " + ex.ToString());
                 TempData["StatusMessage"] = "error";
                 TempData["Message"] = "Error inserting product: " + ex.Message;
-                return Page();
+                return RedirectToPage(new { FilterDate = filterDateString, FilterMachineCode = machineCode });
             }
         }
 
         public IActionResult OnPostInsertProductionRecord(
-            List<int?> IdModel,
-            List<string> ModelName,
-            List<int?> Quantity,
-            List<int?> QtyHour,
-            List<string> Lot,
-            List<string> Remark,
-            List<int?> Overtime,
-            List<int?> NoOfDirectWorker,
-            List<int?> NoOfDirectWorkerOvertime,
             string Comment,
             DateTime TargetDate)
         {
@@ -355,20 +396,22 @@ namespace MonitoringSystem.Pages.Shared
 
                     // ── TAMBAHAN: Kumpulkan Id existing dari form, lalu hapus yang tidak ada ──
                     var submittedIds = new List<int>();
-                    for (int k = 0; k < ModelName.Count; k++)
+                    int k = 0;
+                    while (Request.Form.ContainsKey($"ModelName[{k}]"))
                     {
                         string rawIdK = Request.Form[$"IdModel[{k}]"];
                         if (int.TryParse(rawIdK, out int pid) && pid > 0)
                             submittedIds.Add(pid);
+                        k++;
                     }
 
                     if (submittedIds.Count > 0)
                     {
                         string inClause = string.Join(",", submittedIds);
                         string queryDelOld = $@"DELETE FROM ProductionRecords 
-                                                WHERE PlanId = @PlanId 
-                                                AND MachineCode = @Mc2 
-                                                AND Id NOT IN ({inClause})";
+                                                 WHERE PlanId = @PlanId 
+                                                 AND MachineCode = @Mc2 
+                                                 AND Id NOT IN ({inClause})";
                         using (SqlCommand cmdDel = new SqlCommand(queryDelOld, connection))
                         {
                             cmdDel.Parameters.AddWithValue("@PlanId", planId);
@@ -378,21 +421,72 @@ namespace MonitoringSystem.Pages.Shared
                     }
                     // ── AKHIR TAMBAHAN ──
 
-                    for (int i = 0; i < ModelName.Count; i++)
+                    int i = 0;
+                    while (Request.Form.ContainsKey($"ModelName[{i}]"))
                     {
-                        string safeModelName = (ModelName != null && ModelName.Count > i) ? ModelName[i] : "";
-                        int? safeQty = (Quantity != null && Quantity.Count > i) ? Quantity[i] : null;
-                        int? safeWorker = (NoOfDirectWorker != null && NoOfDirectWorker.Count > i) ? NoOfDirectWorker[i] : null;
-                        int? safeQtyHour = (QtyHour != null && QtyHour.Count > i) ? QtyHour[i] : null;
-                        string safeLot = (Lot != null && Lot.Count > i) ? Lot[i] : null;
-                        string safeRemark = (Remark != null && Remark.Count > i) ? Remark[i] : null;
-                        int? safeOvertime = (Overtime != null && Overtime.Count > i) ? Overtime[i] : null;
-                        int? safeWorkerOvt = (NoOfDirectWorkerOvertime != null && NoOfDirectWorkerOvertime.Count > i) ? NoOfDirectWorkerOvertime[i] : null;
+                        string safeModelName = Request.Form[$"ModelName[{i}]"];
+                        string rawQty = Request.Form[$"Quantity[{i}]"];
+                        int? safeQty = int.TryParse(rawQty, out int parsedQty) ? parsedQty : (int?)null;
+                        
+                        string rawWorker = Request.Form[$"NoOfDirectWorker[{i}]"];
+                        int? safeWorker = int.TryParse(rawWorker, out int parsedWorker) ? parsedWorker : (int?)null;
+                        
+                        string rawQtyHour = Request.Form[$"QtyHour[{i}]"];
+                        int? safeQtyHour = int.TryParse(rawQtyHour, out int parsedQtyHour) ? parsedQtyHour : (int?)null;
+                        
+                        string safeLot = Request.Form[$"Lot[{i}]"];
+                        string safeRemark = Request.Form[$"Remark[{i}]"];
+                        
+                        string rawOvertime = Request.Form[$"Overtime[{i}]"];
+                        int? safeOvertime = int.TryParse(rawOvertime, out int parsedOvertime) ? parsedOvertime : (int?)null;
+                        
+                        string rawWorkerOvt = Request.Form[$"NoOfDirectWorkerOvertime[{i}]"];
+                        int? safeWorkerOvt = int.TryParse(rawWorkerOvt, out int parsedWorkerOvt) ? parsedWorkerOvt : (int?)null;
+
+                        string rawQS1 = Request.Form[$"QtyShift1[{i}]"];
+                        int? safeQtyShift1 = int.TryParse(rawQS1, out int parsedQS1) ? parsedQS1 : (int?)null;
+
+                        string rawQS2 = Request.Form[$"QtyShift2[{i}]"];
+                        int? safeQtyShift2 = int.TryParse(rawQS2, out int parsedQS2) ? parsedQS2 : (int?)null;
+
+                        string rawQS3 = Request.Form[$"QtyShift3[{i}]"];
+                        int? safeQtyShift3 = int.TryParse(rawQS3, out int parsedQS3) ? parsedQS3 : (int?)null;
+
+                        string rawQSNS = Request.Form[$"QtyShiftNS[{i}]"];
+                        int? safeQtyShiftNS = int.TryParse(rawQSNS, out int parsedQSNS) ? parsedQSNS : (int?)null;
+
+                        int computedQty = (safeQtyShift1 ?? 0) + (safeQtyShift2 ?? 0) + (safeQtyShift3 ?? 0) + (safeQtyShiftNS ?? 0);
+                        if (computedQty > 0)
+                        {
+                            safeQty = computedQty;
+                        }
+
+                        string rawOS1 = Request.Form[$"OvtShift1[{i}]"];
+                        int? safeOvtShift1 = int.TryParse(rawOS1, out int parsedOS1) ? parsedOS1 : (int?)null;
+
+                        string rawOS2 = Request.Form[$"OvtShift2[{i}]"];
+                        int? safeOvtShift2 = int.TryParse(rawOS2, out int parsedOS2) ? parsedOS2 : (int?)null;
+
+                        string rawOS3 = Request.Form[$"OvtShift3[{i}]"];
+                        int? safeOvtShift3 = int.TryParse(rawOS3, out int parsedOS3) ? parsedOS3 : (int?)null;
+
+                        string rawOSNS = Request.Form[$"OvtShiftNS[{i}]"];
+                        int? safeOvtShiftNS = int.TryParse(rawOSNS, out int parsedOSNS) ? parsedOSNS : (int?)null;
+
+                        int computedOvt = (safeOvtShift1 ?? 0) + (safeOvtShift2 ?? 0) + (safeOvtShift3 ?? 0) + (safeOvtShiftNS ?? 0);
+                        if (computedOvt > 0)
+                        {
+                            safeOvertime = computedOvt;
+                        }
 
                         bool isRowEmpty = string.IsNullOrEmpty(safeModelName) &&
                                           (!safeQty.HasValue || safeQty == 0) &&
                                           (!safeWorker.HasValue);
-                        if (isRowEmpty) continue;
+                        if (isRowEmpty)
+                        {
+                            i++;
+                            continue;
+                        }
 
                         bool isRowValid = !string.IsNullOrEmpty(safeModelName) &&
                                           (safeQty.HasValue && safeQty > 0) &&
@@ -400,6 +494,7 @@ namespace MonitoringSystem.Pages.Shared
                         if (!isRowValid)
                         {
                             hasInvalidRows = true;
+                            i++;
                             continue;
                         }
 
@@ -407,7 +502,7 @@ namespace MonitoringSystem.Pages.Shared
                         string shiftKey = $"Shift[{i}]";
                         if (Request.Form.ContainsKey(shiftKey))
                         {
-                            shiftValue = string.Join(",", Request.Form[shiftKey]);
+                            shiftValue = Request.Form[shiftKey];
                         }
                         if (string.IsNullOrEmpty(shiftValue)) shiftValue = "NS";
 
@@ -431,49 +526,37 @@ namespace MonitoringSystem.Pages.Shared
                             // UPDATE: hanya update kolom Change Plan, TIDAK menyentuh SapPlan
                             querySQL = @"UPDATE ProductionRecords 
                                  SET ProductName=@Pn, Quantity=@Qty, Lot=@Lot, Remark=@Rem, 
-                                     Overtime=@Ovt, NoDirectOfWorker=@WNorm, NoDirectOfWorkerOvertime=@WOvt, Shift=@Sh
+                                     Overtime=@Ovt, NoDirectOfWorker=@WNorm, NoDirectOfWorkerOvertime=@WOvt, Shift=@Sh,
+                                     QtyShift1=@QS1, QtyShift2=@QS2, QtyShift3=@QS3, QtyShiftNS=@QSNS,
+                                     OvtShift1=@OS1, OvtShift2=@OS2, OvtShift3=@OS3, OvtShiftNS=@OSNS
                                  WHERE Id=@Id";
                         }
                         else
                         {
-                            string queryFindExisting = @"SELECT TOP 1 Id FROM ProductionRecords 
-                                                          WHERE PlanId = @Pid AND ProductName = @Pn 
-                                                          AND MachineCode = @Mc";
-                            using (SqlCommand cmdFind = new SqlCommand(queryFindExisting, connection))
-                            {
-                                cmdFind.Parameters.AddWithValue("@Pid", planId);
-                                cmdFind.Parameters.AddWithValue("@Pn", safeModelName);
-                                cmdFind.Parameters.AddWithValue("@Mc", FilterMachineCode ?? "MCH1-01");
-                                var existingId = cmdFind.ExecuteScalar();
-
-                                if (existingId != null)
-                                {
-                                    safeId = (int)existingId;
-                                    querySQL = @"UPDATE ProductionRecords 
-                                                 SET ProductName=@Pn, Quantity=@Qty, Lot=@Lot, Remark=@Rem, 
-                                                     Overtime=@Ovt, NoDirectOfWorker=@WNorm, 
-                                                     NoDirectOfWorkerOvertime=@WOvt, Shift=@Sh
-                                                 WHERE Id=@Id";
-                                }
-                                else
-                                {
-                                    querySQL = @"INSERT INTO ProductionRecords 
-                                        (PlanID, ProductName, MachineCode, Quantity, Lot, Remark, Overtime, NoDirectOfWorker, NoDirectOfWorkerOvertime, Shift) 
-                                        VALUES (@Pid, @Pn, @Mc, @Qty, @Lot, @Rem, @Ovt, @WNorm, @WOvt, @Sh);";
-                                }
-                            }
+                            // ALWAYS INSERT new rows since they don't have safeId!
+                            querySQL = @"INSERT INTO ProductionRecords 
+                                (PlanID, ProductName, MachineCode, Quantity, Lot, Remark, Overtime, NoDirectOfWorker, NoDirectOfWorkerOvertime, Shift, QtyShift1, QtyShift2, QtyShift3, QtyShiftNS, OvtShift1, OvtShift2, OvtShift3, OvtShiftNS) 
+                                VALUES (@Pid, @Pn, @Mc, @Qty, @Lot, @Rem, @Ovt, @WNorm, @WOvt, @Sh, @QS1, @QS2, @QS3, @QSNS, @OS1, @OS2, @OS3, @OSNS);";
                         }
 
                         using (SqlCommand cmd = new SqlCommand(querySQL, connection))
                         {
                             cmd.Parameters.AddWithValue("@Pn", safeModelName);
-                            cmd.Parameters.AddWithValue("@Qty", safeQty);
-                            cmd.Parameters.AddWithValue("@WNorm", safeWorker);
+                            cmd.Parameters.AddWithValue("@Qty", (object)safeQty ?? 0);
+                            cmd.Parameters.AddWithValue("@WNorm", (object)safeWorker ?? 0);
                             cmd.Parameters.AddWithValue("@Sh", shiftValue);
                             cmd.Parameters.AddWithValue("@Ovt", (object)safeOvertime ?? DBNull.Value);
                             cmd.Parameters.AddWithValue("@WOvt", (object)safeWorkerOvt ?? DBNull.Value);
                             cmd.Parameters.AddWithValue("@Lot", (object)safeLot ?? DBNull.Value);
                             cmd.Parameters.AddWithValue("@Rem", (object)safeRemark ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@QS1", (object)safeQtyShift1 ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@QS2", (object)safeQtyShift2 ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@QS3", (object)safeQtyShift3 ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@QSNS", (object)safeQtyShiftNS ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@OS1", (object)safeOvtShift1 ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@OS2", (object)safeOvtShift2 ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@OS3", (object)safeOvtShift3 ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@OSNS", (object)safeOvtShiftNS ?? DBNull.Value);
 
                             if (safeId.HasValue && safeId > 0)
                             {
@@ -496,6 +579,8 @@ namespace MonitoringSystem.Pages.Shared
                             cmd.ExecuteNonQuery();
                             savedRowsCount++;
                         }
+
+                        i++;
                     }
 
                     if (savedRowsCount > 0)
@@ -604,6 +689,46 @@ namespace MonitoringSystem.Pages.Shared
             string NoOfDirectWorker = Request.Form["NoOfDirectWorker"];
             string NoOfDirectWorkerOvertime = Request.Form["NoOfDirectWorkerOvertime"];
 
+            string qtyShift1 = Request.Form["QtyShift1"];
+            string qtyShift2 = Request.Form["QtyShift2"];
+            string qtyShift3 = Request.Form["QtyShift3"];
+            string qtyShiftNS = Request.Form["QtyShiftNS"];
+
+            int.TryParse(qtyShift1, out int qs1);
+            int.TryParse(qtyShift2, out int qs2);
+            int.TryParse(qtyShift3, out int qs3);
+            int.TryParse(qtyShiftNS, out int qsns);
+            int computedQty = qs1 + qs2 + qs3 + qsns;
+            if (computedQty > 0)
+            {
+                Quantity = computedQty.ToString();
+            }
+
+            object paramQtyShift1 = int.TryParse(qtyShift1, out int valQS1) ? (object)valQS1 : DBNull.Value;
+            object paramQtyShift2 = int.TryParse(qtyShift2, out int valQS2) ? (object)valQS2 : DBNull.Value;
+            object paramQtyShift3 = int.TryParse(qtyShift3, out int valQS3) ? (object)valQS3 : DBNull.Value;
+            object paramQtyShiftNS = int.TryParse(qtyShiftNS, out int valQSNS) ? (object)valQSNS : DBNull.Value;
+
+            string ovtShift1 = Request.Form["OvtShift1"];
+            string ovtShift2 = Request.Form["OvtShift2"];
+            string ovtShift3 = Request.Form["OvtShift3"];
+            string ovtShiftNS = Request.Form["OvtShiftNS"];
+
+            int.TryParse(ovtShift1, out int os1);
+            int.TryParse(ovtShift2, out int os2);
+            int.TryParse(ovtShift3, out int os3);
+            int.TryParse(ovtShiftNS, out int osns);
+            int computedOvt = os1 + os2 + os3 + osns;
+            if (computedOvt > 0)
+            {
+                Overtime = computedOvt.ToString();
+            }
+
+            object paramOvtShift1 = int.TryParse(ovtShift1, out int valOS1) ? (object)valOS1 : DBNull.Value;
+            object paramOvtShift2 = int.TryParse(ovtShift2, out int valOS2) ? (object)valOS2 : DBNull.Value;
+            object paramOvtShift3 = int.TryParse(ovtShift3, out int valOS3) ? (object)valOS3 : DBNull.Value;
+            object paramOvtShiftNS = int.TryParse(ovtShiftNS, out int valOSNS) ? (object)valOSNS : DBNull.Value;
+
             string targetDateString = Request.Form["TargetDate"];
             DateTime targetDate = DateTime.Now.Date;
             if (DateTime.TryParse(targetDateString, out DateTime parsedDate)) targetDate = parsedDate;
@@ -638,7 +763,15 @@ namespace MonitoringSystem.Pages.Shared
                                  Overtime = @Overtime,
                                  NoDirectOfWorker = @WNorm,
                                  NoDirectOfWorkerOvertime = @WOvt,
-                                 Shift = @Shift
+                                 Shift = @Shift,
+                                 QtyShift1 = @QtyShift1,
+                                 QtyShift2 = @QtyShift2,
+                                 QtyShift3 = @QtyShift3,
+                                 QtyShiftNS = @QtyShiftNS,
+                                 OvtShift1 = @OvtShift1,
+                                 OvtShift2 = @OvtShift2,
+                                 OvtShift3 = @OvtShift3,
+                                 OvtShiftNS = @OvtShiftNS
                              WHERE Id = @Id";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
@@ -650,6 +783,14 @@ namespace MonitoringSystem.Pages.Shared
                         command.Parameters.AddWithValue("@WNorm", NoOfDirectWorker ?? (object)DBNull.Value);
                         command.Parameters.AddWithValue("@WOvt", NoOfDirectWorkerOvertime ?? (object)DBNull.Value);
                         command.Parameters.AddWithValue("@Shift", shiftValue);
+                        command.Parameters.AddWithValue("@QtyShift1", paramQtyShift1);
+                        command.Parameters.AddWithValue("@QtyShift2", paramQtyShift2);
+                        command.Parameters.AddWithValue("@QtyShift3", paramQtyShift3);
+                        command.Parameters.AddWithValue("@QtyShiftNS", paramQtyShiftNS);
+                        command.Parameters.AddWithValue("@OvtShift1", paramOvtShift1);
+                        command.Parameters.AddWithValue("@OvtShift2", paramOvtShift2);
+                        command.Parameters.AddWithValue("@OvtShift3", paramOvtShift3);
+                        command.Parameters.AddWithValue("@OvtShiftNS", paramOvtShiftNS);
                         command.ExecuteNonQuery();
                     }
                 }
@@ -903,6 +1044,7 @@ namespace MonitoringSystem.Pages.Shared
         public class ProductName
         {
             public string? Name { get; set; }
+            public int? QtyHour { get; set; }
         }
 
         public class ProductionRecord
@@ -918,6 +1060,14 @@ namespace MonitoringSystem.Pages.Shared
             public double? Hour { get; set; }
             public string? Lot { get; set; }
             public string? Remark { get; set; }
+            public int? QtyShift1 { get; set; }
+            public int? QtyShift2 { get; set; }
+            public int? QtyShift3 { get; set; }
+            public int? QtyShiftNS { get; set; }
+            public int? OvtShift1 { get; set; }
+            public int? OvtShift2 { get; set; }
+            public int? OvtShift3 { get; set; }
+            public int? OvtShiftNS { get; set; }
             // ← SAP Plan reference (diisi dari join saat load)
             public int? SapPlanNormal { get; set; }
             public int? SapPlanOvertime { get; set; }
