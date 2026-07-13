@@ -1,0 +1,671 @@
+﻿@page
+@using System.Globalization
+@model MonitoringSystem.Pages.Inventory2.IndexModel
+@{
+    ViewData["Title"] = "Inventory2";
+}
+
+<style>
+    .container-fluid {
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+    }
+
+    /* FILTER AREA */
+    .filter-area-with-lines {
+        position: relative;
+        padding: 1px 0;
+        margin-bottom: 8px;
+        margin-top: -20px;
+        min-height: 10px;
+        width: calc(100% - 14px);
+        margin-left: 7px;
+        margin-right: 7px;
+    }
+
+    .panamon-bottom-line,
+    .panamon-bottomm-line {
+        position: absolute !important;
+        left: 7px !important;
+        right: 7px !important;
+        height: 2px !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        z-index: 999 !important;
+        pointer-events: none !important;
+        display: block !important;
+    }
+
+    .panamon-bottom-line {
+        top: 0 !important;
+        border-top: 2px solid rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .panamon-bottomm-line {
+        bottom: 0 !important;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important;
+    }
+
+    /* FILTER CONTENT */
+    .filter-content {
+        position: relative;
+        z-index: 2;
+        padding: 6px 0;
+        border-radius: 15px;
+        margin-left: 7px;
+        margin-right: 7px;
+    }
+
+        .filter-content .form-select-sm {
+            height: 28px;
+            padding: 0 !important;
+            padding-left: 12px !important;
+            padding-right: 28px !important;
+            font-size: 12px;
+            line-height: 16px;
+            border-radius: 999px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: #ffffff;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 10px 10px;
+        }
+
+            .filter-content .form-select-sm option {
+                background-color: rgba(50, 60, 80, 0.95);
+                color: #ffffff;
+                font-size: 12px;
+                padding: 8px;
+            }
+
+            .filter-content .form-select-sm:focus {
+                background-color: rgba(255, 255, 255, 0.20);
+                border-color: rgba(255, 255, 255, 0.3);
+                color: #ffffff;
+                box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.1);
+            }
+
+        .filter-content label {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 12px;
+            line-height: 20px;
+        }
+
+        .filter-content .btn {
+            border-radius: 999px !important;
+            height: 28px;
+            min-height: 20px;
+            padding: 0 12px;
+            font-size: 12px;
+            line-height: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .filter-content .btn-primary {
+            background-color: rgba(8, 65, 150, 0.95);
+            border: 2px solid rgba(100, 181, 246, 1);
+            color: rgba(100, 181, 246, 1);
+        }
+
+            .filter-content .btn-primary:hover {
+                background-color: rgba(5, 45, 110, 1);
+                border-color: rgba(144, 202, 249, 1);
+                color: rgba(144, 202, 249, 1);
+            }
+
+        .filter-content .btn-danger {
+            background-color: rgba(140, 30, 40, 0.95);
+            border: 2px solid rgba(239, 154, 154, 1);
+            color: rgba(239, 154, 154, 1);
+        }
+
+            .filter-content .btn-danger:hover {
+                background-color: rgba(110, 20, 30, 1);
+                border-color: rgba(244, 143, 177, 1);
+                color: rgba(244, 143, 177, 1);
+            }
+
+    .filter-divider {
+        width: 1px;
+        height: 20px;
+        background: rgba(255, 255, 255, 0.15);
+        margin: 0 2px;
+    }
+
+    /* TABLE WRAPPER */
+    .table-responsive {
+        max-width: calc(100% - 14px);
+        margin-left: 7px;
+        margin-right: 7px;
+        overflow-x: auto;
+        overflow-y: auto;
+        height: calc(100vh - 234px);
+        border-radius: 8px;
+        scroll-behavior: smooth;
+        padding-bottom: 1px;
+        margin-bottom: 3px;
+    }
+
+    /* TABLE BASE */
+    /* ── GANTI SEMUA CSS UNTUK TABLE BASE, STICKY HEADER, STICKY COLUMNS ── */
+
+    /* TABLE BASE */
+    .table {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+        .table th,
+        .table td {
+            font-size: 12px;
+            padding: 0.25rem 0.4rem;
+            white-space: nowrap;
+            vertical-align: middle;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        /* ── STICKY HEADER (semua th) ── */
+        .table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2; /* default header cell */
+            background-color: #1e283c;
+            color: #ffffff;
+            box-shadow: inset 0 -2px 0 rgba(100, 181, 246, 0.5);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.4px;
+        }
+
+        /* ── STICKY KOLOM 1 — body ── */
+        .table tbody td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 1;
+            min-width: 140px;
+            max-width: 140px;
+            white-space: normal;
+            text-align: left;
+            padding-left: 0.6rem;
+            background-color: #2a3550;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 11px;
+            border-right: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* ── STICKY KOLOM 2 — body ── */
+        .table tbody td:nth-child(2) {
+            position: sticky;
+            left: 140px;
+            z-index: 1;
+            min-width: 90px;
+            max-width: 90px;
+            text-align: left;
+            padding-left: 0.5rem;
+            background-color: #232e47;
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 11px;
+            font-weight: 600;
+            font-style: italic;
+            border-right: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* ── STICKY HEADER KOLOM 1 — intersection sticky top + sticky left ── */
+        .table thead th:first-child {
+            position: sticky;
+            left: 0;
+            top: 0;
+            z-index: 4; /* paling atas: overlap semua */
+            min-width: 140px;
+            max-width: 140px;
+            text-align: left;
+            padding-left: 0.6rem;
+            white-space: normal;
+            background-color: #1e283c;
+            border-right: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: inset 0 -2px 0 rgba(100, 181, 246, 0.5), 3px 0 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* ── STICKY HEADER KOLOM 2 — intersection sticky top + sticky left ── */
+        .table thead th:nth-child(2) {
+            position: sticky;
+            left: 140px;
+            top: 0;
+            z-index: 3; /* di atas body sticky, di bawah col-1 header */
+            min-width: 90px;
+            max-width: 90px;
+            text-align: left;
+            padding-left: 0.5rem;
+            background-color: #1e283c;
+            border-right: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: inset 0 -2px 0 rgba(100, 181, 246, 0.5), 3px 0 8px rgba(0, 0, 0, 0.3);
+        }
+
+    /* ROW STOCK */
+    .row-stock td {
+        background-color: rgba(255, 255, 255, 0.10) !important;
+    }
+
+    /* ROW RUNNING ASSEMBLY */
+    .row-running td {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+    }
+
+    /* ROW DIFFERENCE */
+    .row-diff td {
+        background-color: rgba(255, 255, 255, 0.02) !important;
+        border-bottom: 2px solid rgba(100, 181, 246, 0.25) !important;
+    }
+
+    /* Override sticky kolom per row type */
+    .row-stock td:first-child {
+        background-color: #2e3a55 !important;
+    }
+
+    .row-running td:first-child,
+    .row-diff td:first-child {
+        background-color: #2e3a55 !important;
+    }
+
+    .row-stock td:nth-child(2) {
+        background-color: #283348 !important;
+    }
+
+    .row-running td:nth-child(2) {
+        background-color: #222d44 !important;
+    }
+
+    .row-diff td:nth-child(2) {
+        background-color: #1f2a40 !important;
+    }
+    /* Pastikan sticky col-1 & col-2 tetap solid saat scroll horizontal */
+    .row-stock td:first-child,
+    .row-running td:first-child,
+    .row-diff td:first-child {
+        background-color: #2e3a55;
+    }
+
+    .row-stock td:nth-child(2) {
+        background-color: #283348;
+    }
+
+    .row-running td:nth-child(2) {
+        background-color: #222d44;
+    }
+
+    .row-diff td:nth-child(2) {
+        background-color: #1f2a40;
+    }
+
+    /* HOVER per group — hover semua 3 row */
+    .model-group:hover td {
+        background-color: rgba(100, 181, 246, 0.12) !important;
+        transition: background-color 0.15s ease;
+    }
+
+        .model-group:hover td:first-child {
+            background-color: rgba(100, 181, 246, 0.20) !important;
+        }
+
+    /* NILAI DANGER */
+    .val-danger {
+        color: #ff6b6b !important;
+        font-weight: 700;
+    }
+
+    /* NILAI POSITIF */
+    .val-ok {
+        color: #69db7c !important;
+        font-weight: 700;
+    }
+
+    /* TABLE CONTAINER BOX */
+    .inventory-table-box {
+        position: relative;
+        width: calc(100% - 14px);
+        margin-left: 7px;
+        margin-right: 7px;
+        margin-top: 0.25rem;
+        background: rgba(255, 255, 255, 0.20);
+        border-radius: 12px;
+        padding: 8px 0 6px 0;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.3) !important;
+        overflow: hidden;
+    }
+
+    .inventory-box-header {
+        position: relative;
+        padding: 0 12px 6px 12px;
+        margin-bottom: 4px;
+    }
+
+    .inventory-box-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #ffffff;
+        letter-spacing: 0.3px;
+    }
+
+    .inventory-box-line {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 1px;
+        background: rgba(0, 0, 0, 0.4);
+        border-radius: 1px;
+    }
+
+    .inventory-total-label {
+        color: rgba(255, 255, 255, 0.75);
+        font-size: 11px;
+        margin-right: 14px;
+        margin-bottom: 4px;
+        display: block;
+        text-align: right;
+    }
+
+    .inventory-empty {
+        color: rgba(255, 255, 255, 0.45);
+    }
+
+    /* ── LIGHT MODE ── */
+    body.light-mode .filter-divider {
+        background: rgba(0,0,0,0.15);
+    }
+
+    body.light-mode .filter-content label {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode .filter-content .form-select-sm {
+        background-color: rgba(255,255,255,0.5) !important;
+        border-color: rgba(0,0,0,0.2) !important;
+        color: #1a1a2e !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+    }
+
+        body.light-mode .filter-content .form-select-sm option {
+            background-color: #ffffff !important;
+            color: #1a1a2e !important;
+        }
+
+    body.light-mode .filter-content .btn-primary {
+        background-color: rgba(61,121,176,0.85) !important;
+        border-color: rgba(61,121,176,0.9) !important;
+        color: #ffffff !important;
+    }
+
+    body.light-mode .filter-content .btn-danger {
+        background-color: rgba(180,40,50,0.85) !important;
+        border-color: rgba(200,60,70,0.9) !important;
+        color: #ffffff !important;
+    }
+
+    body.light-mode .panamon-bottom-line {
+        border-top-color: rgba(0,0,0,0.1) !important;
+        background: rgba(0,0,0,0.03) !important;
+    }
+
+    body.light-mode .panamon-bottomm-line {
+        border-bottom-color: rgba(0,0,0,0.1) !important;
+        background: rgba(0,0,0,0.03) !important;
+    }
+
+    body.light-mode .inventory-table-box {
+        background: rgba(255,255,255,0.55) !important;
+        border-color: rgba(255,255,255,0.55) !important;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.10) !important;
+    }
+
+    body.light-mode .inventory-box-title {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode .inventory-box-line {
+        background: rgba(0,0,0,0.1) !important;
+    }
+
+    body.light-mode .inventory-total-label {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode .inventory-empty {
+        color: rgba(26,26,46,0.45) !important;
+    }
+
+    body.light-mode .table thead th {
+        background-color: #19233a !important;
+        color: #ffffff !important;
+    }
+
+        body.light-mode .table thead th:first-child,
+        body.light-mode .table thead th:nth-child(2) {
+            top: 0 !important;
+            background-color: #19233a !important;
+        }
+
+    body.light-mode .table tbody td {
+        color: #1a1a2e !important;
+        background-color: rgba(255,255,255,0.45) !important;
+    }
+
+        body.light-mode .table tbody td:first-child {
+            background-color: rgba(210,225,245,0.9) !important;
+            color: #1a1a2e !important;
+        }
+
+        body.light-mode .table tbody td:nth-child(2) {
+            background-color: rgba(235,242,255,0.8) !important;
+            color: #444 !important;
+        }
+
+    body.light-mode .row-stock td {
+        background-color: rgba(255,255,255,0.55) !important;
+    }
+
+    body.light-mode .row-running td {
+        background-color: rgba(255,255,255,0.40) !important;
+    }
+
+    body.light-mode .row-diff td {
+        background-color: rgba(255,255,255,0.30) !important;
+    }
+
+    body.light-mode .model-group:hover td {
+        background-color: rgba(100,181,246,0.18) !important;
+    }
+
+    body.light-mode .val-danger {
+        color: #c53030 !important;
+    }
+
+    body.light-mode .val-ok {
+        color: #1a7a35 !important;
+    }
+
+    body.light-mode .table-responsive {
+        background: rgba(255,255,255,0.35) !important;
+        backdrop-filter: blur(4px) !important;
+        border-radius: 8px;
+    }
+</style>
+
+<!-- FILTER AREA -->
+<div class="filter-area-with-lines">
+    <div class="panamon-bottom-line"></div>
+    <div class="panamon-bottomm-line"></div>
+
+    <div class="filter-content">
+        <form method="post" asp-page-handler="Filter" class="d-flex flex-wrap align-items-center gap-3">
+
+            <div class="d-flex align-items-center gap-2">
+                <label class="mb-0">Line</label>
+                <select class="form-select-sm" style="width: 130px;"
+                        id="MachineLine" name="MachineLine" asp-for="MachineLine">
+                    <option value="All">All</option>
+                    <option value="MCH1-01">Evaporator</option>
+                    <option value="MCH1-02">Condenser</option>
+                </select>
+            </div>
+
+            <div class="filter-divider"></div>
+
+            <div class="d-flex align-items-center gap-2">
+                <label class="mb-0">Month</label>
+                <select class="form-select-sm" style="width: 110px;"
+                        id="SelectedMonth" name="SelectedMonth" asp-for="SelectedMonth">
+                    @for (int i = 1; i <= 12; i++)
+                    {
+                        <option value="@i">
+                            @CultureInfo.GetCultureInfo("en-US").DateTimeFormat.GetMonthName(i)
+                        </option>
+                    }
+                </select>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <label class="mb-0">Year</label>
+                <select class="form-select-sm" style="width: 80px;"
+                        id="SelectedYear" name="SelectedYear" asp-for="SelectedYear">
+                    @for (int i = DateTime.Now.Year; i >= 2020; i--)
+                    {
+                        <option value="@i">@i</option>
+                    }
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="fas fa-search me-1"></i> Search
+            </button>
+            <button type="submit" asp-page-handler="Reset" class="btn btn-danger btn-sm">
+                <i class="fas fa-undo me-1"></i> Reset
+            </button>
+
+        </form>
+    </div>
+</div>
+
+<!-- TABLE BOX -->
+<div class="inventory-table-box">
+    <div class="inventory-box-header">
+        <span class="inventory-box-title">
+            <i class="fas fa-boxes-stacked me-2"></i>Inventory Data
+            — @CultureInfo.GetCultureInfo("en-US").DateTimeFormat.GetMonthName(Model.SelectedMonth) @Model.SelectedYear
+            @if (Model.MachineLine != "All")
+            {
+                <span style="font-weight:400; opacity:0.75; font-size:11px;">
+                    [@(Model.MachineLine == "MCH1-01" ? "Evaporator" : "Condenser")]
+                </span>
+            }
+        </span>
+        <div class="inventory-box-line"></div>
+    </div>
+
+    <span class="inventory-total-label">
+        @Model.TotalModels model(s) — @Model.DaysInMonth days
+    </span>
+
+    @if (Model.ModelList != null && Model.ModelList.Any())
+    {
+        var days = Model.DaysInMonth;
+
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle w-100" id="inventoryTable">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Item</th>
+                        @for (int d = 1; d <= days; d++)
+                        {
+                            <th>@d</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var modelName in Model.ModelList)
+                    {
+                        var dayMap = Model.PivotData[modelName];
+
+                        // ── Row 1: Stock ──────────────────────────────────────
+                        <tr class="row-stock model-group">
+                            <td rowspan="3" style="vertical-align:middle; font-weight:700; font-size:11px;">
+                                @modelName
+                            </td>
+                            <td>Stock</td>
+                            @for (int d = 1; d <= days; d++)
+                            {
+                                if (dayMap.TryGetValue(d, out var data))
+                                {
+                                    bool isZero = data.Stock == 0;
+                                    <td class="@(isZero ? "val-danger" : "")">@data.Stock.ToString("N0")</td>
+                                }
+                                else
+                                {
+                                    <td style="opacity:0.3;">-</td>
+                                }
+                            }
+                        </tr>
+
+                        // ── Row 2: Running Assembly ───────────────────────────
+                        <tr class="row-running model-group">
+                            <td>Running</td>
+                            @for (int d = 1; d <= days; d++)
+                            {
+                                if (dayMap.TryGetValue(d, out var data))
+                                {
+                                    <td>@data.RunningAssembly.ToString("N0")</td>
+                                }
+                                else
+                                {
+                                    <td style="opacity:0.3;">-</td>
+                                }
+                            }
+                        </tr>
+
+                        // ── Row 3: Difference ─────────────────────────────────
+                        <tr class="row-diff model-group">
+                            <td>Diff</td>
+                            @for (int d = 1; d <= days; d++)
+                            {
+                                if (dayMap.TryGetValue(d, out var data))
+                                {
+                                    int diff = data.Difference;
+                                    string cls = diff < 0 ? "val-danger" : (diff > 0 ? "val-ok" : "");
+                                    <td class="@cls">@diff.ToString("N0")</td>
+                                }
+                                else
+                                {
+                                    <td style="opacity:0.3;">-</td>
+                                }
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center justify-content-center" style="height: 200px;">
+            <div class="text-center inventory-empty">
+                <i class="fas fa-inbox fa-3x mb-3"></i>
+                <h5>No Data Available</h5>
+                <p style="font-size: 12px;">No records found for the selected criteria.</p>
+            </div>
+        </div>
+    }
+</div>

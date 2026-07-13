@@ -1,181 +1,149 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using MonitoringSystem.Models;
 
 namespace MonitoringSystem.Pages.Inventory
 {
-    public class IndexModel : PageModel
+    public class indexModel : PageModel
     {
-        private readonly IConfiguration _configuration;
-        private readonly ILogger<IndexModel> _logger;
+        private readonly ScaffoldedDbContext _context;
+        private readonly ILogger<indexModel> _logger;
 
-        private string ConnectionString => _configuration.GetConnectionString("DefaultConnection");
-
-        public IndexModel(IConfiguration configuration, ILogger<IndexModel> logger)
+        public indexModel(ScaffoldedDbContext context, ILogger<indexModel> logger)
         {
-            _configuration = configuration;
+            _context = context;
             _logger = logger;
         }
 
-        // ── Filter ────────────────────────────────────────────────────────────
+        // ── Filter Bulan & Tahun terpisah ────────────────────────
         [BindProperty(SupportsGet = true)]
-        public string MachineLine { get; set; } = "All";
-
-        [BindProperty(SupportsGet = true)]
-        public int SelectedMonth { get; set; } = DateTime.Now.Month;
+        public int? FilterBulan { get; set; }
 
         [BindProperty(SupportsGet = true)]
-        public int SelectedYear { get; set; } = DateTime.Now.Year;
+        public int? FilterTahun { get; set; }
 
-        // ── Pivot data ────────────────────────────────────────────────────────
-        // DaysInMonth → jumlah kolom tanggal
-        public int DaysInMonth { get; set; }
+        [BindProperty(SupportsGet = true)]
+        public string FilterMachineLine { get; set; }
 
-        // PivotData → key: Model name
-        //             value: Dictionary<day(int 1-31), InventoryData>
-        public Dictionary<string, Dictionary<int, InventoryData>> PivotData { get; set; } = new();
+        // Bulan & tahun yang benar-benar dipakai (fallback ke bulan/tahun sekarang)
+        public int ActiveBulan { get; set; }
+        public int ActiveYear { get; set; }
 
-        // Urutan model agar konsisten
-        public List<string> ModelList { get; set; } = new();
+        public List<InventoryData> listData { get; set; } = new();
 
-        public int TotalModels => ModelList.Count;
-
-        // ── Handlers ─────────────────────────────────────────────────────────
-        public void OnGet()
+        // ─── GET ───────────────────────────────────────────────
+        public async Task OnGetAsync()
         {
-            LoadInventoryData();
-        }
+            listData = new List<InventoryData>();
 
-        public IActionResult OnPostFilter()
-        {
-            LoadInventoryData();
-            return Page();
-        }
-
-        public IActionResult OnPostReset()
-        {
-            MachineLine = "All";
-            SelectedMonth = DateTime.Now.Month;
-            SelectedYear = DateTime.Now.Year;
-            return RedirectToPage();
-        }
-
-        // ── Data loading ──────────────────────────────────────────────────────
-        private void LoadInventoryData()
-        {
-            DaysInMonth = DateTime.DaysInMonth(SelectedYear, SelectedMonth);
-            PivotData.Clear();
-            ModelList.Clear();
-
-            var parameters = new List<SqlParameter>
-            {
-                new SqlParameter("@month", SelectedMonth),
-                new SqlParameter("@year",  SelectedYear)
-            };
-
-            string lineFilter = MachineLine == "All"
-                ? ""
-                : "AND Source = @machineLine";
-
-            if (MachineLine != "All")
-                parameters.Add(new SqlParameter("@machineLine", MachineLine));
-
-            // Query sama — ambil 1 row per Model per hari (Actual tertinggi)
-            // RunningAssembly diambil dari OEESN untuk hari ini (hari jalan)
-            string query = $@"
-SELECT d.Id,
-       d.tanggal,
-       d.Source,
-       d.Model,
-       '-'  AS Type,
-       d.Actual,
-       ''   AS Issue,
-       ''   AS Remark,
-       ISNULL((
-           SELECT COUNT(*)
-           FROM   PROMOSYS.dbo.OEESN      o
-           INNER JOIN PROMOSYS.dbo.MasterData m ON m.Product_Id = o.Product_Id
-           WHERE  m.ProductName = d.Model
-           AND    CAST(o.Date AS DATE) = CAST(GETDATE() AS DATE)
-       ), 0) AS RunningAssembly
-FROM (
-    SELECT *,
-           ROW_NUMBER() OVER (
-               PARTITION BY Model, Source, CAST(tanggal AS DATE)
-               ORDER BY Actual DESC
-           ) AS rn
-    FROM   COBADAQ.dbo.DataMatang
-    WHERE  MONTH(tanggal) = @month
-    AND    YEAR(tanggal)  = @year
-    {lineFilter}
-) d
-WHERE d.rn = 1
-ORDER BY d.Model, d.tanggal";
-
-            // Baca flat list dulu, lalu pivot di C#
-            var flatList = new List<InventoryData>();
-
-            ExecuteReader(query, reader =>
-            {
-                flatList.Add(new InventoryData
-                {
-                    Id = reader.GetInt32(0),
-                    Date = reader.GetDateTime(1),
-                    Location = reader.GetString(2),
-                    Model = reader.GetString(3),
-                    Type = reader.GetString(4),
-                    Stock = reader.GetInt32(5),
-                    Issue = reader.GetString(6),
-                    Remark = reader.GetString(7),
-                    RunningAssembly = Convert.ToInt32(reader[8])
-                });
-            }, parameters.ToArray());
-
-            // Pivot: group by Model → Dictionary<day, InventoryData>
-            foreach (var row in flatList)
-            {
-                string modelKey = row.Model;
-                int day = row.Date.Day;
-
-                if (!PivotData.ContainsKey(modelKey))
-                {
-                    PivotData[modelKey] = new Dictionary<int, InventoryData>();
-                    ModelList.Add(modelKey);
-                }
-
-                // Kalau 1 hari ada duplikat (beda Source), ambil yang Stock-nya lebih besar
-                if (!PivotData[modelKey].ContainsKey(day) ||
-                    PivotData[modelKey][day].Stock < row.Stock)
-                {
-                    PivotData[modelKey][day] = row;
-                }
-            }
-
-            // Sort ModelList A-Z
-            ModelList.Sort();
-        }
-
-        // ── Helper ────────────────────────────────────────────────────────────
-        private void ExecuteReader(string query, Action<SqlDataReader> handleData,
-                                   params SqlParameter[] parameters)
-        {
             try
             {
-                using var connection = new SqlConnection(ConnectionString);
-                connection.Open();
-                using var command = new SqlCommand(query, connection);
-                if (parameters?.Length > 0)
-                    command.Parameters.AddRange(parameters);
-                using var reader = command.ExecuteReader();
-                while (reader.Read())
-                    handleData(reader);
+                // ── Tentukan bulan & tahun aktif ──────────────────
+                var now = DateTime.Now;
+                ActiveBulan = (FilterBulan.HasValue && FilterBulan.Value >= 1 && FilterBulan.Value <= 12)
+                    ? FilterBulan.Value
+                    : now.Month;
+
+                ActiveYear = (FilterTahun.HasValue && FilterTahun.Value >= 2000 && FilterTahun.Value <= 2100)
+                    ? FilterTahun.Value
+                    : now.Year;
+
+                var startDate = new DateTime(ActiveYear, ActiveBulan, 1);
+                var endDate = startDate.AddMonths(1);
+
+                var conn = _context.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var cmd = conn.CreateCommand();
+
+                var machineFilter = string.IsNullOrEmpty(FilterMachineLine)
+                    ? "" : "AND o.MachineCode = @filterMachine";
+
+                cmd.CommandText = $@"
+                    SELECT 
+                        o.Product_Id AS Data_Id,
+                        ISNULL(m.ProductName, o.Product_Id) AS Model,
+                        o.MachineCode,
+                        DAY(o.Date) AS DayNum,
+                        (MAX(o.GoodUnit) - MIN(o.GoodUnit) + 1) AS Actual
+                    FROM OEESN o
+                    LEFT JOIN MasterData m ON m.Product_Id = o.Product_Id
+                    WHERE o.Date >= @startDate AND o.Date < @endDate
+                    {machineFilter}
+                    GROUP BY o.Product_Id, m.ProductName, o.MachineCode, DAY(o.Date)
+                    ORDER BY o.MachineCode, m.ProductName, DayNum";
+
+                var pStart = cmd.CreateParameter();
+                pStart.ParameterName = "@startDate";
+                pStart.Value = startDate;
+                cmd.Parameters.Add(pStart);
+
+                var pEnd = cmd.CreateParameter();
+                pEnd.ParameterName = "@endDate";
+                pEnd.Value = endDate;
+                cmd.Parameters.Add(pEnd);
+
+                if (!string.IsNullOrEmpty(FilterMachineLine))
+                {
+                    var pMachine = cmd.CreateParameter();
+                    pMachine.ParameterName = "@filterMachine";
+                    pMachine.Value = FilterMachineLine;
+                    cmd.Parameters.Add(pMachine);
+                }
+
+                // ── Group hasil query per Product_Id + MachineCode ──
+                var dataMap = new Dictionary<string, InventoryData>();
+
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var dataId = reader["Data_Id"]?.ToString();
+                    var model = reader["Model"]?.ToString();
+                    var machineLine = reader["MachineCode"]?.ToString();
+                    var dayNum = Convert.ToInt32(reader["DayNum"]);
+                    decimal? actual = reader["Actual"] == DBNull.Value ? null : Convert.ToDecimal(reader["Actual"]);
+
+                    var key = $"{dataId}|{machineLine}";
+
+                    if (!dataMap.TryGetValue(key, out var invData))
+                    {
+                        invData = new InventoryData
+                        {
+                            Data_Id = dataId,
+                            Model = model,
+                            MachineLine = machineLine,
+                            DailyValues = new Dictionary<int, decimal?>()
+                        };
+                        dataMap[key] = invData;
+                    }
+
+                    invData.DailyValues[dayNum] = actual;
+                }
+
+                await conn.CloseAsync();
+
+                listData = dataMap.Values.ToList();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error loading inventory data");
-                throw;
+                _logger.LogError($"Error loading Inventory data: {ex.Message}");
+                TempData["StatusMessage"] = "error";
+                TempData["Message"] = $"Error loading data: {ex.Message}";
+
+                // Fallback biar view tetap bisa render walau query gagal
+                if (ActiveBulan == 0) ActiveBulan = DateTime.Now.Month;
+                if (ActiveYear == 0) ActiveYear = DateTime.Now.Year;
             }
         }
+    }
+
+    // ─── DATA MODEL ─────────────────────────────────────────────
+    public class InventoryData
+    {
+        public string Data_Id { get; set; }
+        public string Model { get; set; }
+        public string MachineLine { get; set; }
+        public Dictionary<int, decimal?> DailyValues { get; set; } = new();
     }
 }

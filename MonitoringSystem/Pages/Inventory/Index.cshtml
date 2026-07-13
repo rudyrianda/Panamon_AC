@@ -1,671 +1,725 @@
-﻿@page
-@using System.Globalization
-@model MonitoringSystem.Pages.Inventory.IndexModel
+@page
+@model MonitoringSystem.Pages.Inventory.indexModel
 @{
     ViewData["Title"] = "Inventory";
+
+    int daysInMonth = DateTime.DaysInMonth(Model.ActiveYear, Model.ActiveBulan);
+
+    string[] namaBulan = new[]
+    {
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    };
 }
 
-<style>
-    .container-fluid {
-        padding-left: 0px !important;
-        padding-right: 0px !important;
-    }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link href="~/css/Sidebar.css" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/sweetalert2.css" />
 
-    /* FILTER AREA */
-    .filter-area-with-lines {
-        position: relative;
-        padding: 1px 0;
-        margin-bottom: 8px;
-        margin-top: -20px;
-        min-height: 10px;
-        width: calc(100% - 14px);
-        margin-left: 7px;
-        margin-right: 7px;
-    }
-
-    .panamon-bottom-line,
-    .panamon-bottomm-line {
-        position: absolute !important;
-        left: 7px !important;
-        right: 7px !important;
-        height: 2px !important;
-        background: rgba(255, 255, 255, 0.04) !important;
-        z-index: 999 !important;
-        pointer-events: none !important;
-        display: block !important;
-    }
-
-    .panamon-bottom-line {
-        top: 0 !important;
-        border-top: 2px solid rgba(255, 255, 255, 0.08) !important;
-    }
-
-    .panamon-bottomm-line {
-        bottom: 0 !important;
-        border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important;
-    }
-
-    /* FILTER CONTENT */
-    .filter-content {
-        position: relative;
-        z-index: 2;
-        padding: 6px 0;
-        border-radius: 15px;
-        margin-left: 7px;
-        margin-right: 7px;
-    }
-
-        .filter-content .form-select-sm {
-            height: 28px;
-            padding: 0 !important;
-            padding-left: 12px !important;
-            padding-right: 28px !important;
-            font-size: 12px;
-            line-height: 16px;
-            border-radius: 999px;
-            background-color: rgba(255, 255, 255, 0.05);
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            color: #ffffff;
-            appearance: none;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
-            background-repeat: no-repeat;
-            background-position: right 8px center;
-            background-size: 10px 10px;
+    <style>
+        /* ============================================================
+                                           FILTER AREA
+                                        ============================================================ */
+        .filter-area-with-lines {
+            position: relative;
+            padding: 1px 0;
+            margin-bottom: -63px !important;
+            margin-top: -20px;
+            min-height: 10px;
+            width: calc(100% - 14px);
+            margin-left: 7px;
+            margin-right: 7px;
         }
 
-            .filter-content .form-select-sm option {
-                background-color: rgba(50, 60, 80, 0.95);
-                color: #ffffff;
-                font-size: 12px;
-                padding: 8px;
-            }
-
-            .filter-content .form-select-sm:focus {
-                background-color: rgba(255, 255, 255, 0.20);
-                border-color: rgba(255, 255, 255, 0.3);
-                color: #ffffff;
-                box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.1);
-            }
-
-        .filter-content label {
-            color: rgba(255, 255, 255, 0.85);
-            font-size: 12px;
-            line-height: 20px;
+        .panamon-bottom-line,
+        .panamon-bottomm-line {
+            position: absolute !important;
+            left: -13px !important;
+            right: -13px !important;
+            height: 2px !important;
+            background: rgba(255,255,255,0.04) !important;
+            z-index: 999 !important;
+            pointer-events: none !important;
+            display: block !important;
         }
 
-        .filter-content .btn {
-            border-radius: 999px !important;
-            height: 28px;
-            min-height: 20px;
-            padding: 0 12px;
-            font-size: 12px;
-            line-height: 20px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .filter-content .btn-primary {
-            background-color: rgba(8, 65, 150, 0.95);
-            border: 2px solid rgba(100, 181, 246, 1);
-            color: rgba(100, 181, 246, 1);
-        }
-
-            .filter-content .btn-primary:hover {
-                background-color: rgba(5, 45, 110, 1);
-                border-color: rgba(144, 202, 249, 1);
-                color: rgba(144, 202, 249, 1);
-            }
-
-        .filter-content .btn-danger {
-            background-color: rgba(140, 30, 40, 0.95);
-            border: 2px solid rgba(239, 154, 154, 1);
-            color: rgba(239, 154, 154, 1);
-        }
-
-            .filter-content .btn-danger:hover {
-                background-color: rgba(110, 20, 30, 1);
-                border-color: rgba(244, 143, 177, 1);
-                color: rgba(244, 143, 177, 1);
-            }
-
-    .filter-divider {
-        width: 1px;
-        height: 20px;
-        background: rgba(255, 255, 255, 0.15);
-        margin: 0 2px;
-    }
-
-    /* TABLE WRAPPER */
-    .table-responsive {
-        max-width: calc(100% - 14px);
-        margin-left: 7px;
-        margin-right: 7px;
-        overflow-x: auto;
-        overflow-y: auto;
-        height: calc(100vh - 234px);
-        border-radius: 8px;
-        scroll-behavior: smooth;
-        padding-bottom: 1px;
-        margin-bottom: 3px;
-    }
-
-    /* TABLE BASE */
-    /* ── GANTI SEMUA CSS UNTUK TABLE BASE, STICKY HEADER, STICKY COLUMNS ── */
-
-    /* TABLE BASE */
-    .table {
-        border-collapse: separate;
-        border-spacing: 0;
-    }
-
-        .table th,
-        .table td {
-            font-size: 12px;
-            padding: 0.25rem 0.4rem;
-            white-space: nowrap;
-            vertical-align: middle;
-            font-weight: 600;
-            text-align: center;
-        }
-
-        /* ── STICKY HEADER (semua th) ── */
-        .table thead th {
-            position: sticky;
-            top: 0;
-            z-index: 2; /* default header cell */
-            background-color: #1e283c;
-            color: #ffffff;
-            box-shadow: inset 0 -2px 0 rgba(100, 181, 246, 0.5);
-            font-weight: 700;
-            text-transform: uppercase;
-            font-size: 11px;
-            letter-spacing: 0.4px;
-        }
-
-        /* ── STICKY KOLOM 1 — body ── */
-        .table tbody td:first-child {
-            position: sticky;
-            left: 0;
-            z-index: 1;
-            min-width: 140px;
-            max-width: 140px;
-            white-space: normal;
-            text-align: left;
-            padding-left: 0.6rem;
-            background-color: #2a3550;
-            color: #ffffff;
-            font-weight: 700;
-            font-size: 11px;
-            border-right: 2px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
-        }
-
-        /* ── STICKY KOLOM 2 — body ── */
-        .table tbody td:nth-child(2) {
-            position: sticky;
-            left: 140px;
-            z-index: 1;
-            min-width: 90px;
-            max-width: 90px;
-            text-align: left;
-            padding-left: 0.5rem;
-            background-color: #232e47;
-            color: rgba(255, 255, 255, 0.75);
-            font-size: 11px;
-            font-weight: 600;
-            font-style: italic;
-            border-right: 2px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
-        }
-
-        /* ── STICKY HEADER KOLOM 1 — intersection sticky top + sticky left ── */
-        .table thead th:first-child {
-            position: sticky;
-            left: 0;
-            top: 0;
-            z-index: 4; /* paling atas: overlap semua */
-            min-width: 140px;
-            max-width: 140px;
-            text-align: left;
-            padding-left: 0.6rem;
-            white-space: normal;
-            background-color: #1e283c;
-            border-right: 2px solid rgba(255, 255, 255, 0.3);
-            box-shadow: inset 0 -2px 0 rgba(100, 181, 246, 0.5), 3px 0 8px rgba(0, 0, 0, 0.3);
-        }
-
-        /* ── STICKY HEADER KOLOM 2 — intersection sticky top + sticky left ── */
-        .table thead th:nth-child(2) {
-            position: sticky;
-            left: 140px;
-            top: 0;
-            z-index: 3; /* di atas body sticky, di bawah col-1 header */
-            min-width: 90px;
-            max-width: 90px;
-            text-align: left;
-            padding-left: 0.5rem;
-            background-color: #1e283c;
-            border-right: 2px solid rgba(255, 255, 255, 0.3);
-            box-shadow: inset 0 -2px 0 rgba(100, 181, 246, 0.5), 3px 0 8px rgba(0, 0, 0, 0.3);
-        }
-
-    /* ROW STOCK */
-    .row-stock td {
-        background-color: rgba(255, 255, 255, 0.10) !important;
-    }
-
-    /* ROW RUNNING ASSEMBLY */
-    .row-running td {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-    }
-
-    /* ROW DIFFERENCE */
-    .row-diff td {
-        background-color: rgba(255, 255, 255, 0.02) !important;
-        border-bottom: 2px solid rgba(100, 181, 246, 0.25) !important;
-    }
-
-    /* Override sticky kolom per row type */
-    .row-stock td:first-child {
-        background-color: #2e3a55 !important;
-    }
-
-    .row-running td:first-child,
-    .row-diff td:first-child {
-        background-color: #2e3a55 !important;
-    }
-
-    .row-stock td:nth-child(2) {
-        background-color: #283348 !important;
-    }
-
-    .row-running td:nth-child(2) {
-        background-color: #222d44 !important;
-    }
-
-    .row-diff td:nth-child(2) {
-        background-color: #1f2a40 !important;
-    }
-    /* Pastikan sticky col-1 & col-2 tetap solid saat scroll horizontal */
-    .row-stock td:first-child,
-    .row-running td:first-child,
-    .row-diff td:first-child {
-        background-color: #2e3a55;
-    }
-
-    .row-stock td:nth-child(2) {
-        background-color: #283348;
-    }
-
-    .row-running td:nth-child(2) {
-        background-color: #222d44;
-    }
-
-    .row-diff td:nth-child(2) {
-        background-color: #1f2a40;
-    }
-
-    /* HOVER per group — hover semua 3 row */
-    .model-group:hover td {
-        background-color: rgba(100, 181, 246, 0.12) !important;
-        transition: background-color 0.15s ease;
-    }
-
-        .model-group:hover td:first-child {
-            background-color: rgba(100, 181, 246, 0.20) !important;
-        }
-
-    /* NILAI DANGER */
-    .val-danger {
-        color: #ff6b6b !important;
-        font-weight: 700;
-    }
-
-    /* NILAI POSITIF */
-    .val-ok {
-        color: #69db7c !important;
-        font-weight: 700;
-    }
-
-    /* TABLE CONTAINER BOX */
-    .inventory-table-box {
-        position: relative;
-        width: calc(100% - 14px);
-        margin-left: 7px;
-        margin-right: 7px;
-        margin-top: 0.25rem;
-        background: rgba(255, 255, 255, 0.20);
-        border-radius: 12px;
-        padding: 8px 0 6px 0;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-        border: 2px solid rgba(255, 255, 255, 0.3) !important;
-        overflow: hidden;
-    }
-
-    .inventory-box-header {
-        position: relative;
-        padding: 0 12px 6px 12px;
-        margin-bottom: 4px;
-    }
-
-    .inventory-box-title {
-        font-size: 0.85rem;
-        font-weight: 700;
-        color: #ffffff;
-        letter-spacing: 0.3px;
-    }
-
-    .inventory-box-line {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        height: 1px;
-        background: rgba(0, 0, 0, 0.4);
-        border-radius: 1px;
-    }
-
-    .inventory-total-label {
-        color: rgba(255, 255, 255, 0.75);
-        font-size: 11px;
-        margin-right: 14px;
-        margin-bottom: 4px;
-        display: block;
-        text-align: right;
-    }
-
-    .inventory-empty {
-        color: rgba(255, 255, 255, 0.45);
-    }
-
-    /* ── LIGHT MODE ── */
-    body.light-mode .filter-divider {
-        background: rgba(0,0,0,0.15);
-    }
-
-    body.light-mode .filter-content label {
-        color: #1a1a2e !important;
-    }
-
-    body.light-mode .filter-content .form-select-sm {
-        background-color: rgba(255,255,255,0.5) !important;
-        border-color: rgba(0,0,0,0.2) !important;
-        color: #1a1a2e !important;
-        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
-    }
-
-        body.light-mode .filter-content .form-select-sm option {
-            background-color: #ffffff !important;
-            color: #1a1a2e !important;
-        }
-
-    body.light-mode .filter-content .btn-primary {
-        background-color: rgba(61,121,176,0.85) !important;
-        border-color: rgba(61,121,176,0.9) !important;
-        color: #ffffff !important;
-    }
-
-    body.light-mode .filter-content .btn-danger {
-        background-color: rgba(180,40,50,0.85) !important;
-        border-color: rgba(200,60,70,0.9) !important;
-        color: #ffffff !important;
-    }
-
-    body.light-mode .panamon-bottom-line {
-        border-top-color: rgba(0,0,0,0.1) !important;
-        background: rgba(0,0,0,0.03) !important;
-    }
-
-    body.light-mode .panamon-bottomm-line {
-        border-bottom-color: rgba(0,0,0,0.1) !important;
-        background: rgba(0,0,0,0.03) !important;
-    }
-
-    body.light-mode .inventory-table-box {
-        background: rgba(255,255,255,0.55) !important;
-        border-color: rgba(255,255,255,0.55) !important;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.10) !important;
-    }
-
-    body.light-mode .inventory-box-title {
-        color: #1a1a2e !important;
-    }
-
-    body.light-mode .inventory-box-line {
-        background: rgba(0,0,0,0.1) !important;
-    }
-
-    body.light-mode .inventory-total-label {
-        color: #1a1a2e !important;
-    }
-
-    body.light-mode .inventory-empty {
-        color: rgba(26,26,46,0.45) !important;
-    }
-
-    body.light-mode .table thead th {
-        background-color: #19233a !important;
-        color: #ffffff !important;
-    }
-
-        body.light-mode .table thead th:first-child,
-        body.light-mode .table thead th:nth-child(2) {
+        .panamon-bottom-line {
             top: 0 !important;
-            background-color: #19233a !important;
+            border-top: 2px solid rgba(255,255,255,0.08) !important;
         }
 
-    body.light-mode .table tbody td {
-        color: #1a1a2e !important;
-        background-color: rgba(255,255,255,0.45) !important;
-    }
+        .panamon-bottomm-line {
+            bottom: 0 !important;
+            border-bottom: 2px solid rgba(255,255,255,0.08) !important;
+        }
 
-        body.light-mode .table tbody td:first-child {
-            background-color: rgba(210,225,245,0.9) !important;
+        body.light-mode .panamon-bottom-line {
+            border-top-color: rgba(0,0,0,0.10) !important;
+            background: rgba(0,0,0,0.03) !important;
+        }
+
+        body.light-mode .panamon-bottomm-line {
+            border-bottom-color: rgba(0,0,0,0.10) !important;
+            background: rgba(0,0,0,0.03) !important;
+        }
+
+        .filter-content {
+            position: relative;
+            z-index: 2;
+            padding: 6px 0;
+            border-radius: 15px;
+            margin-left: -8px;
+            margin-right: 7px;
+        }
+
+            .filter-content .form-select,
+            .filter-content .form-control {
+                height: 28px;
+                padding: 0 22px 0 8px;
+                font-size: 12px;
+                line-height: 20px;
+                border-radius: 999px;
+                background-color: rgba(255,255,255,0.05);
+                border: 2px solid rgba(255,255,255,0.5);
+                color: #ffffff;
+                text-align: center;
+                appearance: none;
+                -webkit-appearance: none;
+                -moz-appearance: none;
+            }
+
+            .filter-content .form-select {
+                padding: 0 !important;
+                padding-left: 12px !important;
+                padding-right: 28px !important;
+                line-height: 16px;
+                background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+                background-repeat: no-repeat;
+                background-position: right 8px center;
+                background-size: 10px 10px;
+            }
+
+                .filter-content .form-select option {
+                    background-color: rgb(30,40,60);
+                    color: #ffffff;
+                    font-size: 12px;
+                }
+
+                .filter-content .form-select.selected {
+                    font-weight: 700 !important;
+                }
+
+            .filter-content .form-control[type="number"] {
+                height: 28px;
+                padding: 0 8px;
+                font-size: 12px;
+                line-height: 20px;
+                border-radius: 999px;
+                background-color: rgba(255,255,255,0.05);
+                border: 2px solid rgba(255,255,255,0.5);
+                color: #ffffff;
+                text-align: center;
+            }
+
+                .filter-content .form-control[type="number"]:focus {
+                    border-color: rgba(100,181,246,1);
+                    box-shadow: 0 0 0 0.2rem rgba(100,181,246,0.25);
+                }
+
+            .filter-content label {
+                color: rgba(255,255,255,0.85);
+                font-size: 12px;
+                line-height: 20px;
+            }
+
+            .filter-content .btn {
+                height: 28px;
+                min-height: 20px;
+                padding: 0 12px;
+                font-size: 12px;
+                line-height: 20px;
+                border-radius: 999px !important;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .filter-content .btn-primary {
+                background-color: rgba(8,65,150,0.95);
+                border: 2px solid rgba(100,181,246,1);
+                color: rgba(100,181,246,1);
+            }
+
+                .filter-content .btn-primary:hover {
+                    background-color: rgba(5,45,110,1);
+                    border-color: rgba(144,202,249,1);
+                    color: rgba(144,202,249,1);
+                }
+
+            .filter-content .btn-danger {
+                background-color: rgba(140,30,40,0.95);
+                border: 2px solid rgba(239,154,154,1);
+                color: rgba(239,154,154,1);
+            }
+
+                .filter-content .btn-danger:hover {
+                    background-color: rgba(110,20,30,1);
+                    border-color: rgba(244,143,177,1);
+                    color: rgba(244,143,177,1);
+                }
+
+            .filter-content .btn-success {
+                background-color: rgba(20,110,50,0.95);
+                border: 2px solid rgba(165,220,180,1);
+                color: rgba(165,220,180,1);
+            }
+
+                .filter-content .btn-success:hover {
+                    background-color: rgba(15,80,35,1);
+                    border-color: rgba(195,240,205,1);
+                    color: rgba(195,240,205,1);
+                }
+
+        body.light-mode .filter-content label {
             color: #1a1a2e !important;
         }
 
-        body.light-mode .table tbody td:nth-child(2) {
-            background-color: rgba(235,242,255,0.8) !important;
-            color: #444 !important;
+        body.light-mode .filter-content .form-select {
+            background-color: rgba(255,255,255,0.5) !important;
+            border-color: rgba(0,0,0,0.2) !important;
+            color: #1a1a2e !important;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
         }
 
-    body.light-mode .row-stock td {
-        background-color: rgba(255,255,255,0.55) !important;
-    }
-
-    body.light-mode .row-running td {
-        background-color: rgba(255,255,255,0.40) !important;
-    }
-
-    body.light-mode .row-diff td {
-        background-color: rgba(255,255,255,0.30) !important;
-    }
-
-    body.light-mode .model-group:hover td {
-        background-color: rgba(100,181,246,0.18) !important;
-    }
-
-    body.light-mode .val-danger {
-        color: #c53030 !important;
-    }
-
-    body.light-mode .val-ok {
-        color: #1a7a35 !important;
-    }
-
-    body.light-mode .table-responsive {
-        background: rgba(255,255,255,0.35) !important;
-        backdrop-filter: blur(4px) !important;
-        border-radius: 8px;
-    }
-</style>
-
-<!-- FILTER AREA -->
-<div class="filter-area-with-lines">
-    <div class="panamon-bottom-line"></div>
-    <div class="panamon-bottomm-line"></div>
-
-    <div class="filter-content">
-        <form method="post" asp-page-handler="Filter" class="d-flex flex-wrap align-items-center gap-3">
-
-            <div class="d-flex align-items-center gap-2">
-                <label class="mb-0">Line</label>
-                <select class="form-select-sm" style="width: 130px;"
-                        id="MachineLine" name="MachineLine" asp-for="MachineLine">
-                    <option value="All">All</option>
-                    <option value="MCH1-01">Evaporator</option>
-                    <option value="MCH1-02">Condenser</option>
-                </select>
-            </div>
-
-            <div class="filter-divider"></div>
-
-            <div class="d-flex align-items-center gap-2">
-                <label class="mb-0">Month</label>
-                <select class="form-select-sm" style="width: 110px;"
-                        id="SelectedMonth" name="SelectedMonth" asp-for="SelectedMonth">
-                    @for (int i = 1; i <= 12; i++)
-                    {
-                        <option value="@i">
-                            @CultureInfo.GetCultureInfo("en-US").DateTimeFormat.GetMonthName(i)
-                        </option>
-                    }
-                </select>
-            </div>
-
-            <div class="d-flex align-items-center gap-2">
-                <label class="mb-0">Year</label>
-                <select class="form-select-sm" style="width: 80px;"
-                        id="SelectedYear" name="SelectedYear" asp-for="SelectedYear">
-                    @for (int i = DateTime.Now.Year; i >= 2020; i--)
-                    {
-                        <option value="@i">@i</option>
-                    }
-                </select>
-            </div>
-
-            <button type="submit" class="btn btn-primary btn-sm">
-                <i class="fas fa-search me-1"></i> Search
-            </button>
-            <button type="submit" asp-page-handler="Reset" class="btn btn-danger btn-sm">
-                <i class="fas fa-undo me-1"></i> Reset
-            </button>
-
-        </form>
-    </div>
-</div>
-
-<!-- TABLE BOX -->
-<div class="inventory-table-box">
-    <div class="inventory-box-header">
-        <span class="inventory-box-title">
-            <i class="fas fa-boxes-stacked me-2"></i>Inventory Data
-            — @CultureInfo.GetCultureInfo("en-US").DateTimeFormat.GetMonthName(Model.SelectedMonth) @Model.SelectedYear
-            @if (Model.MachineLine != "All")
-            {
-                <span style="font-weight:400; opacity:0.75; font-size:11px;">
-                    [@(Model.MachineLine == "MCH1-01" ? "Evaporator" : "Condenser")]
-                </span>
+            body.light-mode .filter-content .form-select option {
+                background-color: #ffffff !important;
+                color: #1a1a2e !important;
             }
-        </span>
-        <div class="inventory-box-line"></div>
-    </div>
 
-    <span class="inventory-total-label">
-        @Model.TotalModels model(s) — @Model.DaysInMonth days
-    </span>
+        body.light-mode .filter-content .btn-primary {
+            background-color: rgba(61,121,176,0.85) !important;
+            border-color: rgba(61,121,176,0.9) !important;
+            color: #ffffff !important;
+        }
 
-    @if (Model.ModelList != null && Model.ModelList.Any())
-    {
-        var days = Model.DaysInMonth;
+        body.light-mode .filter-content .btn-danger {
+            background-color: rgba(180,40,50,0.85) !important;
+            border-color: rgba(200,60,70,0.9) !important;
+            color: #ffffff !important;
+        }
 
-        <div class="table-responsive">
-            <table class="table table-bordered align-middle w-100" id="inventoryTable">
-                <thead>
-                    <tr>
-                        <th>Model</th>
-                        <th>Item</th>
-                        @for (int d = 1; d <= days; d++)
-                        {
-                            <th>@d</th>
-                        }
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var modelName in Model.ModelList)
-                    {
-                        var dayMap = Model.PivotData[modelName];
+        body.light-mode .filter-content .btn-success {
+            background-color: rgba(40,167,69,0.85) !important;
+            border-color: rgba(40,167,69,0.9) !important;
+            color: #ffffff !important;
+        }
 
-                        // ── Row 1: Stock ──────────────────────────────────────
-                        <tr class="row-stock model-group">
-                            <td rowspan="3" style="vertical-align:middle; font-weight:700; font-size:11px;">
-                                @modelName
-                            </td>
-                            <td>Stock</td>
-                            @for (int d = 1; d <= days; d++)
-                            {
-                                if (dayMap.TryGetValue(d, out var data))
-                                {
-                                    bool isZero = data.Stock == 0;
-                                    <td class="@(isZero ? "val-danger" : "")">@data.Stock.ToString("N0")</td>
-                                }
-                                else
-                                {
-                                    <td style="opacity:0.3;">-</td>
-                                }
-                            }
-                        </tr>
+        body.light-mode .filter-content .form-control[type="number"] {
+            background-color: rgba(255,255,255,0.5) !important;
+            border-color: rgba(0,0,0,0.2) !important;
+            color: #1a1a2e !important;
+        }
 
-                        // ── Row 2: Running Assembly ───────────────────────────
-                        <tr class="row-running model-group">
-                            <td>Running</td>
-                            @for (int d = 1; d <= days; d++)
-                            {
-                                if (dayMap.TryGetValue(d, out var data))
-                                {
-                                    <td>@data.RunningAssembly.ToString("N0")</td>
-                                }
-                                else
-                                {
-                                    <td style="opacity:0.3;">-</td>
-                                }
-                            }
-                        </tr>
+            body.light-mode .filter-content .form-control[type="number"]:focus {
+                border-color: rgba(61,121,176,1);
+                box-shadow: 0 0 0 0.2rem rgba(61,121,246,0.25);
+            }
 
-                        // ── Row 3: Difference ─────────────────────────────────
-                        <tr class="row-diff model-group">
-                            <td>Diff</td>
-                            @for (int d = 1; d <= days; d++)
-                            {
-                                if (dayMap.TryGetValue(d, out var data))
+        /* ============================================================
+                                           CARD WRAPPER
+                                        ============================================================ */
+        .inv-card {
+            margin: 75px 12px 8px;
+            background: rgba(255,255,255,0.20) !important;
+            border-radius: 12px;
+            border: 2px solid rgba(255,255,255,0.3) !important;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+
+        body.light-mode .inv-card {
+            background: rgba(255,255,255,0.55) !important;
+            border: 2px solid rgba(200,215,235,0.80) !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.10) !important;
+        }
+
+        .inv-table-container {
+            overflow: hidden;
+        }
+
+        :root {
+            --sb-w: 8px;
+        }
+
+        /* ── HEADER: scroll horizontal disinkron via JS, tidak discroll manual ──
+                             PENTING: tidak ada padding kiri-kanan, harus sama persis dengan body ── */
+        .inv-header-wrap {
+            overflow: hidden;
+            background: rgba(30,40,60,1) !important;
+            padding: 0;
+            padding-right: var(--sb-w); /* ⬅️ tambahin ini */
+            box-sizing: content-box;
+        }
+
+            .inv-header-wrap table {
+                table-layout: fixed;
+            }
+
+        /* ── BODY: scroll horizontal + vertikal
+                             PENTING: padding hanya atas-bawah, TIDAK ada padding kiri-kanan
+                             supaya posisi kolom mentok pas sejajar dengan header ── */
+        .inv-body-wrap {
+            overflow: auto;
+            max-height: calc(100vh - 280px);
+            padding: 0px 0;
+            cursor: grab;
+        }
+        .inv-body-wrap.active-dragging {
+            cursor: grabbing;
+            user-select: none;
+        }
+
+            .inv-body-wrap table {
+                table-layout: fixed;
+            }
+
+            .inv-body-wrap::-webkit-scrollbar {
+                height: var(--sb-w);
+                width: var(--sb-w);
+                background: rgba(255,255,255,0.05);
+            }
+
+            .inv-body-wrap::-webkit-scrollbar-thumb {
+                background: rgba(255,255,255,0.18);
+                border-radius: 4px;
+            }
+
+        body.light-mode .inv-body-wrap::-webkit-scrollbar {
+            background: rgba(0,0,0,0.05);
+        }
+
+        body.light-mode .inv-body-wrap::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.15);
+        }
+
+        /* ============================================================
+                                           INVENTORY TABLE
+                                        ============================================================ */
+        .inv-tbl {
+            --bs-table-bg: transparent;
+            --bs-table-color: #ffffff;
+            border-collapse: separate !important;
+            border-spacing: 0 !important;
+            margin: 0;
+        }
+
+            .inv-tbl thead th {
+                background: rgba(30,40,60,1) !important;
+                color: #fff !important;
+                border: 1px solid rgba(255,255,255,0.3) !important;
+                text-align: center;
+            }
+
+            .inv-tbl tbody td,
+            .inv-tbl tbody th {
+                background-color: rgb(58, 74, 107) !important;
+                color: #ffffff !important;
+                border: 1px solid rgba(255,255,255,0.25) !important;
+                padding: 5px 4px;
+                font-size: 12px;
+                vertical-align: middle;
+            }
+
+        body.light-mode .inv-tbl thead th {
+            background: rgba(25,35,58,0.92) !important;
+            color: #ffffff !important;
+            border-color: rgba(255,255,255,0.25) !important;
+        }
+
+        body.light-mode .inv-tbl tbody td,
+        body.light-mode .inv-tbl tbody th {
+            background-color: rgb(222, 231, 243) !important;
+            color: #1a1a2e !important;
+            border: 1px solid rgba(0,0,0,0.12) !important;
+        }
+
+        /* ── Kolom Model nempel di kiri, tidak ikut ke-scroll horizontal ──
+                             (sticky bekerja karena masing2 tabel scroll horizontal-nya sendiri;
+                              scrollLeft header disinkron ke body via JS) ── */
+        .inv-tbl .col-model {
+            position: sticky !important;
+            z-index: 10 !important;
+            left: 0 !important;
+            box-shadow: none !important;
+            text-align: center;
+            opacity: 1 !important;
+        }
+
+        .inv-tbl thead .col-model {
+            z-index: 11 !important;
+            box-shadow: none !important;
+            opacity: 1 !important;
+        }
+
+        /* Background solid supaya konten di belakang sticky cell tidak tembus */
+        .inv-tbl thead .col-model {
+            background: rgb(30, 40, 60) !important;
+            box-shadow: none !important;
+            opacity: 1 !important;
+        }
+
+        body.light-mode .inv-tbl thead .col-model {
+            background: rgb(25, 35, 58) !important;
+            box-shadow: none !important;
+            opacity: 1 !important;
+        }
+
+        .inv-tbl tbody .col-model {
+            background: rgb(38, 50, 74) !important;
+            box-shadow: none !important;
+            opacity: 1 !important;
+        }
+
+        body.light-mode .inv-tbl tbody td.col-model {
+            background: rgb(255, 255, 255) !important;
+            box-shadow: none !important;
+            opacity: 1 !important;
+        }
+
+        /* ============================================================
+                                           COLUMN WIDTHS
+                                         ============================================================ */
+        .inv-tbl .col-model {
+            width: 200px !important;
+        }
+
+        .inv-tbl .col-day {
+            width: 56px !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="filter-area-with-lines">
+        <div class="panamon-bottom-line"></div>
+        <div class="panamon-bottomm-line"></div>
+        <div class="filter-content">
+            <div class="row g-3 align-items-center justify-content-between flex-wrap">
+                <div class="col-auto">
+                    <form method="get" class="d-flex flex-wrap align-items-center gap-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="mb-0">Bulan</label>
+                            <select class="form-select" style="width: 130px;" name="FilterBulan">
+                                @for (int b = 1; b <= 12; b++)
                                 {
-                                    int diff = data.Difference;
-                                    string cls = diff < 0 ? "val-danger" : (diff > 0 ? "val-ok" : "");
-                                    <td class="@cls">@diff.ToString("N0")</td>
+                                    <option value="@b" selected="@(b == Model.ActiveBulan)">@namaBulan[b - 1]</option>
                                 }
-                                else
-                                {
-                                    <td style="opacity:0.3;">-</td>
-                                }
-                            }
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-    else
-    {
-        <div class="d-flex align-items-center justify-content-center" style="height: 200px;">
-            <div class="text-center inventory-empty">
-                <i class="fas fa-inbox fa-3x mb-3"></i>
-                <h5>No Data Available</h5>
-                <p style="font-size: 12px;">No records found for the selected criteria.</p>
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="mb-0">Tahun</label>
+                            <input type="number" class="form-control" style="width: 90px;"
+                                   name="FilterTahun" value="@Model.ActiveYear" min="2000" max="2100" />
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="mb-0">Machine Line</label>
+                            <select class="form-select" style="width: 120px;" name="FilterMachineLine" asp-for="FilterMachineLine">
+                                <option value="">All</option>
+                                <option value="MCH1-01">CU</option>
+                                <option value="MCH1-02">CS</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Search</button>
+                        <a href="/Inventory/Index" class="btn btn-danger">Reset</a>
+                        <button type="button" class="btn btn-success" id="btn-export-csv">Save Excel</button>
+                    </form>
+                </div>
             </div>
         </div>
-    }
-</div>
+    </div>
+
+    <div class="inv-card">
+        <div id="inventory-report">
+
+            <div class="inv-table-container">
+
+                <!-- HEADER -->
+                <div class="inv-header-wrap">
+                    <table class="table table-bordered mb-0 inv-tbl">
+                        <colgroup>
+                            <col class="col-model" />
+                            @for (int d = 1; d <= daysInMonth; d++)
+                            {
+                                <col class="col-day" />
+                            }
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th class="col-model">Model</th>
+                                @for (int d = 1; d <= daysInMonth; d++)
+                                {
+                                    <th class="col-day text-center">@d</th>
+                                }
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+
+                <!-- BODY -->
+                <div class="inv-body-wrap">
+                    <table class="table table-bordered mb-0 inv-tbl">
+                        <colgroup>
+                            <col class="col-model" />
+                            @for (int d = 1; d <= daysInMonth; d++)
+                            {
+                                <col class="col-day" />
+                            }
+                        </colgroup>
+                        <tbody id="inventory-table-body">
+                            @{
+                                int minRows = 15;
+                                int dataCount = Model.listData?.Count ?? 0;
+                                int totalRows = Math.Max(dataCount, minRows);
+                            }
+
+                            @for (int i = 0; i < totalRows; i++)
+                            {
+                                var item = dataCount > i ? Model.listData[i] : null;
+
+                                <tr>
+                                    <td class="col-model">@(item?.Model ?? "")</td>
+
+                                    @for (int d = 1; d <= daysInMonth; d++)
+                                    {
+                                        decimal? dayValue = null;
+                                        if (item?.DailyValues != null && item.DailyValues.ContainsKey(d))
+                                        {
+                                            dayValue = item.DailyValues[d];
+                                        }
+
+                                        <td class="col-day text-center">@(dayValue?.ToString() ?? "")</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/sweetalert2.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            var statusMessage = '@TempData["StatusMessage"]';
+            var message = '@TempData["Message"]';
+            if (statusMessage === 'success') {
+                Swal.fire({ icon: 'success', title: 'Success', text: message, confirmButtonText: 'OK' });
+            } else if (statusMessage === 'error') {
+                Swal.fire({ icon: 'error', title: 'Error', text: message, confirmButtonText: 'OK' });
+            }
+
+        const body   = document.querySelector('.inv-body-wrap');
+        const header = document.querySelector('.inv-header-wrap');
+
+        if (body && header) {
+            let lockedAxis = null;   // 'x' | 'y' | null
+            let axisTimeout = null;
+
+            body.addEventListener('wheel', function (e) {
+                // Tentukan axis dominan tiap kali mulai scroll baru
+                if (lockedAxis === null) {
+                    lockedAxis = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? 'x' : 'y';
+                }
+
+                if (lockedAxis === 'y') {
+                    // Scroll vertikal murni: cegah drift horizontal
+                    if (e.deltaX !== 0) e.preventDefault();
+                    body.scrollTop += e.deltaY;
+                    e.preventDefault();
+                }
+
+                // Reset axis setelah user berhenti scroll sejenak (150ms)
+                clearTimeout(axisTimeout);
+                axisTimeout = setTimeout(() => { lockedAxis = null; }, 150);
+            }, { passive: false });
+
+            // Sinkronisasi header tetap jalan seperti biasa
+            body.addEventListener('scroll', () => {
+                header.scrollLeft = body.scrollLeft;
+            });
+
+            // Drag-to-scroll horizontal (scroll tanpa menyentuh scrollbar)
+            let isDown = false;
+            let startX;
+            let scrollLeft;
+
+            body.addEventListener('mousedown', (e) => {
+                if (e.button !== 0 || e.target.closest('input, select, button, a')) return;
+                isDown = true;
+                body.classList.add('active-dragging');
+                startX = e.pageX - body.offsetLeft;
+                scrollLeft = body.scrollLeft;
+            });
+
+            body.addEventListener('mouseleave', () => {
+                isDown = false;
+                body.classList.remove('active-dragging');
+            });
+
+            body.addEventListener('mouseup', () => {
+                isDown = false;
+                body.classList.remove('active-dragging');
+            });
+
+            body.addEventListener('mousemove', (e) => {
+                if (!isDown) return;
+                e.preventDefault();
+                const x = e.pageX - body.offsetLeft;
+                const walk = (x - startX) * 1.5; // sensitivitas drag
+                body.scrollLeft = scrollLeft - walk;
+            });
+        }
+
+            // Excel Export Handler (XLS Format with centered text and auto-calculated column widths)
+            const exportBtn = document.getElementById('btn-export-csv');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', function () {
+                    const headers = ['Model'];
+                    const dayCols = document.querySelectorAll('.inv-header-wrap thead th.col-day');
+                    dayCols.forEach(th => {
+                        headers.push(th.textContent.trim());
+                    });
+
+                    const bodyRows = document.querySelectorAll('#inventory-table-body tr');
+
+                    // Array to store maximum character length for each column to compute widths
+                    const colMaxLengths = Array(headers.length).fill(0);
+                    headers.forEach((h, colIdx) => {
+                        colMaxLengths[colIdx] = h.length;
+                    });
+
+                    const rowsData = [];
+                    bodyRows.forEach(tr => {
+                        const rowData = [];
+                        const modelTd = tr.querySelector('.col-model');
+                        const modelText = modelTd ? modelTd.textContent.trim() : '';
+                        rowData.push(modelText);
+                        if (modelText.length > colMaxLengths[0]) {
+                            colMaxLengths[0] = modelText.length;
+                        }
+
+                        const dayTds = tr.querySelectorAll('.col-day');
+                        dayTds.forEach((td, dayIdx) => {
+                            const valText = td.textContent.trim();
+                            rowData.push(valText);
+                            const colIdx = dayIdx + 1; // offset by 1 because of Model column
+                            if (valText.length > colMaxLengths[colIdx]) {
+                                colMaxLengths[colIdx] = valText.length;
+                            }
+                        });
+                        rowsData.push(rowData);
+                    });
+
+                    // Calculate column widths based on max character length
+                    // Model: base length * 7 + 30 (min 200, max 300 px)
+                    const modelWidth = Math.min(Math.max(colMaxLengths[0] * 7 + 30, 200), 300);
+                    let colGroupHtml = `<col width="${modelWidth}" />`;
+                    
+                    // Day columns: max digits * 8 + 25 (min 50 px) to prevent ### format issues
+                    for (let colIdx = 1; colIdx < headers.length; colIdx++) {
+                        const maxLen = colMaxLengths[colIdx];
+                        const dayWidth = Math.max(maxLen * 8 + 25, 50);
+                        colGroupHtml += `<col width="${dayWidth}" />`;
+                    }
+
+                    let excelHtml = `
+                    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+                    <head>
+                    <meta charset="utf-8" />
+                    <!--[if gte mso 9]>
+                    <xml>
+                    <x:ExcelWorkbook>
+                      <x:ExcelWorksheets>
+                        <x:ExcelWorksheet>
+                          <x:Name>Inventory</x:Name>
+                          <x:WorksheetOptions>
+                            <x:DisplayGridlines/>
+                          </x:WorksheetOptions>
+                        </x:ExcelWorksheet>
+                      </x:ExcelWorksheets>
+                    </x:ExcelWorkbook>
+                    </xml>
+                    <![endif]-->
+                    <style>
+                      table { border-collapse: collapse; }
+                      th, td { border: 0.5pt solid #c0c0c0; text-align: center; font-family: Arial, sans-serif; font-size: 10pt; vertical-align: middle; }
+                      th { background-color: #1e283c; color: #ffffff; font-weight: bold; }
+                      .col-model { text-align: center; }
+                    </style>
+                    </head>
+                    <body>
+                    <table>
+                      <colgroup>
+                        ${colGroupHtml}
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          ${headers.map(h => `<th class="col-model">${h}</th>`).join('')}
+                        </tr>
+                      </thead>
+                      <tbody>
+                    `;
+
+                    rowsData.forEach(rowData => {
+                        excelHtml += '<tr>';
+                        excelHtml += `<td class="col-model">${rowData[0]}</td>`;
+                        for (let colIdx = 1; colIdx < rowData.length; colIdx++) {
+                            excelHtml += `<td>${rowData[colIdx]}</td>`;
+                        }
+                        excelHtml += '</tr>';
+                    });
+
+                    excelHtml += `
+                      </tbody>
+                    </table>
+                    </body>
+                    </html>
+                    `;
+
+                    const blob = new Blob([excelHtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.setAttribute('href', url);
+                    
+                    const activeMonthName = document.querySelector('.filter-content select[name="FilterBulan"] option:checked')?.textContent.trim() || 'Inventory';
+                    const activeYear = document.querySelector('.filter-content input[name="FilterTahun"]')?.value || '';
+                    link.setAttribute('download', `Inventory_${activeMonthName}_${activeYear}.xls`);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                });
+            }
+
+            const sel = document.querySelector('.filter-content select[name="FilterMachineLine"]');
+            if (sel && sel.value) sel.classList.add('selected');
+            if (sel) sel.addEventListener('change', function () {
+                this.value ? this.classList.add('selected') : this.classList.remove('selected');
+            });
+        });
+    </script>
+</body>
+</html>
