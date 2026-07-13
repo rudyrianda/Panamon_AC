@@ -16,6 +16,7 @@ namespace MonitoringSystem.Pages.Shared
         public List<SapPlanRecord> listSapPlans = new List<SapPlanRecord>(); // ← BARU: SAP Plan dari Excel
         private readonly IConfiguration _configuration;
         private string connectionString;
+        private static readonly string[] ShiftLabels = { "NS", "1", "2", "3" };
 
         public string? ProductNames { get; set; }
         public string? MachineCode { get; set; }
@@ -50,7 +51,7 @@ namespace MonitoringSystem.Pages.Shared
             getListModelName();
             InsertProductionPlanNow();
             getTotalQuantity();
-        }   
+        }
 
 
         public IActionResult getListModelName()
@@ -157,7 +158,7 @@ namespace MonitoringSystem.Pages.Shared
 
                     // ── 1. AMBIL SAP PLAN (dari tabel SapPlan) ──────────────────────────
                     string querySapPlan = @"
-                        SELECT SP.Id, SP.ProductName, SP.SapPlanNormal, SP.SapPlanOvertime
+                        SELECT SP.Id, SP.ProductName, SP.SapPlanNormal, SP.SapPlanOvertime, SP.Shift
                         FROM SapPlan SP
                         INNER JOIN ProductionPlan PP ON SP.PlanId = PP.Id
                         WHERE PP.CurrentDate = @CurrentDate
@@ -178,7 +179,8 @@ namespace MonitoringSystem.Pages.Shared
                                     Id = reader.GetInt32(0),
                                     ModelName = reader.IsDBNull(1) ? "" : reader.GetString(1),
                                     SapPlanNormal = reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
-                                    SapPlanOvertime = reader.IsDBNull(3) ? 0 : reader.GetInt32(3)
+                                    SapPlanOvertime = reader.IsDBNull(3) ? 0 : reader.GetInt32(3),
+                                    Shift = reader.IsDBNull(4) ? "NS" : reader.GetString(4)   // ← BARU
                                 });
                             }
                         }
@@ -222,7 +224,8 @@ namespace MonitoringSystem.Pages.Shared
 
                                 // ── Cari SAP Plan yang cocok berdasarkan ProductName ──
                                 var matchingSap = listSapPlans.FirstOrDefault(s =>
-                                    s.ModelName?.Trim().ToLower() == record.ModelName?.Trim().ToLower());
+                                    s.ModelName?.Trim().ToLower() == record.ModelName?.Trim().ToLower() &&
+                                    s.Shift == record.Shift);   // ← TAMBAHAN
                                 if (matchingSap != null)
                                 {
                                     record.SapPlanNormal = matchingSap.SapPlanNormal;
@@ -790,24 +793,29 @@ namespace MonitoringSystem.Pages.Shared
 
                                         for (int day = 1; day <= daysInMonth; day++)
                                         {
-                                            int colNormal = 3 + ((day - 1) * 2);
-                                            int colOvertime = colNormal + 1;
+                                            int colBase = 3 + ((day - 1) * 8);
 
-                                            var valNormal = worksheet.Cells[row, colNormal].Value;
-                                            var valOvertime = worksheet.Cells[row, colOvertime].Value;
-
-                                            int qtyNormal = 0;
-                                            int qtyOvertime = 0;
-
-                                            if (valNormal != null) int.TryParse(valNormal.ToString(), out qtyNormal);
-                                            if (valOvertime != null) int.TryParse(valOvertime.ToString(), out qtyOvertime);
-
-                                            if (qtyNormal > 0 || qtyOvertime > 0)
+                                            for (int s = 0; s < ShiftLabels.Length; s++)
                                             {
-                                                DateTime currentDate = new DateTime(TargetYear, TargetMonth, day);
-                                                int planId = GetOrCreatePlanId(connection, transaction, currentDate);
-                                                InsertSapPlanFromExcel(connection, transaction, planId, modelName, TargetMachine, qtyNormal, qtyOvertime);
-                                                totalSaved++;
+                                                int colNormal = colBase + (s * 2);
+                                                int colOvertime = colNormal + 1;
+
+                                                var valNormal = worksheet.Cells[row, colNormal].Value;
+                                                var valOvertime = worksheet.Cells[row, colOvertime].Value;
+
+                                                int qtyNormal = 0;
+                                                int qtyOvertime = 0;
+                                                if (valNormal != null) int.TryParse(valNormal.ToString(), out qtyNormal);
+                                                if (valOvertime != null) int.TryParse(valOvertime.ToString(), out qtyOvertime);
+
+                                                if (qtyNormal > 0 || qtyOvertime > 0)
+                                                {
+                                                    DateTime currentDate = new DateTime(TargetYear, TargetMonth, day);
+                                                    int planId = GetOrCreatePlanId(connection, transaction, currentDate);
+                                                    InsertSapPlanFromExcel(connection, transaction, planId, modelName, TargetMachine,
+                                                        qtyNormal, qtyOvertime, ShiftLabels[s]);
+                                                    totalSaved++;
+                                                }
                                             }
                                         }
                                     }
@@ -856,20 +864,20 @@ namespace MonitoringSystem.Pages.Shared
         }
 
         // ── INSERT KE SapPlan (dari Excel) ─────────────────────────────────────
-        private void InsertSapPlanFromExcel(SqlConnection conn, SqlTransaction trans, int planId, string modelName, string machineCode, int normalQty, int overtimeQty)
+        private void InsertSapPlanFromExcel(SqlConnection conn, SqlTransaction trans, int planId, string modelName, string machineCode, int normalQty, int overtimeQty, string shift)
         {
             string query = @"
-                IF EXISTS (SELECT 1 FROM SapPlan WHERE PlanId = @PlanId AND ProductName = @Pn AND MachineCode = @Mc)
-                BEGIN
-                    UPDATE SapPlan 
-                    SET SapPlanNormal = @Normal, SapPlanOvertime = @Overtime
-                    WHERE PlanId = @PlanId AND ProductName = @Pn AND MachineCode = @Mc;
-                END
-                ELSE
-                BEGIN
-                    INSERT INTO SapPlan (PlanId, ProductName, MachineCode, SapPlanNormal, SapPlanOvertime)
-                    VALUES (@PlanId, @Pn, @Mc, @Normal, @Overtime);
-                END";
+        IF EXISTS (SELECT 1 FROM SapPlan WHERE PlanId = @PlanId AND ProductName = @Pn AND MachineCode = @Mc AND Shift = @Shift)
+        BEGIN
+            UPDATE SapPlan 
+            SET SapPlanNormal = @Normal, SapPlanOvertime = @Overtime
+            WHERE PlanId = @PlanId AND ProductName = @Pn AND MachineCode = @Mc AND Shift = @Shift;
+        END
+        ELSE
+        BEGIN
+            INSERT INTO SapPlan (PlanId, ProductName, MachineCode, SapPlanNormal, SapPlanOvertime, Shift)
+            VALUES (@PlanId, @Pn, @Mc, @Normal, @Overtime, @Shift);
+        END";
 
             using (SqlCommand cmd = new SqlCommand(query, conn, trans))
             {
@@ -878,10 +886,11 @@ namespace MonitoringSystem.Pages.Shared
                 cmd.Parameters.AddWithValue("@Mc", machineCode);
                 cmd.Parameters.AddWithValue("@Normal", normalQty);
                 cmd.Parameters.AddWithValue("@Overtime", overtimeQty > 0 ? (object)overtimeQty : DBNull.Value);
+                cmd.Parameters.AddWithValue("@Shift", shift);
                 cmd.ExecuteNonQuery();
             }
         }
-        
+
         public IActionResult OnGetDownloadTemplate()
         {
             var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "data", "productionplan", "ProductionPlan_Template.xlsx");
@@ -921,6 +930,7 @@ namespace MonitoringSystem.Pages.Shared
             public string? ModelName { get; set; }
             public int SapPlanNormal { get; set; }
             public int SapPlanOvertime { get; set; }
+            public string? Shift { get; set; }
         }
 
         public class SubmitCount

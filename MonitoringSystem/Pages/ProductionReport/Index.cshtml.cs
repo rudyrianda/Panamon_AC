@@ -272,19 +272,25 @@ DailyAggregates AS (
     GROUP BY ReportDate
 )
 SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
-
+            string sapShiftFilter = "";
+            if (!SelectedShifts.Contains("All") && SelectedShifts.Any())
+            {
+                var sapShiftConditions = SelectedShifts.Select(s => $"sp.Shift = '{s}'");
+                sapShiftFilter = $"AND ({string.Join(" OR ", sapShiftConditions)})";
+            }
             string sapPlanSql = $@"
-    SELECT DAY(pp.CurrentDate) as Day,
-           SUM(ISNULL(sp.SapPlanNormal, 0)) as TotalSapNormal,
-           SUM(ISNULL(sp.SapPlanOvertime, 0)) as TotalSapOvertime
-    FROM ProductionPlan pp
-    INNER JOIN SapPlan sp ON pp.Id = sp.PlanId
-    WHERE YEAR(pp.CurrentDate) = @SelectedYear
-      AND MONTH(pp.CurrentDate) = @SelectedMonth
-      {(MachineLine != "All"
-           ? "AND sp.MachineCode = @MachineLine"
-           : "AND sp.MachineCode IN ('MCH1-01', 'MCH1-02')")}
-    GROUP BY DAY(pp.CurrentDate)";
+                            SELECT DAY(pp.CurrentDate) as Day,
+                                   SUM(ISNULL(sp.SapPlanNormal, 0)) as TotalSapNormal,
+                                   SUM(ISNULL(sp.SapPlanOvertime, 0)) as TotalSapOvertime
+                            FROM ProductionPlan pp
+                            INNER JOIN SapPlan sp ON pp.Id = sp.PlanId
+                            WHERE YEAR(pp.CurrentDate) = @SelectedYear
+                              AND MONTH(pp.CurrentDate) = @SelectedMonth
+                              {(MachineLine != "All"
+                           ? "AND sp.MachineCode = @MachineLine"
+                           : "AND sp.MachineCode IN ('MCH1-01', 'MCH1-02')")}
+                              {sapShiftFilter}
+                            GROUP BY DAY(pp.CurrentDate)";
 
             try
             {
