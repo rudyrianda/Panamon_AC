@@ -58,13 +58,15 @@ if (!builder.Environment.IsDevelopment())
 var app = builder.Build();
 
 // ✅ FIX 2: Warm up database (tetap dipertahankan, bagus)
-using (var scope = app.Services.CreateScope())
+try
 {
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await db.Database.ExecuteSqlRawAsync("SELECT 1");
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.ExecuteSqlRawAsync("SELECT 1");
 
-    // Auto-migrate database columns for shift quantities in ProductionRecords table
-    string addColumnsSql = @"
+        // Auto-migrate database columns for shift quantities in ProductionRecords table
+        string addColumnsSql = @"
         IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ProductionRecords') AND name = 'QtyShift1')
         BEGIN
             ALTER TABLE ProductionRecords ADD QtyShift1 INT NULL;
@@ -81,8 +83,14 @@ using (var scope = app.Services.CreateScope())
         BEGIN
             ALTER TABLE ProductionRecords ADD QtyShiftNS INT NULL;
         END";
-    await db.Database.ExecuteSqlRawAsync(addColumnsSql);
+        await db.Database.ExecuteSqlRawAsync(addColumnsSql);
+    }
 }
+catch (Exception ex)
+{
+    Console.WriteLine($"⚠️ DB warm-up skipped (DB not reachable): {ex.Message}");
+}
+
 
 if (!app.Environment.IsDevelopment())
 {

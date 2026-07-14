@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Data.SqlClient;
 using MonitoringSystem.Data;
@@ -9,8 +9,8 @@ namespace MonitoringSystem.Pages.Performance
 {
     public class PerformanceModel : PageModel
     {
-        public string connectionString = "Server=localhost\\SQLEXPRESS01;Database=PROMOSYS;Trusted_Connection=True;TrustServerCertificate=True;";
-        //public string connectionString = "Data Source=DESKTOP-NBPATD6\\MSSQLSERVERR;trusted_connection=true;trustservercertificate=True;Database=PROMOSYS;Integrated Security=True;Encrypt=False";
+       
+        //public string connectionString = "Dat public string connectionString = "Server=10.83.33.103;User Id=sa;Password=sa;Database=PROMOSYS;Trusted_Connection=False;TrustServerCertificate=True;Encrypt=False";a Source=DESKTOP-NBPATD6\\MSSQLSERVERR;trusted_connection=true;trustservercertificate=True;Database=PROMOSYS;Integrated Security=True;Encrypt=False";
         public string errorMessage = "";
 
         private readonly ApplicationDbContext _context;
