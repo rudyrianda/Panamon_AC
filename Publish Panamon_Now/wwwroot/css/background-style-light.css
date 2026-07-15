@@ -1,0 +1,741 @@
+﻿/* ========== LIGHT MODE BACKGROUND ========== */
+html.light-mode {
+    background-color: #e8f0f7;
+    background-image: url('../assets/BackgroundPanamonLight.jpg');
+    background-attachment: fixed;
+    background-size: cover;
+    background-position: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+}
+
+body.light-mode {
+    background: transparent !important;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    color: #1a1a2e !important;
+}
+
+    body.light-mode.auth-body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.15);
+        z-index: -1;
+    }
+
+    /* ========== HEADER ========== */
+    body.light-mode .header-right p,
+    body.light-mode .header-center span {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode .header-center .brand-o {
+        border-color: #1a1a2e !important;
+    }
+
+        body.light-mode .header-center .brand-o::before {
+            background-color: #1a1a2e !important;
+        }
+
+    body.light-mode .header-right p:first-child::after {
+        color: #1a1a2e !important;
+    }
+
+    /* ========== SIDEBAR ========== */
+    body.light-mode #bdSidebar {
+        background: rgba(255, 255, 255, 0.15) !important;
+        backdrop-filter: blur(10px) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.3) !important;
+    }
+
+        body.light-mode #bdSidebar .nav-label,
+        body.light-mode #bdSidebar a,
+        body.light-mode #bdSidebar i {
+            color: #1a1a2e !important;
+        }
+
+            body.light-mode #bdSidebar a:hover {
+                background: rgba(255, 255, 255, 0.3) !important;
+                border-radius: 8px;
+            }
+
+            body.light-mode #bdSidebar a.active {
+                background: rgba(255, 255, 255, 0.35) !important;
+                border-radius: 8px;
+            }
+
+    body.light-mode .logout-btn {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode #themeToggle {
+        color: #1a1a2e !important;
+    }
+
+    /* ========== MAIN CONTENT WRAPPER ========== */
+    body.light-mode .main-content-wrapper {
+        background: transparent !important;
+    }
+
+    /* ========== CHART BOX ========== */
+    body.light-mode #dayDiv,
+    body.light-mode .chart-box {
+        background: rgba(255, 255, 255, 0.50) !important;
+        backdrop-filter: blur(8px) !important;
+        border-color: rgba(255, 255, 255, 0.5) !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+    }
+
+    body.light-mode .chart-box-title {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode .chart-box-line {
+        background: rgba(0, 0, 0, 0.1) !important;
+    }
+
+    body.light-mode h5 {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode .chart-box h5 {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode canvas {
+        filter: none !important;
+    }
+
+    /* ========== FILTER AREA ========== */
+    body.light-mode .filter-content label,
+    body.light-mode .filter-content .form-check-label {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode .filter-content .form-control {
+        background-color: rgba(255, 255, 255, 0.65) !important;
+        border-color: rgba(0, 0, 0, 0.25) !important;
+        color: #1a1a2e !important;
+    }
+
+        body.light-mode .filter-content .form-control:focus {
+            background-color: rgba(255, 255, 255, 0.88) !important;
+            border-color: rgba(61, 121, 176, 0.5) !important;
+            color: #1a1a2e !important;
+            box-shadow: 0 0 0 0.2rem rgba(61, 121, 176, 0.12) !important;
+        }
+
+    body.light-mode .filter-content .form-select-sm {
+        background-color: rgba(255, 255, 255, 0.5) !important;
+        border-color: rgba(0, 0, 0, 0.2) !important;
+        color: #1a1a2e !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+    }
+
+        body.light-mode .filter-content .form-select-sm option {
+            background-color: #ffffff !important;
+            color: #1a1a2e !important;
+        }
+
+    body.light-mode .filter-content .form-select {
+        background-color: rgba(255, 255, 255, 0.5) !important;
+        border-color: rgba(0, 0, 0, 0.2) !important;
+        color: #1a1a2e !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+    }
+
+        body.light-mode .filter-content .form-select option {
+            background-color: #ffffff !important;
+            color: #1a1a2e !important;
+        }
+
+    /* Filter buttons */
+    body.light-mode .filter-content .btn-primary {
+        background-color: rgba(61, 121, 176, 0.85) !important;
+        border-color: rgba(61, 121, 176, 0.9) !important;
+        color: #ffffff !important;
+    }
+
+        body.light-mode .filter-content .btn-primary:hover {
+            background-color: rgba(35, 90, 150, 0.95) !important;
+            color: #ffffff !important;
+        }
+
+    body.light-mode .filter-content .btn-danger {
+        background-color: rgba(180, 40, 50, 0.85) !important;
+        border-color: rgba(200, 60, 70, 0.9) !important;
+        color: #ffffff !important;
+    }
+
+        body.light-mode .filter-content .btn-danger:hover {
+            background-color: rgba(160, 30, 40, 0.95) !important;
+            color: #ffffff !important;
+        }
+
+    body.light-mode .filter-content .btn-success {
+        background-color: rgba(25, 135, 84, 0.85) !important;
+        border-color: rgba(25, 135, 84, 0.9) !important;
+        color: #ffffff !important;
+    }
+
+        body.light-mode .filter-content .btn-success:hover {
+            background-color: rgba(18, 108, 66, 0.95) !important;
+            color: #ffffff !important;
+        }
+
+    body.light-mode .form-select {
+        color: #1a1a2e !important;
+        background-color: rgba(255, 255, 255, 0.5) !important;
+        border-color: rgba(0, 0, 0, 0.2) !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+    }
+
+        body.light-mode .form-select option {
+            color: #1a1a2e !important;
+            background-color: #ffffff !important;
+        }
+
+    /* ========== SHIFT BUTTONS ========== */
+    body.light-mode .shift-button {
+        background-color: rgba(255, 255, 255, 0.5) !important;
+        border-color: rgba(0, 0, 0, 0.2) !important;
+        color: #1a1a2e !important;
+    }
+
+        body.light-mode .shift-button:hover {
+            background-color: rgba(255, 255, 255, 0.65) !important;
+        }
+
+        body.light-mode .shift-button.active {
+            background-color: rgba(255, 255, 255, 0.75) !important;
+            border-color: rgba(0, 0, 0, 0.4) !important;
+            color: #1a1a2e !important;
+            font-weight: 700;
+        }
+
+    /* ========== BUTTONS (global fallback, NON-modal) ========== */
+    /* CATATAN: Tombol di dalam .modal di-handle oleh site.css Section 18b */
+    body.light-mode .btn-warning {
+        background-color: rgba(255, 193, 7, 0.90) !important;
+        border-color: rgba(200, 150, 0, 0.7) !important;
+        color: #1a1a2e !important;
+    }
+
+        body.light-mode .btn-warning:hover {
+            background-color: rgba(230, 170, 0, 1) !important;
+            color: #1a1a2e !important;
+        }
+
+    /* ========== GARIS SEPARATOR ========== */
+    body.light-mode .panamon-bottom-line {
+        border-top-color: rgba(0, 0, 0, 0.1) !important;
+        background: rgba(0, 0, 0, 0.03) !important;
+    }
+
+    body.light-mode .panamon-bottomm-line {
+        border-bottom-color: rgba(0, 0, 0, 0.1) !important;
+        background: rgba(0, 0, 0, 0.03) !important;
+    }
+
+    /* ========== TABLE RESPONSIVE WRAPPER ========== */
+    body.light-mode .table-responsive {
+        background: rgba(255, 255, 255, 0.35) !important;
+        backdrop-filter: blur(4px) !important;
+        border-radius: 8px;
+    }
+
+    /* ========== TABLE HEADER ========== */
+    body.light-mode table.table thead th,
+    body.light-mode .table thead th,
+    body.light-mode .table > thead > tr > th {
+        background-color: rgba(25, 35, 58, 0.92) !important;
+        color: #ffffff !important;
+        border-color: rgba(255, 255, 255, 0.25) !important;
+        border-bottom-color: rgba(100, 181, 246, 0.5) !important;
+    }
+
+    body.light-mode table.table thead tr:nth-child(2) th,
+    body.light-mode .table thead tr:nth-child(2) th {
+        background-color: rgba(30, 40, 60, 0.90) !important;
+        color: #ffffff !important;
+    }
+
+    /* ========== TABLE BODY ========== */
+    body.light-mode table.table tbody td,
+    body.light-mode .table tbody td,
+    body.light-mode .table tbody th {
+        color: #1a1a2e !important;
+        background-color: rgba(255, 255, 255, 0.50) !important;
+        border-color: rgba(0, 0, 0, 0.07) !important;
+    }
+
+    body.light-mode table.table-bordered > :not(caption) > * {
+        border-color: rgba(0, 0, 0, 0.08) !important;
+    }
+
+    body.light-mode .table tbody tr:nth-of-type(odd) td,
+    body.light-mode .table tbody tr:nth-of-type(odd) th,
+    body.light-mode .table tbody tr:nth-of-type(even) td,
+    body.light-mode .table tbody tr:nth-of-type(even) th {
+        background-color: rgba(255, 255, 255, 0.50) !important;
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode .table-secondary td {
+        background-color: rgba(200, 210, 230, 0.5) !important;
+        color: #1a1a2e !important;
+        font-weight: 700;
+    }
+
+    body.light-mode .table-dark td {
+        background-color: rgba(30, 50, 90, 0.85) !important;
+        color: #ffffff !important;
+        font-weight: 700;
+    }
+
+    body.light-mode .table tbody tr:hover td,
+    body.light-mode .table tbody tr:hover th {
+        background-color: rgba(100, 181, 246, 0.20) !important;
+        transition: background-color 0.2s ease;
+    }
+
+    body.light-mode .table th,
+    body.light-mode .table td {
+        color: #1a1a2e !important;
+    }
+
+        /* Input di dalam tabel */
+        body.light-mode .table td input.form-control,
+        body.light-mode .table td textarea.form-control {
+            background-color: rgba(255, 255, 255, 0.80) !important;
+            border: 1px solid rgba(0, 0, 0, 0.18) !important;
+            color: #1a1a2e !important;
+            border-radius: 5px !important;
+        }
+
+            body.light-mode .table td input.form-control:focus,
+            body.light-mode .table td textarea.form-control:focus {
+                background-color: rgba(255, 255, 255, 0.96) !important;
+                border-color: rgba(61, 121, 176, 0.55) !important;
+                box-shadow: 0 0 0 0.15rem rgba(61, 121, 176, 0.15) !important;
+                color: #1a1a2e !important;
+            }
+
+        body.light-mode .table td input:disabled {
+            background-color: rgba(220, 228, 240, 0.60) !important;
+            color: rgba(26, 26, 46, 0.55) !important;
+            border-color: rgba(0, 0, 0, 0.10) !important;
+        }
+
+    /* ========== DETAIL LOSS TIME TABLE ========== */
+    body.light-mode #lossTimeTable thead th {
+        background-color: rgba(30, 40, 60, 0.90) !important;
+        color: #ffffff !important;
+        border-color: rgba(0, 0, 0, 0.15) !important;
+    }
+
+    body.light-mode #lossTimeTable tbody td {
+        color: #1a1a2e !important;
+        border-color: rgba(0, 0, 0, 0.07) !important;
+        background-color: rgba(255, 255, 255, 0.50) !important;
+    }
+
+    body.light-mode #lossTimeTable tbody tr:hover td {
+        background-color: rgba(100, 181, 246, 0.20) !important;
+    }
+
+    /* ========== DETAILED REASON MODAL (Loss Time) ========== */
+    body.light-mode #detailedReasonModal .modal-content {
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        color: #1a1a2e !important;
+        border: 1px solid rgba(0, 0, 0, 0.15) !important;
+    }
+
+    body.light-mode #detailedReasonModal .modal-header {
+        background-color: rgba(240, 245, 255, 0.95) !important;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+    }
+
+    body.light-mode #detailedReasonModal .modal-title {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode #detailedReasonModal .btn-close-white {
+        filter: invert(1) !important;
+    }
+
+    body.light-mode #detailedReasonModal .modal-body {
+        background-color: transparent !important;
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode #detailedReasonModal #detailedReasonText {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode #detailedReasonModal .modal-footer {
+        background-color: rgba(240, 245, 255, 0.95) !important;
+        border-top: 1px solid rgba(0, 0, 0, 0.1) !important;
+    }
+
+    body.light-mode #detailedReasonModal .btn-secondary {
+        background-color: rgba(100, 110, 130, 0.85) !important;
+        border-color: rgba(80, 90, 110, 0.9) !important;
+        color: #ffffff !important;
+    }
+
+        body.light-mode #detailedReasonModal .btn-secondary:hover {
+            background-color: rgba(75, 85, 105, 0.95) !important;
+            color: #ffffff !important;
+        }
+
+    /* View button (btn-info) inside lossTimeTable */
+    body.light-mode #lossTimeTable .btn-info {
+        background-color: rgba(13, 110, 180, 0.85) !important;
+        border-color: rgba(13, 110, 180, 0.9) !important;
+        color: #ffffff !important;
+    }
+
+        body.light-mode #lossTimeTable .btn-info:hover {
+            background-color: rgba(9, 85, 145, 0.95) !important;
+            border-color: rgba(9, 85, 145, 1) !important;
+            color: #ffffff !important;
+        }
+
+    /* ========== CARD ========== */
+    body.light-mode .card {
+        background: rgba(255, 255, 255, 0.55) !important;
+        backdrop-filter: blur(8px) !important;
+        border-color: rgba(255, 255, 255, 0.55) !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10) !important;
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode .card-header {
+        background-color: rgba(255, 255, 255, 0.35) !important;
+        border-bottom-color: rgba(0, 0, 0, 0.1) !important;
+    }
+
+        body.light-mode .card-title,
+        body.light-mode .card-header h5,
+        body.light-mode .card-header .card-title,
+        body.light-mode .card-header h5.card-title {
+            color: #1a1a2e !important;
+        }
+
+    body.light-mode .card label,
+    body.light-mode .card p,
+    body.light-mode .card span,
+    body.light-mode .card h1, body.light-mode .card h2,
+    body.light-mode .card h3, body.light-mode .card h4,
+    body.light-mode .card h5, body.light-mode .card h6,
+    body.light-mode .card .fw-bold {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode .card-footer {
+        background-color: rgba(255, 255, 255, 0.2) !important;
+        border-top-color: rgba(0, 0, 0, 0.1) !important;
+    }
+
+        body.light-mode .card-footer .fw-bold,
+        body.light-mode .card-footer span {
+            color: #1a1a2e !important;
+        }
+
+    /* ========== PAGINATION ========== */
+    body.light-mode .pagination .page-link {
+        background-color: rgba(255, 255, 255, 0.5) !important;
+        border-color: rgba(0, 0, 0, 0.2) !important;
+        color: #1a1a2e !important;
+    }
+
+        body.light-mode .pagination .page-link:hover {
+            background-color: rgba(255, 255, 255, 0.65) !important;
+            border-color: rgba(0, 0, 0, 0.3) !important;
+            color: #1a1a2e !important;
+        }
+
+    body.light-mode .pagination .page-item.active .page-link {
+        background-color: rgba(100, 181, 246, 0.6) !important;
+        border-color: rgba(100, 181, 246, 0.8) !important;
+        color: #ffffff !important;
+    }
+
+    body.light-mode .pagination .page-item.disabled .page-link {
+        background-color: rgba(255, 255, 255, 0.2) !important;
+        border-color: rgba(0, 0, 0, 0.1) !important;
+        color: rgba(0, 0, 0, 0.3) !important;
+    }
+
+    /* ========== ALERT ========== */
+    body.light-mode .alert-warning {
+        background-color: rgba(255, 193, 7, 0.15) !important;
+        border-color: rgba(255, 193, 7, 0.3) !important;
+        color: #1a1a2e !important;
+    }
+
+    /* ========== FOOTER ========== */
+    body.light-mode .footer-copyright p {
+        color: #1a1a2e !important;
+        font-size: 11px !important;
+    }
+
+    /* ========== SCROLLBAR ========== */
+    body.light-mode ::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    body.light-mode ::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.2);
+    }
+
+        body.light-mode ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.35);
+        }
+
+/* Fix sticky column header */
+.table thead tr:first-child th:nth-child(2) {
+    position: static !important;
+    background-color: rgba(30, 40, 60, 1) !important;
+    box-shadow: none !important;
+    border-right: none !important;
+}
+
+/* ====================================================
+   QUALITY PAGE THEME FIX - LIGHT MODE
+   ==================================================== */
+
+body.light-mode .grid-border {
+    background: rgba(255, 255, 255, 0.55) !important;
+    backdrop-filter: blur(8px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.6) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode .btn-blue-active {
+    background-color: var(--panasonic-blue) !important;
+    color: #ffffff !important;
+    border: 1px solid var(--panasonic-blue) !important;
+}
+
+body.light-mode .kpi-value {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    color: #1a1a2e !important;
+}
+
+body.light-mode .dashboard-container .btn-blue-active {
+    background-color: rgba(61, 121, 176, 0.88) !important;
+    border-color: rgba(61, 121, 176, 0.9) !important;
+    color: #ffffff !important;
+}
+
+/* ====================================================
+   CATATAN PENTING:
+   Semua styling MODAL (dark & light mode) ada di site.css Section 18.
+   File ini TIDAK mengandung override modal sama sekali.
+   Ini mencegah konflik CSS antar file.
+   ==================================================== */
+body.light-mode .kpi-box canvas,
+body.light-mode canvas {
+    color: #555555;
+}
+/* ========== SORT DROPDOWN DETAIL LOSS TIME ========== */
+body.light-mode #sortSelect {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    border-color: rgba(0, 0, 0, 0.2) !important;
+    color: #1a1a2e !important;
+}
+
+    body.light-mode #sortSelect option {
+        background-color: #ffffff !important;
+        color: #1a1a2e !important;
+    }
+/* ====================================================
+   MACHINE PAGE — LIGHT MODE FIX
+   Tambahkan blok ini ke lightmode.css
+   ==================================================== */
+
+/* Info Card — model name, labels, stat rows */
+body.light-mode .info-model-lbl {
+    color: rgba(26, 26, 46, 0.55) !important;
+}
+
+body.light-mode .info-model-name {
+    color: #1a1a2e !important;
+}
+
+body.light-mode .stat-row {
+    border-top-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode .stat-lbl {
+    color: rgba(26, 26, 46, 0.55) !important;
+}
+
+body.light-mode .stat-val {
+    color: #1a1a2e !important;
+}
+
+    body.light-mode .stat-val.neg {
+        color: #c53030 !important;
+    }
+
+    body.light-mode .stat-val.pos {
+        color: #276749 !important;
+    }
+
+/* Shift Card — shift labels, rows, scroll */
+body.light-mode .shift-card {
+    overflow-y: auto;
+}
+
+    body.light-mode .shift-card::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05) !important;
+    }
+
+    body.light-mode .shift-card::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.18) !important;
+    }
+
+body.light-mode .shift-lbl {
+    color: #185FA5 !important;
+}
+
+body.light-mode .shift-row {
+    color: rgba(26, 26, 46, 0.55) !important;
+}
+
+    body.light-mode .shift-row span:last-child {
+        color: #1a1a2e !important;
+    }
+
+/* OEE Card — donut center value, legend */
+body.light-mode .oee-card .card-title {
+    color: rgba(26, 26, 46, 0.6) !important;
+}
+
+body.light-mode .donut-center {
+    color: #1a1a2e !important;
+}
+
+body.light-mode .legend-item {
+    color: rgba(26, 26, 46, 0.75) !important;
+}
+
+/* Plan & Actual card title */
+body.light-mode .pa-card .card-title {
+    color: rgba(26, 26, 46, 0.6) !important;
+}
+
+/* Gantt card — labels dan track */
+body.light-mode .gantt-card .card-title {
+    color: rgba(26, 26, 46, 0.6) !important;
+}
+
+body.light-mode .gantt-lbl {
+    color: rgba(26, 26, 46, 0.5) !important;
+}
+
+body.light-mode .gantt-track {
+    background: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Machine page — card-title global (uppercase labels) */
+body.light-mode .card-title {
+    color: rgba(26, 26, 46, 0.6) !important;
+}
+
+/* Filter area slider group text — Machine page */
+body.light-mode .filter-content .slider-group {
+    color: rgba(26, 26, 46, 0.85) !important;
+}
+
+    body.light-mode .filter-content .slider-group b {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode .filter-content .slider-group input[type=range] {
+        accent-color: #185FA5 !important;
+    }
+
+/* Machine select dropdown */
+body.light-mode #mdp-machine-select {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    border-color: rgba(0, 0, 0, 0.2) !important;
+    color: #1a1a2e !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+}
+
+    body.light-mode #mdp-machine-select option {
+        background-color: #ffffff !important;
+        color: #1a1a2e !important;
+    }
+
+/* ====================================================
+   LOSS TIME PAGE — LIGHT MODE PATCH TAMBAHAN
+   ==================================================== */
+
+/* MTT info badge */
+body.light-mode .mtt-info-badge {
+    color: rgba(26, 26, 46, 0.65) !important;
+    background: rgba(100, 100, 120, 0.12) !important;
+    border-color: rgba(100, 100, 120, 0.25) !important;
+}
+
+/* MTT top info bar */
+body.light-mode #mttTopInfoBar {
+    background: rgba(61, 121, 176, 0.07) !important;
+    border-color: rgba(61, 121, 176, 0.2) !important;
+    color: rgba(26, 26, 46, 0.75) !important;
+}
+
+    body.light-mode #mttTopInfoBar .mtt-top-label {
+        color: #185FA5 !important;
+    }
+
+/* sortSelect & chartCategoryFilter — override base hardcoded dark bg */
+body.light-mode #sortSelect,
+body.light-mode #chartCategoryFilter {
+    background-color: rgba(255, 255, 255, 0.6) !important;
+    border-color: rgba(61, 121, 176, 0.5) !important;
+    color: #1a1a2e !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 6px center !important;
+    background-size: 9px 9px !important;
+}
+
+    body.light-mode #sortSelect option,
+    body.light-mode #chartCategoryFilter option {
+        background-color: #ffffff !important;
+        color: #1a1a2e !important;
+    }
+
+/* mttCountBadge text */
+body.light-mode #mttCountBadge {
+    color: rgba(26, 26, 46, 0.7) !important;
+}
+
+/* tableFilterBadge */
+body.light-mode #tableFilterBadge {
+    background: rgba(100, 110, 130, 0.12) !important;
+    border-color: rgba(100, 110, 130, 0.3) !important;
+    color: rgba(26, 26, 46, 0.65) !important;
+}
+
+/* Daily chart title */
+body.light-mode #dailyChartTitle {
+    color: #1a1a2e !important;
+}
+
+    body.light-mode #dailyChartTitle small {
+        color: rgba(26, 26, 46, 0.6) !important;
+    }
