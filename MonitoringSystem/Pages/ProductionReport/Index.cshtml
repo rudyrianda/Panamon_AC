@@ -1017,12 +1017,26 @@
             const isCurrentMonth = @Html.Raw(Json.Serialize(Model.IsCurrentMonthView));
             const today = new Date().getDate();
             
+            // true jika filter shift = All (atau kosong)
+            const isAllShift = @Html.Raw(Json.Serialize(
+                !Model.SelectedShifts.Any() || Model.SelectedShifts.Contains("All")
+            ));
+
+            const isNoShift = @Html.Raw(Json.Serialize(
+                Model.SelectedShifts.Count == 1 && Model.SelectedShifts.Contains("NS")
+            ));
+
             const chartChangePlanData = planData.map((v, i) => {
                 const dayIndex = i + 1;
+                if (isNoShift && dayIndex > 5) return null; // hilangkan untuk NS selain tgl 1-5 sesuai request
+
                 if (v > 0) {
+                    // Ada change plan beneran → tampilkan untuk semua shift
                     return effectivePlanData[i];
                 } else {
-                    if (isCurrentMonth && (dayIndex === today || dayIndex === today + 1)) {
+                    // Fallback: tampilkan SAP plan sebagai bar ungu hanya saat filter All
+                    // dan hari ini atau besok belum di-input production plan
+                    if (isAllShift && isCurrentMonth && (dayIndex === today || dayIndex === today + 1)) {
                         return (originalPlanData[i] || 0) + (originalPlanOvertimeData[i] || 0);
                     }
                     return null;
