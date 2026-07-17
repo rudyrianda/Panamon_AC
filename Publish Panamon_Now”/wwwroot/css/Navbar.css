@@ -1,0 +1,36 @@
+﻿.mynav {
+    color: #fff;
+    margin-top: 30px;
+}
+
+    .mynav li {
+        margin-bottom: 12px;
+    }
+
+        .mynav li a {
+            color: #fff;
+            text-decoration: none;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.25s ease;
+        }
+
+            .mynav li a i {
+                width: 22px;
+                text-align: center;
+                font-size: 16px;
+            }
+
+            .mynav li a:hover {
+                background: rgba(255,255,255,0.18);
+            }
+
+            .mynav li a.active {
+                background: rgba(255,255,255,0.25);
+            }

@@ -1,0 +1,803 @@
+﻿/* ========================================
+   MACHINE PAGE CSS
+   ======================================== */
+
+/* FILTER AREA WITH LINES */
+.filter-area-with-lines {
+    position: relative;
+    padding: 1px 0;
+    margin-bottom: 8px;
+    margin-top: -20px;
+    min-height: 10px;
+    width: calc(100% - 14px);
+    margin-left: 7px;
+    margin-right: 7px;
+}
+
+.panamon-bottom-line,
+.panamon-bottomm-line {
+    position: absolute !important;
+    left: 7px !important;
+    right: 7px !important;
+    width: calc(100% - 14px) !important;
+    height: 2px !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    z-index: 999 !important;
+    pointer-events: none !important;
+    display: block !important;
+}
+
+.panamon-bottom-line {
+    top: 0 !important;
+    border-top: 2px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.panamon-bottomm-line {
+    bottom: 0 !important;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* FILTER CONTENT */
+.filter-content {
+    position: relative;
+    z-index: 2;
+    padding: 6px 7px;
+}
+
+    .filter-content label {
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 12px;
+        line-height: 20px;
+    }
+
+/* ========================================
+   FILTER SELECT (Month / Year) - DARK MODE
+   ======================================== */
+.filter-select {
+    height: 28px;
+    padding: 0 28px 0 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    color: #ffffff;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 10px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+    .filter-select:focus {
+        background-color: rgba(255, 255, 255, 0.10);
+        border-color: rgba(255, 255, 255, 0.8);
+        color: #ffffff;
+        box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.1);
+    }
+
+    .filter-select option {
+        background-color: rgba(30, 40, 60, 0.98);
+        color: #ffffff;
+        font-size: 12px;
+    }
+
+    /* Bold saat sudah ada nilai terpilih (via JS) */
+    .filter-select.selected {
+        font-weight: 700 !important;
+    }
+
+/* ========================================
+   BUTTONS - DARK MODE
+   ======================================== */
+.filter-content .btn {
+    border-radius: 999px !important;
+    height: 28px;
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+/* Search button - dark */
+.filter-content .btn-primary {
+    background-color: rgba(8, 65, 150, 0.95);
+    border: 2px solid rgba(100, 181, 246, 1);
+    color: rgba(100, 181, 246, 1);
+}
+
+    .filter-content .btn-primary:hover {
+        background-color: rgba(5, 45, 110, 1);
+        border-color: rgba(144, 202, 249, 1);
+        color: rgba(144, 202, 249, 1);
+    }
+
+/* Upload button - dark */
+.filter-content .btn-success {
+    background-color: rgba(18, 90, 48, 0.92);
+    border: 2px solid rgba(129, 199, 132, 0.85);
+    color: rgba(129, 199, 132, 1);
+}
+
+    .filter-content .btn-success:hover {
+        background-color: rgba(12, 70, 35, 1);
+        border-color: rgba(165, 214, 167, 1);
+        color: rgba(165, 214, 167, 1);
+    }
+
+/* ========================================
+   LIGHT MODE - FILTER AREA
+   ======================================== */
+
+/* Label */
+body.light-mode .filter-content label {
+    color: #1a1a2e !important;
+}
+
+/* Separator lines */
+body.light-mode .panamon-bottom-line {
+    border-top-color: rgba(0, 0, 0, 0.12) !important;
+    background: rgba(0, 0, 0, 0.03) !important;
+}
+
+body.light-mode .panamon-bottomm-line {
+    border-bottom-color: rgba(0, 0, 0, 0.12) !important;
+    background: rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Filter Select - light */
+body.light-mode .filter-select {
+    background-color: rgba(255, 255, 255, 0.75) !important;
+    border: 2px solid rgba(0, 0, 0, 0.22) !important;
+    color: #1a1a2e !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 8px center !important;
+    background-size: 10px !important;
+}
+
+    body.light-mode .filter-select:focus {
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        border-color: rgba(61, 121, 176, 0.6) !important;
+        color: #1a1a2e !important;
+        box-shadow: 0 0 0 0.2rem rgba(61, 121, 176, 0.12) !important;
+    }
+
+    body.light-mode .filter-select option {
+        background-color: #ffffff !important;
+        color: #1a1a2e !important;
+    }
+
+/* Search button - light */
+body.light-mode .filter-content .btn-primary {
+    background-color: rgba(61, 121, 176, 0.88) !important;
+    border: 2px solid rgba(61, 121, 176, 0.9) !important;
+    color: #ffffff !important;
+}
+
+    body.light-mode .filter-content .btn-primary:hover {
+        background-color: rgba(35, 90, 150, 0.95) !important;
+        border-color: rgba(35, 90, 150, 1) !important;
+        color: #ffffff !important;
+    }
+
+/* Upload button - light */
+body.light-mode .filter-content .btn-success {
+    background-color: rgba(25, 135, 84, 0.88) !important;
+    border: 2px solid rgba(25, 135, 84, 0.9) !important;
+    color: #ffffff !important;
+}
+
+    body.light-mode .filter-content .btn-success:hover {
+        background-color: rgba(18, 108, 66, 0.95) !important;
+        border-color: rgba(18, 108, 66, 1) !important;
+        color: #ffffff !important;
+    }
+
+/* ========================================
+   FACTORY MAP
+   ======================================== */
+.factory-map-wrapper {
+    position: relative;
+    width: calc(47% - 14px);
+    max-height: none;
+    margin: 0 7px 8px 7px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(158, 163, 174, 0.5);
+    background-color: #14223D;
+}
+
+.factory-map-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+}
+
+/* SVG OVERLAY */
+#line-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+/*.connector-line {
+    stroke: rgba(255, 255, 255, 0.6);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 2;
+    marker-end: url(#arrowhead);
+} */
+
+/* BALLOON */
+.info-balloon {
+    position: absolute;
+    background-color: rgba(255, 255, 255, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    color: #ffffff;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    min-width: 60px;
+    max-width: 150px;
+    max-height: 40px;
+    padding: 6px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    transition: max-width 0.4s ease, max-height 0.4s ease, background-color 0.3s, padding 0.4s ease;
+    cursor: default;
+}
+
+.balloon-title {
+    font-size: 0.45rem;
+    font-weight: bold;
+    text-align: center;
+    white-space: nowrap;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.balloon-details {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    font-size: 0.45rem;
+    transition: max-height 0.4s ease, opacity 0.3s ease;
+    width: 100%;
+}
+
+.info-balloon::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 18px solid rgba(255, 255, 255, 0.25);
+    transition: border-color 0.3s;
+}
+
+.info-balloon.tacked-from-top::after {
+    top: auto;
+    bottom: 100%;
+    border-top: none;
+    border-bottom: 18px solid rgba(255, 255, 255, 0.25);
+}
+
+.alert-balloon {
+    background-color: rgba(217, 4, 41, 0.5);
+    border-color: rgba(217, 4, 41, 0.9);
+    cursor: pointer;
+}
+
+    .alert-balloon::after {
+        border-top-color: rgba(217, 4, 41, 0.5);
+    }
+
+    .alert-balloon.tacked-from-top::after {
+        border-bottom-color: rgba(217, 4, 41, 0.5);
+    }
+
+.info-balloon.expanded {
+    max-width: 280px;
+    max-height: 220px;
+    z-index: 20;
+    align-items: flex-start;
+    padding: 12px 15px;
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+    .info-balloon.expanded .balloon-details {
+        max-height: 160px;
+        opacity: 1;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+/* POSISI BALLOON */
+#machine-300t-new {
+    top: 71%;
+    left: 89%;
+}
+
+#machine-300t {
+    top: 51%;
+    left: 87%;
+}
+
+#machine-200t {
+    top: 43%;
+    left: 86%;
+}
+
+#machine-400t {
+    top: 62%;
+    left: 89%;
+}
+
+#machine-110t-amada {
+    top: 29%;
+    left: 72%;
+}
+
+#machine-110t-komatsu {
+    top: 36%;
+    left: 88%;
+}
+
+#machine-sf-250 {
+    top: 12%;
+    left: 69%;
+}
+
+#machine-fix-80 {
+    top: 12%;
+    left: 60%;
+}
+
+#machine-fix-12 {
+    top: 12%;
+    left: 51%;
+}
+
+#machine-fix-36 {
+    top: 12%;
+    left: 42%;
+}
+
+#machine-kyoshin-ori {
+    top: 30%;
+    left: 43%;
+}
+
+#machine-kyoshin {
+    top: 30%;
+    left: 61%;
+}
+
+#machine-li-chin {
+    top: 30%;
+    left: 52%;
+}
+
+#machine-14-row {
+    top: 14%;
+    left: 84%;
+}
+
+#machine-7-row {
+    top: 26%;
+    left: 85%;
+}
+
+#outdoor-unit-marker {
+    top: 35%;
+    left: 24%;
+    max-width: 175px;
+}
+
+#indoor-unit-marker {
+    top: 51%;
+    left: 12%;
+    max-width: 175px;
+}
+
+#oven {
+    top: 45%;
+    left: 59%;
+}
+
+#evap {
+    top: 65%;
+    left: 53%;
+}
+
+#cond {
+    top: 70%;
+    left: 76%;
+}
+
+/* LAYOUT */
+.container-fluid {
+    max-width: 100%;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.main-content-wrapper {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+    .main-content-wrapper .p-4 {
+        padding-left: 1px !important;
+        padding-right: 1px !important;
+    }
+
+#machineContainer {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+    #machineContainer > .container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+/* ========================================
+   MACHINE LAYOUT ROW (denah + tabel)
+   ======================================== */
+.machine-layout-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    width: calc(100% - 14px);
+    margin: 0 7px 8px 7px;
+}
+
+    .machine-layout-row .factory-map-wrapper {
+        width: 55%;
+        flex-shrink: 0;
+        margin: 0;
+    }
+
+/* ========================================
+   TABEL KANAN
+   ======================================== */
+.machine-table-wrapper {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    height: fit-content;
+}
+
+.machine-table-box {
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 120px);
+}
+
+.machine-table-header {
+    padding: 10px 14px 8px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    flex-shrink: 0; /* ← ADDED: header tidak ikut shrink */
+}
+
+.machine-table-title {
+    font-size: 0.9rem; /* ← INCREASED dari 0.8rem */
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.3px;
+}
+
+.machine-table-scroll {
+    overflow-y: auto;
+    flex: 1; /* ← CHANGED: hapus max-height, pakai flex:1 */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+.machine-eff-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px; /* ← INCREASED dari 11px */
+    color: #eaeaea;
+}
+
+    .machine-eff-table thead th {
+        position: sticky;
+        top: 0;
+        background-color: rgba(30, 40, 60, 1);
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 13px; /* ← INCREASED dari 11px */
+        padding: 9px 10px; /* ← INCREASED dari 7px 8px */
+        text-align: center;
+        border-bottom: 2px solid rgba(100, 181, 246, 0.4);
+        /*border-right: 1px solid rgba(255, 255, 255, 0.1);*/
+        white-space: nowrap;
+    }
+
+        .machine-eff-table thead th:last-child {
+            border-right: none;
+        }
+
+    .machine-eff-table tbody td {
+        padding: 8px 10px; /* ← INCREASED dari 5px 8px */
+        text-align: center;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        /*border-right: 1px solid rgba(255, 255, 255, 0.06);*/
+        vertical-align: middle;
+    }
+
+        .machine-eff-table tbody td:last-child {
+            border-right: none;
+        }
+
+        .machine-eff-table tbody td.td-machine-name {
+            text-align: center;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+    .machine-eff-table tbody tr:hover td {
+        background-color: rgba(100, 181, 246, 0.1);
+        transition: background-color 0.15s ease;
+    }
+
+    .machine-eff-table tbody tr:nth-of-type(even) td {
+        background-color: rgba(255, 255, 255, 0.03);
+    }
+
+/* ========================================
+   ACHIEVEMENT BADGE
+   ======================================== */
+.achievement-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px; /* ← INCREASED dari 10px */
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+
+.badge-excellent {
+    background-color: rgba(46,160,67,0.25);
+    border: 1px solid rgba(46,160,67,0.7);
+    color: #4cde6e;
+}
+
+.badge-good {
+    background-color: rgba(100,181,246,0.2);
+    border: 1px solid rgba(100,181,246,0.6);
+    color: #90caf9;
+}
+
+.badge-average {
+    background-color: rgba(255,193,7,0.2);
+    border: 1px solid rgba(255,193,7,0.6);
+    color: #ffd54f;
+}
+
+.badge-poor {
+    background-color: rgba(217,4,41,0.2);
+    border: 1px solid rgba(217,4,41,0.6);
+    color: #ff6b6b;
+}
+
+.badge-na {
+    background-color: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.4);
+}
+
+/* BAR PROGRESS */
+.eff-bar {
+    position: relative;
+    background-color: rgba(199, 203, 255, 0.2);
+    height: 20px; /* ← INCREASED dari 18px */
+    border-radius: 3px;
+    overflow: hidden;
+    min-width: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .eff-bar .eff-fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        background-color: #4F86F3;
+        border-radius: 3px;
+        transition: width 0.4s ease;
+    }
+
+    .eff-bar .eff-text {
+        position: relative;
+        z-index: 1;
+        font-size: 11px; /* ← INCREASED dari 10px */
+        font-weight: 700;
+        color: #ffffff;
+    }
+
+.no-data {
+    text-align: center !important;
+    color: rgba(255, 255, 255, 0.35);
+    padding: 2rem 0 !important;
+    font-size: 13px; /* ← INCREASED dari 11px */
+}
+
+/* ========================================
+   LIGHT MODE - FACTORY MAP & TABLE
+   ======================================== */
+
+body.light-mode .factory-map-wrapper {
+    background-color: rgba(255, 255, 255, 0.55) !important;
+    border-color: rgba(0, 0, 0, 0.15) !important;
+    backdrop-filter: blur(8px) !important;
+}
+
+body.light-mode .info-balloon {
+    background-color: rgba(255, 255, 255, 0.55) !important;
+    border-color: rgba(0, 0, 0, 0.25) !important;
+    color: #1a1a2e !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15) !important;
+}
+
+    body.light-mode .info-balloon::after {
+        border-top-color: rgba(255, 255, 255, 0.55) !important;
+    }
+
+    body.light-mode .info-balloon.tacked-from-top::after {
+        border-bottom-color: rgba(255, 255, 255, 0.55) !important;
+    }
+
+    body.light-mode .info-balloon.expanded {
+        background-color: rgba(255, 255, 255, 0.75) !important;
+    }
+
+body.light-mode .balloon-title {
+    color: #1a1a2e !important;
+    text-shadow: none !important;
+}
+
+body.light-mode .balloon-details {
+    color: #1a1a2e !important;
+    border-top-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+body.light-mode .alert-balloon {
+    background-color: rgba(217, 4, 41, 0.45) !important;
+    border-color: rgba(217, 4, 41, 0.8) !important;
+}
+
+    body.light-mode .alert-balloon::after {
+        border-top-color: rgba(217, 4, 41, 0.45) !important;
+    }
+
+    body.light-mode .alert-balloon.tacked-from-top::after {
+        border-bottom-color: rgba(217, 4, 41, 0.45) !important;
+    }
+
+body.light-mode .connector-line {
+    stroke: rgba(0, 0, 0, 0.35) !important;
+}
+
+body.light-mode #line-overlay #arrowhead polygon {
+    fill: rgba(0, 0, 0, 0.35) !important;
+}
+
+body.light-mode .machine-table-box {
+    background: rgba(255, 255, 255, 0.55) !important;
+    border-color: rgba(255, 255, 255, 0.6) !important;
+    backdrop-filter: blur(8px) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode .machine-table-header {
+    border-bottom-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-mode .machine-table-title {
+    color: #1a1a2e !important;
+}
+
+body.light-mode .machine-table-scroll {
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent !important;
+}
+
+body.light-mode .machine-eff-table thead th {
+    background-color: rgba(25, 35, 58, 0.92) !important;
+    color: #ffffff !important;
+    border-bottom-color: rgba(100, 181, 246, 0.5) !important;
+    border-right-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+body.light-mode .machine-eff-table tbody td {
+    color: #1a1a2e !important;
+    background-color: rgba(255, 255, 255, 0.45) !important;
+    border-bottom-color: rgba(0, 0, 0, 0.07) !important;
+    border-right-color: rgba(0, 0, 0, 0.07) !important;
+}
+
+body.light-mode .machine-eff-table tbody tr:nth-of-type(even) td {
+    background-color: rgba(255, 255, 255, 0.30) !important;
+}
+
+body.light-mode .machine-eff-table tbody tr:hover td {
+    background-color: rgba(100, 181, 246, 0.15) !important;
+}
+
+body.light-mode .eff-bar {
+    background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+    body.light-mode .eff-bar .eff-fill {
+        background-color: rgba(61, 121, 176, 0.85) !important;
+    }
+
+    body.light-mode .eff-bar .eff-text {
+        color: #1a1a2e !important;
+    }
+
+body.light-mode .no-data {
+    color: rgba(26, 26, 46, 0.4) !important;
+}
+
+/* LIGHT MODE - Achievement Badge */
+body.light-mode .badge-excellent {
+    background-color: rgba(46,160,67,0.15) !important;
+    border-color: rgba(46,160,67,0.6) !important;
+    color: #1a7a35 !important;
+}
+
+body.light-mode .badge-good {
+    background-color: rgba(61,121,176,0.15) !important;
+    border-color: rgba(61,121,176,0.6) !important;
+    color: #235a9b !important;
+}
+
+body.light-mode .badge-average {
+    background-color: rgba(230,160,0,0.15) !important;
+    border-color: rgba(230,160,0,0.6) !important;
+    color: #a07000 !important;
+}
+
+body.light-mode .badge-poor {
+    background-color: rgba(217,4,41,0.12) !important;
+    border-color: rgba(217,4,41,0.5) !important;
+    color: #b0001e !important;
+}
+
+body.light-mode .badge-na {
+    background-color: rgba(0,0,0,0.05) !important;
+    border-color: rgba(0,0,0,0.2) !important;
+    color: rgba(26,26,46,0.4) !important;
+}

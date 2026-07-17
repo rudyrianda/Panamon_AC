@@ -1,0 +1,461 @@
+﻿/* ============================================================
+   FILTER AREA
+============================================================ */
+.filter-area-with-lines {
+    position: relative;
+    padding: 1px 0;
+    margin-bottom: -63px !important;
+    margin-top: -20px;
+    min-height: 10px;
+    width: calc(100% - 14px);
+    margin-left: 7px;
+    margin-right: 7px;
+}
+
+.panamon-bottom-line,
+.panamon-bottomm-line {
+    position: absolute !important;
+    left: -13px !important;
+    right: -13px !important;
+    height: 2px !important;
+    background: rgba(255,255,255,0.04) !important;
+    z-index: 999 !important;
+    pointer-events: none !important;
+    display: block !important;
+}
+
+.panamon-bottom-line {
+    top: 0 !important;
+    border-top: 2px solid rgba(255,255,255,0.08) !important;
+}
+
+.panamon-bottomm-line {
+    bottom: 0 !important;
+    border-bottom: 2px solid rgba(255,255,255,0.08) !important;
+}
+
+body.light-mode .panamon-bottom-line {
+    border-top-color: rgba(0,0,0,0.10) !important;
+    background: rgba(0,0,0,0.03) !important;
+}
+
+body.light-mode .panamon-bottomm-line {
+    border-bottom-color: rgba(0,0,0,0.10) !important;
+    background: rgba(0,0,0,0.03) !important;
+}
+
+.filter-content {
+    position: relative;
+    z-index: 2;
+    padding: 6px 0;
+    border-radius: 15px;
+    margin-left: -8px;
+    margin-right: 7px;
+}
+
+    .filter-content .form-select,
+    .filter-content .form-control {
+        height: 28px;
+        padding: 0 22px 0 8px;
+        font-size: 12px;
+        line-height: 20px;
+        border-radius: 999px;
+        background-color: rgba(255,255,255,0.05);
+        border: 2px solid rgba(255,255,255,0.5);
+        color: #ffffff;
+        text-align: center;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+    }
+
+    .filter-content .form-select {
+        padding: 0 !important;
+        padding-left: 12px !important;
+        padding-right: 28px !important;
+        line-height: 16px;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        background-size: 10px 10px;
+    }
+
+        .filter-content .form-select option {
+            background-color: rgb(30,40,60);
+            color: #ffffff;
+            font-size: 12px;
+        }
+
+        .filter-content .form-select.selected {
+            font-weight: 700 !important;
+        }
+
+    .filter-content .form-control[type="number"] {
+        height: 28px;
+        padding: 0 8px;
+        font-size: 12px;
+        line-height: 20px;
+        border-radius: 999px;
+        background-color: rgba(255,255,255,0.05);
+        border: 2px solid rgba(255,255,255,0.5);
+        color: #ffffff;
+        text-align: center;
+    }
+
+        .filter-content .form-control[type="number"]:focus {
+            border-color: rgba(100,181,246,1);
+            box-shadow: 0 0 0 0.2rem rgba(100,181,246,0.25);
+        }
+
+    .filter-content label {
+        color: rgba(255,255,255,0.85);
+        font-size: 12px;
+        line-height: 20px;
+    }
+
+    .filter-content .btn {
+        height: 28px;
+        min-height: 20px;
+        padding: 0 12px;
+        font-size: 12px;
+        line-height: 20px;
+        border-radius: 999px !important;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .filter-content .btn-primary {
+        background-color: rgba(8,65,150,0.95);
+        border: 2px solid rgba(100,181,246,1);
+        color: rgba(100,181,246,1);
+    }
+
+        .filter-content .btn-primary:hover {
+            background-color: rgba(5,45,110,1);
+            border-color: rgba(144,202,249,1);
+            color: rgba(144,202,249,1);
+        }
+
+    .filter-content .btn-danger {
+        background-color: rgba(140,30,40,0.95);
+        border: 2px solid rgba(239,154,154,1);
+        color: rgba(239,154,154,1);
+    }
+
+        .filter-content .btn-danger:hover {
+            background-color: rgba(110,20,30,1);
+            border-color: rgba(244,143,177,1);
+            color: rgba(244,143,177,1);
+        }
+
+    .filter-content .btn-success {
+        background-color: rgba(20,110,50,0.95);
+        border: 2px solid rgba(165,220,180,1);
+        color: rgba(165,220,180,1);
+    }
+
+        .filter-content .btn-success:hover {
+            background-color: rgba(15,80,35,1);
+            border-color: rgba(195,240,205,1);
+            color: rgba(195,240,205,1);
+        }
+
+body.light-mode .filter-content label {
+    color: #1a1a2e !important;
+}
+
+body.light-mode .filter-content .form-select {
+    background-color: rgba(255,255,255,0.5) !important;
+    border-color: rgba(0,0,0,0.2) !important;
+    color: #1a1a2e !important;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+}
+
+    body.light-mode .filter-content .form-select option {
+        background-color: #ffffff !important;
+        color: #1a1a2e !important;
+    }
+
+body.light-mode .filter-content .btn-primary {
+    background-color: rgba(61,121,176,0.85) !important;
+    border-color: rgba(61,121,176,0.9) !important;
+    color: #ffffff !important;
+}
+
+body.light-mode .filter-content .btn-danger {
+    background-color: rgba(180,40,50,0.85) !important;
+    border-color: rgba(200,60,70,0.9) !important;
+    color: #ffffff !important;
+}
+
+body.light-mode .filter-content .btn-success {
+    background-color: rgba(40,167,69,0.85) !important;
+    border-color: rgba(40,167,69,0.9) !important;
+    color: #ffffff !important;
+}
+
+body.light-mode .filter-content .form-control[type="number"] {
+    background-color: rgba(255,255,255,0.5) !important;
+    border-color: rgba(0,0,0,0.2) !important;
+    color: #1a1a2e !important;
+}
+
+    body.light-mode .filter-content .form-control[type="number"]:focus {
+        border-color: rgba(61,121,176,1);
+        box-shadow: 0 0 0 0.2rem rgba(61,121,246,0.25);
+    }
+
+/* ============================================================
+   CARD WRAPPER
+============================================================ */
+.inv-card {
+    margin: 75px 12px 8px;
+    background: rgba(255,255,255,0.20) !important;
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.3) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+body.light-mode .inv-card {
+    background: rgba(255,255,255,0.55) !important;
+    border: 2px solid rgba(200,215,235,0.80) !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.10) !important;
+}
+
+.inv-table-container {
+    overflow: hidden;
+}
+
+:root {
+    --sb-w: 8px;
+}
+
+/* ── HEADER: scroll horizontal disinkron via JS, tidak discroll manual ──
+   PENTING: tidak ada padding kiri-kanan, harus sama persis dengan body ── */
+.inv-header-wrap {
+    overflow: hidden;
+    background: rgba(30,40,60,1) !important;
+    padding: 0;
+    padding-right: var(--sb-w);
+    box-sizing: content-box;
+}
+
+    .inv-header-wrap table {
+        table-layout: fixed;
+    }
+
+/* ── BODY: scroll horizontal + vertikal
+   PENTING: padding hanya atas-bawah, TIDAK ada padding kiri-kanan
+   supaya posisi kolom mentok pas sejajar dengan header ── */
+.inv-body-wrap {
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: calc(100vh - 320px);
+    padding: 0px 0;
+}
+
+    .inv-body-wrap table {
+        table-layout: fixed;
+    }
+
+/* Cursor grab/drag diterapkan ke seluruh container (header+body+footer)
+   supaya terasa jadi satu area scroll yang menyatu ── */
+.inv-table-container {
+    cursor: grab;
+}
+
+    .inv-table-container.active-dragging {
+        cursor: grabbing;
+        user-select: none;
+    }
+
+.inv-body-wrap::-webkit-scrollbar {
+    height: var(--sb-w);
+    width: var(--sb-w);
+    background: rgba(255,255,255,0.05);
+}
+
+.inv-body-wrap::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.18);
+    border-radius: 4px;
+}
+
+body.light-mode .inv-body-wrap::-webkit-scrollbar {
+    background: rgba(0,0,0,0.05);
+}
+
+body.light-mode .inv-body-wrap::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.15);
+}
+
+/* ── FOOTER (TOTAL): sekarang jadi pemilik scrollbar horizontal utama,
+   jadi scrollbar-nya muncul di posisi paling bawah, bukan di tengah ── */
+.inv-footer-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: rgba(20,30,48,1) !important;
+    padding: 0;
+    padding-right: var(--sb-w);
+    box-sizing: content-box;
+}
+
+    .inv-footer-wrap table {
+        table-layout: fixed;
+    }
+
+    .inv-footer-wrap::-webkit-scrollbar {
+        height: var(--sb-w);
+        width: var(--sb-w);
+        background: rgba(255,255,255,0.05);
+    }
+
+    .inv-footer-wrap::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.18);
+        border-radius: 4px;
+    }
+
+body.light-mode .inv-footer-wrap {
+    background: rgb(240, 240, 240) !important;
+}
+
+    body.light-mode .inv-footer-wrap::-webkit-scrollbar {
+        background: rgba(0,0,0,0.05);
+    }
+
+    body.light-mode .inv-footer-wrap::-webkit-scrollbar-thumb {
+        background: rgba(0,0,0,0.15);
+    }
+
+/* ============================================================
+   INVENTORY TABLE
+============================================================ */
+.inv-tbl {
+    --bs-table-bg: transparent;
+    --bs-table-color: #ffffff;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    margin: 0;
+}
+
+    .inv-tbl thead th {
+        background: rgba(30,40,60,1) !important;
+        color: #fff !important;
+        border: 1px solid rgba(255,255,255,0.3) !important;
+        text-align: center;
+    }
+
+    .inv-tbl tbody td,
+    .inv-tbl tbody th {
+        background-color: rgb(58, 74, 107) !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255,255,255,0.25) !important;
+        padding: 5px 4px;
+        font-size: 12px;
+        vertical-align: middle;
+    }
+
+body.light-mode .inv-tbl thead th {
+    background: rgba(25,35,58,0.92) !important;
+    color: #ffffff !important;
+    border-color: rgba(255,255,255,0.25) !important;
+}
+
+body.light-mode .inv-tbl tbody td,
+body.light-mode .inv-tbl tbody th {
+    background-color: rgb(222, 231, 243) !important;
+    color: #1a1a2e !important;
+    border: 1px solid rgba(0,0,0,0.12) !important;
+}
+
+/* Baris TOTAL di footer table */
+.inv-tbl tfoot td,
+.inv-tbl tfoot th {
+    background-color: rgb(40, 55, 84) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255,255,255,0.3) !important;
+    padding: 5px 4px;
+    font-size: 12px;
+    font-weight: 700;
+    vertical-align: middle;
+}
+
+body.light-mode .inv-tbl tfoot td,
+body.light-mode .inv-tbl tfoot th {
+    background-color: rgb(240, 240, 240) !important;
+    color: #1a1a2e !important;
+    border: 1px solid rgba(0,0,0,0.15) !important;
+}
+
+/* ── Kolom Model nempel di kiri, tidak ikut ke-scroll horizontal ──
+   (sticky bekerja karena masing2 tabel scroll horizontal-nya sendiri;
+    scrollLeft header & footer disinkron ke body via JS) ── */
+.inv-tbl .col-model {
+    position: sticky !important;
+    z-index: 10 !important;
+    left: 0 !important;
+    box-shadow: none !important;
+    text-align: center;
+    opacity: 1 !important;
+}
+
+.inv-tbl thead .col-model {
+    z-index: 11 !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+}
+
+.inv-tbl tfoot .col-model {
+    z-index: 11 !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+}
+
+/* Background solid supaya konten di belakang sticky cell tidak tembus */
+.inv-tbl thead .col-model {
+    background: rgb(30, 40, 60) !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+}
+
+body.light-mode .inv-tbl thead .col-model {
+    background: rgb(25, 35, 58) !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+}
+
+.inv-tbl tbody .col-model {
+    background: rgb(38, 50, 74) !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+}
+
+body.light-mode .inv-tbl tbody td.col-model {
+    background: rgb(255, 255, 255) !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+}
+
+.inv-tbl tfoot .col-model {
+    background: rgb(40, 55, 84) !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+}
+
+body.light-mode .inv-tbl tfoot td.col-model {
+    background: rgb(240, 240, 240) !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+}
+
+/* ============================================================
+   COLUMN WIDTHS
+============================================================ */
+.inv-tbl .col-model {
+    width: 200px !important;
+}
+
+.inv-tbl .col-day {
+    width: 56px !important;
+}
