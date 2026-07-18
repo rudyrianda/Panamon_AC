@@ -66,13 +66,58 @@ namespace MonitoringSystem.Pages.Inventory
                             o.Product_Id,
                             ISNULL(m.ProductName, o.Product_Id) AS Model,
                             o.MachineCode,
-                            CAST(DATEADD(hour, -7, o.SDate) AS DATE) AS ReportDate,
+                            CASE
+                                WHEN CAST(o.SDate AS TIME) < '07:00:00' THEN CAST(DATEADD(DAY, -1, o.SDate) AS DATE)
+                                ELSE CAST(o.SDate AS DATE)
+                            END AS ReportDate,
+                            o.SDate,
                             o.TotalUnit,
-                            LAG(o.TotalUnit) OVER (PARTITION BY o.MachineCode ORDER BY o.SDate) AS PreviousUnit
+                            o.ShiftMode AS Mode_Asli_Mesin,
+                            CASE 
+                                WHEN o.ShiftMode = 'NON-SHIFT' THEN
+                                    CASE 
+                                        WHEN MONTH(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 7 AND YEAR(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 2026 AND DAY(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) <= 5 THEN 'NON-SHIFT'
+                                        WHEN CAST(o.SDate AS TIME) >= '07:00:00' AND CAST(o.SDate AS TIME) <= '15:45:00' THEN 'SHIFT 1'
+                                        WHEN CAST(o.SDate AS TIME) > '15:45:00' AND CAST(o.SDate AS TIME) <= '18:00:00' THEN 'OVERTIME SHIFT 1'
+                                        WHEN CAST(o.SDate AS TIME) > '18:00:00' AND CAST(o.SDate AS TIME) <= '23:15:00' THEN 'OVERTIME SHIFT 3'
+                                        ELSE 'SHIFT 3'
+                                    END
+                                WHEN o.ShiftMode LIKE 'OVERTIME%' THEN
+                                    CASE 
+                                        WHEN MONTH(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 7 AND YEAR(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 2026 AND DAY(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) <= 5 THEN 'OVERTIME'
+                                        WHEN CAST(o.SDate AS TIME) >= '15:45:00' AND CAST(o.SDate AS TIME) <= '18:00:00' THEN 'OVERTIME SHIFT 1'
+                                        WHEN CAST(o.SDate AS TIME) > '18:00:00' AND CAST(o.SDate AS TIME) <= '23:15:00' THEN 'OVERTIME SHIFT 3'
+                                        WHEN CAST(o.SDate AS TIME) > '23:15:00' OR CAST(o.SDate AS TIME) <= '07:00:00' THEN 'SHIFT 3'
+                                        ELSE 'OVERTIME'
+                                    END
+                                WHEN o.ShiftMode = 'SHIFT 2' AND MONTH(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 7 AND YEAR(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 2026 THEN
+                                    CASE 
+                                        WHEN CAST(o.SDate AS TIME) >= '07:00:00' AND CAST(o.SDate AS TIME) <= '15:45:00' THEN 'SHIFT 1'
+                                        WHEN CAST(o.SDate AS TIME) > '15:45:00' AND CAST(o.SDate AS TIME) <= '18:00:00' THEN 'OVERTIME SHIFT 1'
+                                        WHEN CAST(o.SDate AS TIME) > '18:00:00' AND CAST(o.SDate AS TIME) <= '23:15:00' THEN 'OVERTIME SHIFT 3'
+                                        ELSE 'SHIFT 3'
+                                    END
+                                WHEN o.ShiftMode = 'SHIFT 3' AND CAST(o.SDate AS TIME) > '18:00:00' AND CAST(o.SDate AS TIME) <= '23:15:00' THEN 'OVERTIME SHIFT 3'
+                                ELSE o.ShiftMode
+                            END AS Status_Di_Web
                         FROM OEESN o
                         LEFT JOIN MasterData m ON m.Product_Id = o.Product_Id
-                        WHERE o.SDate >= DATEADD(hour, 7, @startDate) AND o.SDate < DATEADD(hour, 7, @endDate)
+                        WHERE (
+                            (YEAR(o.SDate) = YEAR(@startDate) AND MONTH(o.SDate) = MONTH(@startDate) AND CAST(o.SDate AS TIME) >= '07:00:00')
+                            OR
+                            (o.SDate >= DATEADD(DAY, 1, @startDate) AND o.SDate < @endDate AND CAST(o.SDate AS TIME) < '07:00:00')
+                        )
                         {machineFilter}
+                    ),
+                    LaggedData AS (
+                        SELECT 
+                            Product_Id,
+                            Model,
+                            MachineCode,
+                            ReportDate,
+                            TotalUnit,
+                            LAG(TotalUnit) OVER (PARTITION BY ReportDate, MachineCode, Mode_Asli_Mesin, Status_Di_Web ORDER BY SDate) AS PreviousUnit
+                        FROM ShiftData
                     ),
                     ShiftDataFiltered AS (
                         SELECT 
@@ -85,7 +130,7 @@ namespace MonitoringSystem.Pages.Inventory
                                 WHEN TotalUnit < PreviousUnit THEN 0
                                 ELSE TotalUnit - PreviousUnit
                             END AS DeltaUnit
-                        FROM ShiftData
+                        FROM LaggedData
                     )
                     SELECT 
                         Product_Id AS Data_Id,
