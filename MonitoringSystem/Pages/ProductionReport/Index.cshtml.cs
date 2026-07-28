@@ -37,6 +37,7 @@ namespace MonitoringSystem.Pages.ProductionReport
         public List<int> PlanOvertimeData { get; private set; } = new List<int>();
         public List<int> EffectivePlanData { get; private set; } = new List<int>();
         public List<int> EffectivePlanOvertimeData { get; private set; } = new List<int>();
+        public List<double> DailyNetManHours { get; private set; } = new List<double>();
 
         private class DailyData
         {
@@ -61,6 +62,16 @@ namespace MonitoringSystem.Pages.ProductionReport
             public TimeSpan? OT_S1_Time { get; set; } = null;
             public TimeSpan? OT_S3_Time { get; set; } = null;
             public TimeSpan? OT_Normal_Time { get; set; } = null;
+            public int Shift1_MaxOp { get; set; } = 0;
+            public int Shift2_MaxOp { get; set; } = 0;
+            public int Shift3_MaxOp { get; set; } = 0;
+            public int NonShift_MaxOp { get; set; } = 0;
+            public int Overtime_MaxOp { get; set; } = 0;
+            public int Shift1_ActiveCount { get; set; } = 0;
+            public int Shift2_ActiveCount { get; set; } = 0;
+            public int Shift3_ActiveCount { get; set; } = 0;
+            public int NonShift_ActiveCount { get; set; } = 0;
+            public int Overtime_ActiveCount { get; set; } = 0;
         }
 
         public class RestTime { public int Duration { get; set; } public TimeSpan StartTime { get; set; } public TimeSpan EndTime { get; set; } }
@@ -307,6 +318,18 @@ MachineDaily AS (
         MAX(CASE WHEN Status_Di_Web = 'OVERTIME SHIFT 3' AND Estimasi_Produksi > 0 THEN CAST(Max_SDate AS TIME) END) as OT_S3_Time,
         MAX(CASE WHEN Status_Di_Web = 'OVERTIME' AND Estimasi_Produksi > 0 THEN CAST(Max_SDate AS TIME) END) as OT_Normal_Time,
 
+        CASE WHEN SUM(CASE WHEN Status_Di_Web = 'SHIFT 1' THEN Estimasi_Produksi ELSE 0 END) > 0 OR MAX(CASE WHEN Status_Di_Web = 'SHIFT 1' THEN CAST(Max_SDate AS TIME) END) IS NOT NULL THEN 1 ELSE 0 END as S1_ActiveCount,
+        CASE WHEN SUM(CASE WHEN Status_Di_Web = 'SHIFT 2' THEN Estimasi_Produksi ELSE 0 END) > 0 OR MAX(CASE WHEN Status_Di_Web = 'SHIFT 2' THEN CAST(Max_SDate AS TIME) END) IS NOT NULL THEN 1 ELSE 0 END as S2_ActiveCount,
+        CASE WHEN SUM(CASE WHEN Status_Di_Web = 'SHIFT 3' THEN Estimasi_Produksi ELSE 0 END) > 0 OR MAX(CASE WHEN Status_Di_Web = 'SHIFT 3' THEN CAST(Max_SDate AS TIME) END) IS NOT NULL THEN 1 ELSE 0 END as S3_ActiveCount,
+        CASE WHEN SUM(CASE WHEN Status_Di_Web = 'NON-SHIFT' THEN Estimasi_Produksi ELSE 0 END) > 0 OR MAX(CASE WHEN Status_Di_Web = 'NON-SHIFT' THEN CAST(Max_SDate AS TIME) END) IS NOT NULL THEN 1 ELSE 0 END as NS_ActiveCount,
+        CASE WHEN SUM(CASE WHEN Status_Di_Web LIKE 'OVERTIME%' THEN Estimasi_Produksi ELSE 0 END) > 0 OR MAX(CASE WHEN Status_Di_Web LIKE 'OVERTIME%' THEN CAST(Max_SDate AS TIME) END) IS NOT NULL THEN 1 ELSE 0 END as OT_ActiveCount,
+
+        MAX(CASE WHEN Status_Di_Web = 'SHIFT 1' THEN MaxOp END) as S1_MaxOp,
+        MAX(CASE WHEN Status_Di_Web = 'SHIFT 2' THEN MaxOp END) as S2_MaxOp,
+        MAX(CASE WHEN Status_Di_Web = 'SHIFT 3' THEN MaxOp END) as S3_MaxOp,
+        MAX(CASE WHEN Status_Di_Web = 'NON-SHIFT' THEN MaxOp END) as NS_MaxOp,
+        MAX(CASE WHEN Status_Di_Web LIKE 'OVERTIME%' THEN MaxOp END) as OT_MaxOp,
+
         MAX(MaxOp) as MaxOp,
         SUM(Estimasi_Produksi) as TotalUnit
     FROM GroupedData
@@ -329,6 +352,16 @@ DailyAggregates AS (
         MAX(OT_S1_Time) as OT_S1_Time,
         MAX(OT_S3_Time) as OT_S3_Time,
         MAX(OT_Normal_Time) as OT_Normal_Time,
+        SUM(ISNULL(S1_MaxOp, 0)) as S1_MaxOp,
+        SUM(ISNULL(S2_MaxOp, 0)) as S2_MaxOp,
+        SUM(ISNULL(S3_MaxOp, 0)) as S3_MaxOp,
+        SUM(ISNULL(NS_MaxOp, 0)) as NS_MaxOp,
+        SUM(ISNULL(OT_MaxOp, 0)) as OT_MaxOp,
+        SUM(ISNULL(S1_ActiveCount, 0)) as S1_ActiveCount,
+        SUM(ISNULL(S2_ActiveCount, 0)) as S2_ActiveCount,
+        SUM(ISNULL(S3_ActiveCount, 0)) as S3_ActiveCount,
+        SUM(ISNULL(NS_ActiveCount, 0)) as NS_ActiveCount,
+        SUM(ISNULL(OT_ActiveCount, 0)) as OT_ActiveCount,
         SUM(MaxOp) as MaxOp,
         MAX(TotalUnit) as TotalUnit
     FROM MachineDaily
@@ -409,6 +442,16 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                                     d.OT_S1_Time = reader["OT_S1_Time"] != DBNull.Value ? (TimeSpan)reader["OT_S1_Time"] : (TimeSpan?)null;
                                     d.OT_S3_Time = reader["OT_S3_Time"] != DBNull.Value ? (TimeSpan)reader["OT_S3_Time"] : (TimeSpan?)null;
                                     d.OT_Normal_Time = reader["OT_Normal_Time"] != DBNull.Value ? (TimeSpan)reader["OT_Normal_Time"] : (TimeSpan?)null;
+                                    d.Shift1_MaxOp = reader["S1_MaxOp"] != DBNull.Value ? Convert.ToInt32(reader["S1_MaxOp"]) : 0;
+                                    d.Shift2_MaxOp = reader["S2_MaxOp"] != DBNull.Value ? Convert.ToInt32(reader["S2_MaxOp"]) : 0;
+                                    d.Shift3_MaxOp = reader["S3_MaxOp"] != DBNull.Value ? Convert.ToInt32(reader["S3_MaxOp"]) : 0;
+                                    d.NonShift_MaxOp = reader["NS_MaxOp"] != DBNull.Value ? Convert.ToInt32(reader["NS_MaxOp"]) : 0;
+                                    d.Overtime_MaxOp = reader["OT_MaxOp"] != DBNull.Value ? Convert.ToInt32(reader["OT_MaxOp"]) : 0;
+                                    d.Shift1_ActiveCount = reader["S1_ActiveCount"] != DBNull.Value ? Convert.ToInt32(reader["S1_ActiveCount"]) : 0;
+                                    d.Shift2_ActiveCount = reader["S2_ActiveCount"] != DBNull.Value ? Convert.ToInt32(reader["S2_ActiveCount"]) : 0;
+                                    d.Shift3_ActiveCount = reader["S3_ActiveCount"] != DBNull.Value ? Convert.ToInt32(reader["S3_ActiveCount"]) : 0;
+                                    d.NonShift_ActiveCount = reader["NS_ActiveCount"] != DBNull.Value ? Convert.ToInt32(reader["NS_ActiveCount"]) : 0;
+                                    d.Overtime_ActiveCount = reader["OT_ActiveCount"] != DBNull.Value ? Convert.ToInt32(reader["OT_ActiveCount"]) : 0;
                                     d.NoOfOperator = reader["MaxOp"] != DBNull.Value ? Convert.ToInt32(reader["MaxOp"]) : 0;
                                 }
                             }
@@ -494,6 +537,13 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                     else totalOtMinutes += (int)(new TimeSpan(24, 0, 0) - start).TotalMinutes + (int)data.OT_Normal_Time.Value.TotalMinutes;
                 }
 
+                int baseOtMinutes = totalOtMinutes;
+                if (totalOtMinutes > 0)
+                {
+                    int multiplierOT = (MachineLine == "All" && data.Overtime_ActiveCount > 0) ? data.Overtime_ActiveCount : 1;
+                    totalOtMinutes = totalOtMinutes * multiplierOT;
+                }
+
                 OvertimeMinutes.Add(totalOtMinutes);
 
                 int overtimeOpCount = (data.Overtime_Unit > 0 || totalOtMinutes > 0) ? data.NoOfOperator : 0;
@@ -543,23 +593,56 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                 var dayType = DetermineTypeOfDay(new DateTime(SelectedYear, SelectedMonth, data.Day).DayOfWeek);
                 
                 int stdWorkingMinutes = 0;
-                if (dayType != "WEEKEND")
+                double dailyManMinutes = 0;
+
+                bool isWeekend = (dayType == "WEEKEND");
+
+                if (data.Shift1_Unit > 0 || (!isWeekend && data.Shift1_EndTime != TimeSpan.Zero))
                 {
-                    if (data.Shift1_Unit > 0 || data.Shift1_EndTime != TimeSpan.Zero)
-                        stdWorkingMinutes += (dayType == "FRIDAY") ? 418 : 458;
-                        
-                    if (data.Shift2_Unit > 0 || data.Shift2_EndTime != TimeSpan.Zero)
-                        stdWorkingMinutes += 393; // Standard Shift 2
-                        
-                    if (data.Shift3_Unit > 0 || data.Shift3_EndTime != TimeSpan.Zero)
-                        stdWorkingMinutes += 398; // Standard Shift 3
-                        
-                    if (data.NonShift_Unit > 0 || data.NonShift_EndTime != TimeSpan.Zero)
-                        stdWorkingMinutes += 473; // Standard Non-Shift
+                    int mins = (dayType == "FRIDAY") ? 418 : 458;
+                    int multiplier = (MachineLine == "All" && data.Shift1_ActiveCount > 0) ? data.Shift1_ActiveCount : 1;
+                    stdWorkingMinutes += (mins * multiplier);
+                    int ops = data.Shift1_MaxOp > 0 ? data.Shift1_MaxOp : data.NoOfOperator;
+                    dailyManMinutes += ops * mins;
+                }
+                    
+                if (data.Shift2_Unit > 0 || (!isWeekend && data.Shift2_EndTime != TimeSpan.Zero))
+                {
+                    int multiplier = (MachineLine == "All" && data.Shift2_ActiveCount > 0) ? data.Shift2_ActiveCount : 1;
+                    stdWorkingMinutes += (393 * multiplier);
+                    int ops = data.Shift2_MaxOp > 0 ? data.Shift2_MaxOp : data.NoOfOperator;
+                    dailyManMinutes += ops * 393;
+                }
+                    
+                if (data.Shift3_Unit > 0 || (!isWeekend && data.Shift3_EndTime != TimeSpan.Zero))
+                {
+                    int multiplier = (MachineLine == "All" && data.Shift3_ActiveCount > 0) ? data.Shift3_ActiveCount : 1;
+                    stdWorkingMinutes += (398 * multiplier);
+                    int ops = data.Shift3_MaxOp > 0 ? data.Shift3_MaxOp : data.NoOfOperator;
+                    dailyManMinutes += ops * 398;
+                }
+                    
+                if (data.NonShift_Unit > 0 || (!isWeekend && data.NonShift_EndTime != TimeSpan.Zero))
+                {
+                    int multiplier = (MachineLine == "All" && data.NonShift_ActiveCount > 0) ? data.NonShift_ActiveCount : 1;
+                    stdWorkingMinutes += (473 * multiplier);
+                    int ops = data.NonShift_MaxOp > 0 ? data.NonShift_MaxOp : data.NoOfOperator;
+                    dailyManMinutes += ops * 473;
+                }
+
+                if (baseOtMinutes > 0 || data.Overtime_Unit > 0)
+                {
+                    int otOps = data.Overtime_MaxOp > 0 ? data.Overtime_MaxOp : data.NoOfOperator;
+                    dailyManMinutes += otOps * baseOtMinutes;
                 }
 
                 int baseWorkMinutes = (normalUnits > 0 || overtimeUnits > 0) ? stdWorkingMinutes : 0;
-                DailyWorkTime.Add(baseWorkMinutes + totalOtMinutes);
+                int totalWorkMinutes = baseWorkMinutes + totalOtMinutes;
+                DailyWorkTime.Add(totalWorkMinutes);
+
+                double lossRatio = (totalWorkMinutes > 0) ? (double)(lossDurationSec / 60) / totalWorkMinutes : 0;
+                double netManMinutes = dailyManMinutes * (1.0 - lossRatio);
+                DailyNetManHours.Add(netManMinutes / 60.0);
             }
 
             for (int i = 0; i < PlanData.Count; i++)
@@ -576,14 +659,16 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
         {
             (new TimeSpan(9, 30, 0), new TimeSpan(9, 35, 0)),
             (new TimeSpan(12, 0, 0), new TimeSpan(12, 45, 0)),
-            (new TimeSpan(14, 30, 0), new TimeSpan(14, 35, 0))
+            (new TimeSpan(14, 30, 0), new TimeSpan(14, 35, 0)),
+            (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
         };
 
         private readonly List<(TimeSpan Start, TimeSpan End)> FridayBreakTimes = new List<(TimeSpan, TimeSpan)>
         {
             (new TimeSpan(9, 30, 0), new TimeSpan(9, 35, 0)),
             (new TimeSpan(11, 50, 0), new TimeSpan(13, 15, 0)),
-            (new TimeSpan(14, 30, 0), new TimeSpan(14, 35, 0))
+            (new TimeSpan(14, 30, 0), new TimeSpan(14, 35, 0)),
+            (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
         };
 
         private bool IsInBreakTime(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
@@ -669,17 +754,35 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
             string shiftFilterSql = "";
             if (SelectedShifts.Any() && !SelectedShifts.Contains("All"))
             {
-                var hours = new List<string>();
+                var conditions = new List<string>();
                 foreach (var shift in SelectedShifts)
                 {
-                    if (shift == "1") hours.Add("(DATEPART(HOUR, Time) >= 7 AND DATEPART(HOUR, Time) < 16)");
-                    if (shift == "2") hours.Add("((DATEPART(HOUR, Time) >= 16 AND DATEPART(HOUR, Time) < 23) OR (DATEPART(HOUR, Time) = 23 AND DATEPART(MINUTE, Time) <= 15))");
-                    if (shift == "3") hours.Add("(DATEPART(HOUR, Time) >= 23 OR DATEPART(HOUR, Time) < 7)");
+                    if (shift == "1") 
+                    {
+                        if (SelectedYear == 2026 && SelectedMonth == 7)
+                            conditions.Add("(CAST(Time AS TIME) >= '07:00:00' AND CAST(Time AS TIME) <= '19:45:00')");
+                        else
+                            conditions.Add("(CAST(Time AS TIME) >= '07:00:00' AND CAST(Time AS TIME) <= '15:45:00')");
+                    }
+                    else if (shift == "2") 
+                    {
+                        if (SelectedYear == 2026 && SelectedMonth == 7)
+                            conditions.Add("1=0");
+                        else
+                            conditions.Add("(CAST(Time AS TIME) > '15:45:00' AND CAST(Time AS TIME) <= '23:15:00')");
+                    }
+                    else if (shift == "3") 
+                    {
+                        if (SelectedYear == 2026 && SelectedMonth == 7)
+                            conditions.Add("(CAST(Time AS TIME) > '19:45:00' OR CAST(Time AS TIME) <= '07:00:00')");
+                        else
+                            conditions.Add("(CAST(Time AS TIME) > '23:15:00' OR CAST(Time AS TIME) <= '07:00:00')");
+                    }
                 }
                 
-                if (hours.Any())
+                if (conditions.Any())
                 {
-                    shiftFilterSql = $"AND ({string.Join(" OR ", hours)})";
+                    shiftFilterSql = $"AND ({string.Join(" OR ", conditions)})";
                 }
             }
 
@@ -725,9 +828,32 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                                 var duration = Convert.ToInt32(reader["Duration"]);
 
                                 var dayType = DetermineTypeOfDay(fullDate.DayOfWeek);
-                                var breaksForThisDay = (dayType == "FRIDAY") ? this.FridayBreakTimes : this.RegularDayBreakTimes;
+                                
+                                // Copy-paste Break Times dari Detail Loss Time
+                                var breakTimes = new List<(TimeSpan Start, TimeSpan End)>
+                                {
+                                    (new TimeSpan(7, 0, 0), new TimeSpan(7, 5, 0)),
+                                    (new TimeSpan(9, 30, 0), new TimeSpan(9, 35, 0)),
+                                    (new TimeSpan(15, 30, 0), new TimeSpan(15, 35, 0)),
+                                    (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
+                                };
+                                // Tambahkan additional breaks
+                                foreach (var ab in GetAdditionalBreakTimesForDate(fullDate))
+                                {
+                                    breakTimes.Add(ab);
+                                }
 
-                                if (!IsInBreakTime(startTime, endTime, breaksForThisDay))
+                                bool isInBreakTime = false;
+                                foreach (var (breakStart, breakEnd) in breakTimes)
+                                {
+                                    if (startTime < breakEnd && endTime > breakStart)
+                                    {
+                                        isInBreakTime = true;
+                                        break;
+                                    }
+                                }
+
+                                if (!isInBreakTime)
                                 {
                                     if (!dailyTotals.ContainsKey(day)) dailyTotals[day] = 0;
                                     dailyTotals[day] += duration;

@@ -5,6 +5,12 @@
     ViewData["Title"] = "Production Report";
     ViewData["ShowPanamonLines"] = true;
     /* Pa Adan Disini */
+    
+    bool IsWeekend(int day) {
+        if (day < 1 || day > Model.DaysInMonth) return false;
+        var date = new DateTime(Model.SelectedYear, Model.SelectedMonth, day);
+        return date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday;
+    }
 }
 
 <style>
@@ -244,23 +250,58 @@
         background-color: rgba(255, 255, 255, 0.20) !important;
     }
 
-    /* TABLE HEADER - SOLID BACKGROUND GAK TEMBUS PANDANG */
-    table.table thead th {
-        background-color: rgba(30, 40, 60, 1) !important;  /* SOLID 100% - GAK TRANSPARAN */
+    /* BASE CELL STYLE (TIDAK TERMASUK KOLOM PERTAMA AGAR STICKY TIDAK RUSAK) */
+    .table tbody td:not(:first-child) {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        color: #eaeaea !important;
+        transition: background-color 0.15s ease;
+    }
+
+    /* WEEKEND - kolom Sabtu/Minggu sedikit dibedakan */
+    .table tbody td.bg-weekend {
+        background-color: rgba(60, 80, 120, 0.3) !important;
+    }
+
+    .table thead th.bg-weekend-header {
+        background-color: rgba(40, 55, 90, 1) !important;
+    }
+
+    /* BARIS TOTAL PLAN & TOTAL ACTUAL - SEDIKIT LEBIH GELAP dari baris biasa */
+    .table tbody tr.bg-row-total > td:not(:first-child) {
+        background-color: rgba(0, 0, 0, 0.15) !important;
+    }
+
+    /* Sel weekend di baris total */
+    .table tbody tr.bg-row-total > td.bg-weekend {
+        background-color: rgba(0, 0, 0, 0.25) !important;
+    }
+
+    /* Kolom pertama (sticky) di baris total juga sedikit lebih gelap dari sticky biasa */
+    .table tbody tr.bg-row-total > td:first-child {
+        background-color: rgba(255, 255, 255, 0.12) !important;
+    }
+
+    /* TABLE HEADER */
+    .table thead th {
+        background-color: rgba(30, 40, 60, 1) !important;
         color: #ffffff !important;
         font-weight: 600;
         border-bottom: 2px solid rgba(100, 181, 246, 0.5) !important;
     }
 
-
-
-    table.table tbody td {
-        background-color: rgba(255, 255, 255, 0.08) !important;
-        color: #eaeaea !important;
+    /* HOVER - baris biasa */
+    .table tbody tr:hover td:not(:first-child) {
+        background-color: rgba(0, 0, 0, 0.25) !important;
     }
 
-    table.table-bordered > :not(caption) > * {
+    /* HOVER - baris total */
+    .table tbody tr.bg-row-total:hover > td:not(:first-child) {
+        background-color: rgba(0, 0, 0, 0.35) !important;
+    }
+
+    table.table-bordered > :not(caption) > * > * {
         border-color: rgba(255, 255, 255, 0.5) !important;
+        border-width: 1.5px !important;
     }
 
     /* CHART CONTAINER - SUPER COMPACT */
@@ -534,127 +575,75 @@
     }
 
     /* ========================================
-       BODY ROWS BACKGROUND (UPDATE)
+       SEMUA BARIS BODY = WARNA PLAN FORECAST
        ======================================== */
-    @*.table tbody td:first-child {
-    background-color: rgba(255, 255, 255, 0.08) !important;
-}
+    #productionTable tbody td {
+        background-color: rgba(255, 255, 255, 0.15) !important;
+        color: #eaeaea !important;
+    }
 
-/* Kolom kedua tetap ada background berbeda karena sticky */
-.table tbody td:nth-child(2) {
-    background-color: rgba(255, 255, 255, 0.08) !important;
-}
+    /* ========================================
+       BARIS TOTAL PLAN & TOTAL ACTUAL - ELEGAN & LEMBUT
+       ======================================== */
+    #productionTable tbody tr.bg-row-total > td {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+    }
 
-/* Override: pastikan semua kolom data (termasuk kolom angka 1) punya warna sama */
-.table tbody tr td:not(:first-child):not(:nth-child(2)) {
-    background-color: rgba(255, 255, 255, 0.08) !important;
-}
-*@
+    /* ========================================
+       KOLOM WEEKEND (SABTU/MINGGU) - MERAH HANGAT SANGAT TIPIS
+       ======================================== */
+    #productionTable tbody td.bg-weekend,
+    #productionTable tbody tr.bg-row-total > td.bg-weekend {
+        background-color: rgba(255, 60, 60, 0.08) !important;
+    }
 
-    /* BARIS TOTAL PLAN & TOTAL ACTUAL - bold aja, warna ikut grup */
-    .table tbody tr:nth-child(3) td,
-    .table tbody tr:nth-child(6) td {
+    #productionTable thead th.bg-weekend-header {
+        background-color: rgba(220, 45, 45, 0.20) !important;
+    }
+
+    /* ========================================
+       KOLOM TOTAL (SEBELAH KANAN) - SAMA LEMBUT SEPERTI BARIS TOTAL
+       ======================================== */
+    #productionTable tbody td:last-child {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        color: #ffffff !important;
         font-weight: 700;
     }
-    .table tbody tr:nth-of-type(odd) td {
-        background-color: rgba(255, 255, 255, 0.08) !important;
-        color: #eaeaea !important;
+
+    /* ========================================
+       KOLOM STICKY KIRI (CATEGORY & PROD RESULT) 
+       SAMA LEMBUT SEPERTI BARIS TOTAL
+       ======================================== */
+    #productionTable tbody td:first-child,
+    #productionTable tbody tr:nth-child(1) > td:nth-child(2),
+    #productionTable tbody tr:nth-child(4) > td:nth-child(2),
+    #productionTable tbody tr:nth-child(10) > td:nth-child(2),
+    #productionTable tbody tr:nth-child(11) > td:nth-child(2) {
+        background-color: rgba(255, 255, 255, 0.05) !important;
     }
 
-    /* Baris GENAP - Warna Gelap */
-    .table tbody tr:nth-of-type(even) td {
-        background-color: rgba(255, 255, 255, 0.03) !important;
-        color: #eaeaea !important;
-    }
-
-    /* Kolom Pertama (sticky) - ikut warna barisnya tapi sedikit lebih terang untuk depth */
-    .table tbody tr:nth-of-type(odd) td:first-child {
-        background-color: rgba(255, 255, 255, 0.12) !important;
-    }
-
-    .table tbody tr:nth-of-type(even) td:first-child {
-        background-color: rgba(255, 255, 255, 0.07) !important;
-    }
-
-    /* Kolom Kedua (sticky) - ikut warna barisnya tapi sedikit lebih terang */
-    .table tbody tr:nth-of-type(odd) td:nth-child(2) {
-        background-color: rgba(255, 255, 255, 0.12) !important;
-    }
-
-    .table tbody tr:nth-of-type(even) td:nth-child(2) {
-        background-color: rgba(255, 255, 255, 0.07) !important;
+    /* BARIS TOTAL PLAN & TOTAL ACTUAL - bold aja */
+    #productionTable tbody tr:nth-child(3) td,
+    #productionTable tbody tr:nth-child(6) td {
+        font-weight: 700;
     }
 
     /* Hover effect */
-    .table tbody tr:hover td {
-        background-color: rgba(100, 181, 246, 0.15) !important;
+    #productionTable tbody tr:hover td {
+        background-color: rgba(0, 0, 0, 0.20) !important;
         transition: background-color 0.2s ease;
     }
 
-
-    /* ========================================
-       WARNA GRUP BARIS - PLAN FORECAST VS ACTUAL
-       ======================================== */
-
-    /* GRUP PLAN FORECAST (Lebih Terang) */
-    .table tbody tr:nth-child(1) td,
-    .table tbody tr:nth-child(2) td,
-    .table tbody tr:nth-child(3) td,
-    .table tbody tr:nth-child(7) td,
-    .table tbody tr:nth-child(8) td,
-    .table tbody tr:nth-child(9) td,
-    .table tbody tr:nth-child(10) td
-    {
-        background-color: rgba(255, 255, 255, 0.15) !important; /* Lebih Terang */
+    /* Hover effect - Baris Total */
+    #productionTable tbody tr.bg-row-total:hover > td {
+        background-color: rgba(0, 0, 0, 0.30) !important;
     }
 
-    /* GRUP ACTUAL (Lebih Gelap) */
-    .table tbody tr:nth-child(4) td,
-    .table tbody tr:nth-child(5) td,
-    .table tbody tr:nth-child(6) td,
-    .table tbody tr:nth-child(11) td,
-    .table tbody tr:nth-child(12) td,
-    .table tbody tr:nth-child(13) td,
-    .table tbody tr:nth-child(14) td
-    {
-        background-color: rgba(255, 255, 255, 0.05) !important; /* Lebih Gelap */
+    /* Header tetap solid gelap */
+    #productionTable thead th {
+        background-color: rgba(30, 40, 60, 1) !important;
     }
 
-    /* Override untuk kolom sticky (Plan Forecast group) */
-    .table tbody tr:nth-child(1) td:first-child,
-    .table tbody tr:nth-child(1) td:nth-child(2),
-    .table tbody tr:nth-child(2) td:first-child,
-    .table tbody tr:nth-child(2) td:nth-child(2),
-    .table tbody tr:nth-child(3) td:first-child,
-    .table tbody tr:nth-child(3) td:nth-child(2),
-    .table tbody tr:nth-child(7) td:first-child,
-    .table tbody tr:nth-child(7) td:nth-child(2),
-    .table tbody tr:nth-child(8) td:first-child,
-    .table tbody tr:nth-child(8) td:nth-child(2),
-    .table tbody tr:nth-child(9) td:first-child,
-    .table tbody tr:nth-child(9) td:nth-child(2),
-    .table tbody tr:nth-child(10) td:first-child,
-    .table tbody tr:nth-child(10) td:nth-child(2) {
-        background-color: rgba(255, 255, 255, 0.18) !important;
-    }
-
-    /* Override untuk kolom sticky (Actual group) */
-    .table tbody tr:nth-child(4) td:first-child,
-    .table tbody tr:nth-child(4) td:nth-child(2),
-    .table tbody tr:nth-child(5) td:first-child,
-    .table tbody tr:nth-child(5) td:nth-child(2),
-    .table tbody tr:nth-child(6) td:first-child,
-    .table tbody tr:nth-child(6) td:nth-child(2),
-    .table tbody tr:nth-child(11) td:first-child,
-    .table tbody tr:nth-child(11) td:nth-child(2),
-    .table tbody tr:nth-child(12) td:first-child,
-    .table tbody tr:nth-child(12) td:nth-child(2),
-    .table tbody tr:nth-child(13) td:first-child,
-    .table tbody tr:nth-child(13) td:nth-child(2),
-    .table tbody tr:nth-child(14) td:first-child,
-    .table tbody tr:nth-child(14) td:nth-child(2) {
-        background-color: rgba(255, 255, 255, 0.08) !important;
-    }
     /* LIGHT MODE - Total Info Text */
     body.light-mode .total-info-text span,
     body.light-mode .total-info-text strong {
@@ -662,16 +651,17 @@
     }
 
     body.light-mode #totalActualValue {
-        color: #1a7a35 !important;  /* hijau gelap */
+        color: #1a7a35 !important;
     }
 
     body.light-mode #totalPlanValue {
-        color: #235a9b !important;  /* biru gelap */
+        color: #235a9b !important;
     }
 
     body.light-mode #totalPhhValue {
-        color: #0e7490 !important;  /* teal gelap */
+        color: #0e7490 !important;
     }
+
     .filter-content .btn-success {
         background-color: rgba(255, 255, 255, 0.05);
         border: 2px solid rgba(255, 255, 255, 0.5);
@@ -683,35 +673,13 @@
         background-color: rgba(255, 255, 255, 0.1);
         border-color: rgba(255, 255, 255, 0.7);
     }
-    /* ========================================
-       HAPUS/COMMENT CSS YANG LAMA INI (HAPUS)
-       ======================================== */
-    /* HAPUS YANG INI - GA DIPAKE LAGI:
-    .table thead th:first-child { ... }  <- yang lama untuk "Production Result"
-    .table tbody td:first-child { ... }  <- yang lama
-    #toggleExtraRows { ... }
-    .extra-row { ... }
-    .always-visible { ... }
-    */
 </style>
 
 <div id="reportContainer">
     @{
         decimal monthlyTotalActual = Model.NormalData.Sum() + Model.OvertimeData.Sum();
-        double totalProductiveManMinutes = 0;
-
-        int calculationDays = new[] { Model.DaysInMonth, Model.NoOfDirectWorkers.Count, Model.DailyWorkTime.Count, Model.DailyLossTime.Count }.Min();
-
-        for (int i = 0; i < calculationDays; i++)
-        {
-            double dailyNetMinutes = Model.DailyWorkTime[i] - Model.DailyLossTime[i];
-            if (dailyNetMinutes > 0 && Model.NoOfDirectWorkers[i] > 0)
-            {
-                totalProductiveManMinutes += Model.NoOfDirectWorkers[i] * dailyNetMinutes;
-            }
-        }
-
-        double totalProductiveManHours = totalProductiveManMinutes / 60.0;
+        double totalProductiveManHours = Model.DailyNetManHours.Sum();
+        
         double monthlyPph = 0;
         if (monthlyTotalActual > 0 && totalProductiveManHours > 0)
         {
@@ -832,8 +800,9 @@
                         <th>Production Result</th>
                         @for (int day = 1; day <= Model.DaysInMonth; day++)
                         {
-                            <th>@day</th>
+                            <th class="@(IsWeekend(day) ? "bg-weekend-header" : "")">@day</th>
                         }
+                        <th style="min-width: 80px; background-color: rgba(30, 40, 60, 1) !important;">Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -843,22 +812,25 @@
                         <td style="text-align: left;">Normal</td>
                         @for (int i = 0; i < Model.EffectivePlanData.Count; i++)
                         {
-                            <td>@Model.EffectivePlanData[i].ToString("N0")</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.EffectivePlanData[i].ToString("N0")</td>
                         }
+                        <td style="font-weight: 700;">@Model.EffectivePlanData.Sum().ToString("N0")</td>
                     </tr>
                     <tr>
                         <td style="text-align: left;">Overtime</td>
                         @for (int i = 0; i < Model.EffectivePlanOvertimeData.Count; i++)
                         {
-                            <td>@Model.EffectivePlanOvertimeData[i].ToString("N0")</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.EffectivePlanOvertimeData[i].ToString("N0")</td>
                         }
+                        <td style="font-weight: 700;">@Model.EffectivePlanOvertimeData.Sum().ToString("N0")</td>
                     </tr>
-                    <tr>
+                    <tr class="bg-row-total">
                         <td style="text-align: left;"><b>Total Plan</b></td>
                         @for (int i = 0; i < Model.PlanData.Count; i++)
                         {
-                            <td>@((Model.EffectivePlanData[i] + Model.EffectivePlanOvertimeData[i]).ToString("N0"))</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@((Model.EffectivePlanData[i] + Model.EffectivePlanOvertimeData[i]).ToString("N0"))</td>
                         }
+                        <td style="font-weight: 700;">@((Model.EffectivePlanData.Sum() + Model.EffectivePlanOvertimeData.Sum()).ToString("N0"))</td>
                     </tr>
 
                     <!-- ACTUAL -->
@@ -867,22 +839,25 @@
                         <td style="text-align: left;">Normal</td>
                         @for (int i = 0; i < Model.NormalData.Count; i++)
                         {
-                            <td>@Model.NormalData[i].ToString("N0")</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.NormalData[i].ToString("N0")</td>
                         }
+                        <td style="font-weight: 700;">@Model.NormalData.Sum().ToString("N0")</td>
                     </tr>
                     <tr>
                         <td style="text-align: left;">Overtime</td>
                         @for (int i = 0; i < Model.OvertimeData.Count; i++)
                         {
-                            <td>@Model.OvertimeData[i].ToString("N0")</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.OvertimeData[i].ToString("N0")</td>
                         }
+                        <td style="font-weight: 700;">@Model.OvertimeData.Sum().ToString("N0")</td>
                     </tr>
-                    <tr>
+                    <tr class="bg-row-total">
                         <td style="text-align: left;"><b>Total Actual</b></td>
                         @for (int i = 0; i < Model.NormalData.Count; i++)
                         {
-                            <td>@((Model.NormalData[i] + Model.OvertimeData[i]).ToString("N0"))</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@((Model.NormalData[i] + Model.OvertimeData[i]).ToString("N0"))</td>
                         }
+                        <td style="font-weight: 700;">@((Model.NormalData.Sum() + Model.OvertimeData.Sum()).ToString("N0"))</td>
                     </tr>
 
                     <!-- DIFFERENCE - SATU KOLOM PENUH -->
@@ -890,8 +865,9 @@
                         <td colspan="2" style="text-align: left; font-weight: 700;">Difference (Actual - Plan)</td>
                         @for (int i = 0; i < Model.NormalData.Count; i++)
                         {
-                            <td>@(((Model.NormalData[i] + Model.OvertimeData[i]) - (Model.EffectivePlanData[i] + Model.EffectivePlanOvertimeData[i])).ToString("N0"))</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(((Model.NormalData[i] + Model.OvertimeData[i]) - (Model.EffectivePlanData[i] + Model.EffectivePlanOvertimeData[i])).ToString("N0"))</td>
                         }
+                        <td style="font-weight: 700;">@(((Model.NormalData.Sum() + Model.OvertimeData.Sum()) - (Model.EffectivePlanData.Sum() + Model.EffectivePlanOvertimeData.Sum())).ToString("N0"))</td>
                     </tr>
 
                     <!-- ACHIEVEMENT RATIO - SATU KOLOM PENUH, DIBAWAH DIFFERENCE -->
@@ -913,8 +889,25 @@
                                 ratioDisplay = "N/A";
                             }
 
-                            <td>@ratioDisplay</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@ratioDisplay</td>
                         }
+                        <td style="font-weight: 700;">
+                            @{
+                                decimal totalMonthAct = Model.NormalData.Sum() + Model.OvertimeData.Sum();
+                                decimal totalMonthPlan = Model.EffectivePlanData.Sum() + Model.EffectivePlanOvertimeData.Sum();
+                                string monthRatioDisplay = "-";
+                                if (totalMonthPlan > 0)
+                                {
+                                    double mRatio = Math.Round(((double)totalMonthAct / (double)totalMonthPlan) * 100, 2);
+                                    monthRatioDisplay = mRatio.ToString("0.#") + "%";
+                                }
+                                else if (totalMonthAct > 0)
+                                {
+                                    monthRatioDisplay = "N/A";
+                                }
+                            }
+                            @monthRatioDisplay
+                        </td>
                     </tr>
 
                     <!-- NO. OF DIRECT WORKERS - SATU KOLOM PENUH, DIBAWAH ACHIEVEMENT RATIO -->
@@ -922,8 +915,9 @@
                         <td colspan="2" style="text-align: left; font-weight: 700;">No. of Direct Workers</td>
                         @for (int i = 0; i < Model.NoOfDirectWorkers.Count; i++)
                         {
-                            <td>@(Model.NoOfDirectWorkers[i] > 0 ? Model.NoOfDirectWorkers[i].ToString() : "0")</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.NoOfDirectWorkers[i] > 0 ? Model.NoOfDirectWorkers[i].ToString() : "0")</td>
                         }
+                        <td style="font-weight: 700;">@(Model.NoOfDirectWorkers.Any() ? Model.NoOfDirectWorkers.Max().ToString() : "0")</td>
                     </tr>
 
                     <!-- WORKFORCE -->
@@ -932,8 +926,9 @@
                         <td style="text-align: left;">Overtime - No. of Operator</td>
                         @for (int i = 0; i < Model.OvertimeOperators.Count; i++)
                         {
-                            <td>@(Model.OvertimeOperators[i] > 0 ? Model.OvertimeOperators[i] : "0")</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.OvertimeOperators[i] > 0 ? Model.OvertimeOperators[i] : "0")</td>
                         }
+                        <td style="font-weight: 700;">@(Model.OvertimeOperators.Any() ? Model.OvertimeOperators.Max().ToString() : "0")</td>
                     </tr>
 
                     <!-- TIME MANAGEMENT -->
@@ -942,48 +937,59 @@
                         <td style="text-align: left;">Overtime - Minutes</td>
                         @for (int i = 0; i < Model.OvertimeMinutes.Count; i++)
                         {
-                            <td>@(Model.OvertimeMinutes[i] > 0 ? Model.OvertimeMinutes[i] : "0")</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.OvertimeMinutes[i] > 0 ? Model.OvertimeMinutes[i].ToString("N0") : "0")</td>
                         }
+                        <td style="font-weight: 700;">@Model.OvertimeMinutes.Sum().ToString("N0")</td>
                     </tr>
                     <tr>
                         <td style="text-align: left;">Loss Time</td>
                         @for (int i = 0; i < Model.DailyLossTime.Count; i++)
                         {
-                            <td>@(Model.DailyLossTime[i] > 0 ? Model.DailyLossTime[i] : "0")</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.DailyLossTime[i] > 0 ? Model.DailyLossTime[i].ToString("N0") : "0")</td>
                         }
+                        <td style="font-weight: 700;">@Model.DailyLossTime.Sum().ToString("N0")</td>
                     </tr>
 
-                    <!-- TOTAL WORKING TIME - SATU KOLOM PENUH, DIBAWAH LOSS TIME -->
+                    <!-- TOTAL LOAD TIME - SATU KOLOM PENUH, DIBAWAH LOSS TIME -->
                     <tr>
-                        <td colspan="2" style="text-align: left; font-weight: 700;">Total Working Time</td>
+                        <td colspan="2" style="text-align: left; font-weight: 700;">Total Load Time</td>
                         @for (int i = 0; i < Model.DailyWorkTime.Count; i++)
                         {
-                            <td>@Model.DailyWorkTime[i]</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.DailyWorkTime[i] > 0 ? Model.DailyWorkTime[i].ToString("N0") : "0")</td>
                         }
+                        <td style="font-weight: 700;">@Model.DailyWorkTime.Sum().ToString("N0")</td>
                     </tr>
 
-                    <!-- PROD. QTY / HEAD / HOUR - SATU KOLOM PENUH, DIBAWAH TOTAL WORKING TIME -->
+                    <!-- PROD. QTY / HEAD / HOUR - SATU KOLOM PENUH, DIBAWAH TOTAL LOAD TIME -->
                     <tr>
                         <td colspan="2" style="text-align: left; font-weight: 700;">Production Qty. / Head / Hour</td>
                         @for (int i = 0; i < Model.PlanData.Count; i++)
                         {
-                            <td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">
                                 @{
                                     decimal totalActual = Model.NormalData[i] + Model.OvertimeData[i];
-                                    int workers = Model.NoOfDirectWorkers[i];
-                                    int workingMinutes = Model.DailyWorkTime[i];
-                                    int lossMinutes = Model.DailyLossTime[i];
-                                    double netProductiveMinutes = workingMinutes - lossMinutes;
+                                    double netManHours = Model.DailyNetManHours[i];
                                     double pph = 0;
-                                    if (totalActual > 0 && workers > 0 && netProductiveMinutes > 0)
+                                    if (totalActual > 0 && netManHours > 0)
                                     {
-                                        double netProductiveHours = netProductiveMinutes / 60.0;
-                                        pph = Math.Round((double)totalActual / workers / netProductiveHours, 2);
+                                        pph = Math.Round((double)totalActual / netManHours, 2);
                                     }
                                 }
                                 @(pph > 0 ? pph.ToString() : "")
                             </td>
                         }
+                        <td style="font-weight: 700;">
+                            @{
+                                decimal monthTotalAct = Model.NormalData.Sum() + Model.OvertimeData.Sum();
+                                double monthNetManHours = Model.DailyNetManHours.Sum();
+                                double monthPph = 0;
+                                if (monthTotalAct > 0 && monthNetManHours > 0)
+                                {
+                                    monthPph = Math.Round((double)monthTotalAct / monthNetManHours, 2);
+                                }
+                            }
+                            @(monthPph > 0 ? monthPph.ToString() : "")
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -1048,15 +1054,15 @@
             const anchorDay = isCurrentMonth ? today : daysInMonth;
 
                         // ===== HITUNG TOTAL =====
-                        let totalActualAtAnchor = 0;
-                        let totalPlanAtAnchor = 0;
-                        for (let i = 0; i < anchorDay; i++) {
-                            totalActualAtAnchor += (normalData[i] || 0) + (overtimeData[i] || 0);
-                                   totalPlanAtAnchor += (effectivePlanData[i] || 0) + (effectivePlanOtData[i] || 0);
+                        let totalActualSum = 0;
+                        let totalPlanSum = 0;
+                        for (let i = 0; i < daysInMonth; i++) {
+                            totalActualSum += (normalData[i] || 0) + (overtimeData[i] || 0);
+                            totalPlanSum += (effectivePlanData[i] || 0) + (effectivePlanOtData[i] || 0);
                         }
 
-                        document.getElementById('totalActualValue').textContent = totalActualAtAnchor.toLocaleString();
-                        document.getElementById('totalPlanValue').textContent = totalPlanAtAnchor.toLocaleString();
+                        document.getElementById('totalActualValue').textContent = totalActualSum.toLocaleString();
+                        document.getElementById('totalPlanValue').textContent = totalPlanSum.toLocaleString();
 
                         // ===== HITUNG RATIO =====
                         const ratioActualData = [], ratioPlanData = [];
@@ -1068,9 +1074,9 @@
                                 ratioPlanData.push(null);
                             } else {
                                 runningActualTotal += (normalData[i] || 0) + (overtimeData[i] || 0);
-                                       runningPlanTotal += (effectivePlanData[i] || 0) + (effectivePlanOtData[i] || 0);
-                                ratioActualData.push((totalActualAtAnchor > 0) ? (runningActualTotal / totalActualAtAnchor) * 100 : 0);
-                                ratioPlanData.push((totalPlanAtAnchor > 0) ? (runningPlanTotal / totalPlanAtAnchor) * 100 : 0);
+                                runningPlanTotal += (effectivePlanData[i] || 0) + (effectivePlanOtData[i] || 0);
+                                ratioActualData.push((totalActualSum > 0) ? (runningActualTotal / totalActualSum) * 100 : 0);
+                                ratioPlanData.push((totalPlanSum > 0) ? (runningPlanTotal / totalPlanSum) * 100 : 0);
                             }
                         }
             // ===== DETEKSI LIGHT MODE =====

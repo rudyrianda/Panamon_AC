@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Data.SqlClient;
 using ClosedXML.Excel;
@@ -171,10 +171,10 @@ namespace MonitoringSystem.Pages.LossTime
 
         private readonly List<(TimeSpan Start, TimeSpan End)> FixedBreakTimes = new List<(TimeSpan, TimeSpan)>
         {
-            (new TimeSpan(7, 0, 0),  new TimeSpan(7, 5, 0)),
+            (new TimeSpan(7, 0, 0), new TimeSpan(7, 5, 0)),
             (new TimeSpan(9, 30, 0), new TimeSpan(9, 35, 0)),
-            (new TimeSpan(15, 30, 0),new TimeSpan(15, 35, 0)),
-            (new TimeSpan(18, 15, 0),new TimeSpan(18, 45, 0)),
+            (new TimeSpan(15, 30, 0), new TimeSpan(15, 35, 0)),
+            (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
         };
 
 
@@ -303,9 +303,9 @@ namespace MonitoringSystem.Pages.LossTime
         private bool IsInBreakTime(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
         {
             foreach (var (breakStart, breakEnd) in breakTimes)
-                if ((startTime >= breakStart && startTime <= breakEnd) ||
-                    (endTime >= breakStart && endTime <= breakEnd) ||
-                    (startTime <= breakStart && endTime >= breakEnd)) return true;
+            {
+                if (startTime < breakEnd && endTime > breakStart) return true;
+            }
             return false;
         }
 
@@ -340,6 +340,18 @@ namespace MonitoringSystem.Pages.LossTime
                 var allRecords = GetCombinedRecords(lastMonthStart, lastMonthEnd, StartSelectedDate, EndSelectedDate, breakTimes);
                 lastMonthRecords = allRecords.Where(r => r.Date >= lastMonthStart && r.Date <= lastMonthEnd).ToList();
                 currentRecords = allRecords.Where(r => r.Date >= StartSelectedDate && r.Date <= EndSelectedDate).ToList();
+            }
+
+            if (SelectedShifts != null && SelectedShifts.Any() && SelectedShifts.Count < 3)
+            {
+                currentRecords = currentRecords.Where(r => SelectedShifts.Contains(r.Shift)).ToList();
+                lastMonthRecords = lastMonthRecords.Where(r => SelectedShifts.Contains(r.Shift)).ToList();
+            }
+
+            if (!string.IsNullOrEmpty(MachineLine) && MachineLine != "All")
+            {
+                currentRecords = currentRecords.Where(r => r.Location == MachineLine).ToList();
+                lastMonthRecords = lastMonthRecords.Where(r => r.Location == MachineLine).ToList();
             }
 
             PrepareSummaryChartData(currentRecords, lastMonthRecords);
@@ -530,12 +542,29 @@ namespace MonitoringSystem.Pages.LossTime
                         {
                             TimeSpan startTime = reader.GetTimeSpan(reader.GetOrdinal("StartTime"));
                             TimeSpan endTime = reader.GetTimeSpan(reader.GetOrdinal("EndTime"));
-                            if (IsInBreakTime(startTime, endTime, breakTimes)) continue;
+                            
+                            DateTime recordDate = reader.GetDateTime(reader.GetOrdinal("Date"));
+                            if (startTime >= TimeSpan.Zero && startTime < new TimeSpan(7, 0, 0))
+                            {
+                                recordDate = recordDate.AddDays(-1);
+                            }
+                            
+                            var breaksForThisDay = new List<(TimeSpan, TimeSpan)>();
+                            breaksForThisDay.AddRange(this.FixedBreakTimes);
+
+                            if (breakTimes != null)
+                                breaksForThisDay.AddRange(breakTimes);
+
+                            if (IsInBreakTime(startTime, endTime, breaksForThisDay)) continue;
+
                             string reason = reader.IsDBNull(reader.GetOrdinal("Reason")) ? string.Empty : reader.GetString(reader.GetOrdinal("Reason"));
+
+                            if (recordDate < lastStart || recordDate > currEnd) continue;
+
                             records.Add(new LossTimeRecord
                             {
                                 RecordId = reader.IsDBNull(reader.GetOrdinal("Id")) ? 0 : reader.GetInt32(reader.GetOrdinal("Id")),
-                                Date = reader.GetDateTime(reader.GetOrdinal("Date")),
+                                Date = recordDate,
                                 LossTime = reason,
                                 Start = startTime,
                                 End = endTime,
@@ -557,11 +586,17 @@ namespace MonitoringSystem.Pages.LossTime
             string query = @"
 SELECT Id, Date, Reason, DetailedReason, MachineCode,
        CAST(Time AS TIME) AS StartTime, CAST(EndDateTime AS TIME) AS EndTime, LossTime, 
-       CASE WHEN CAST(Time AS TIME) >= '07:00:00' AND CAST(Time AS TIME) < '15:45:00' THEN '1'
-            WHEN CAST(Time AS TIME) >= '15:45:00' AND CAST(Time AS TIME) < '23:15:00' THEN '2'
-            ELSE '3' END AS Shift
+       CASE WHEN MONTH(Date) = 7 AND YEAR(Date) = 2026 THEN
+                 CASE WHEN CAST(Time AS TIME) >= '07:00:00' AND CAST(Time AS TIME) <= '19:45:00' THEN '1'
+                      WHEN CAST(Time AS TIME) > '19:45:00' OR CAST(Time AS TIME) < '07:00:00' THEN '3'
+                      ELSE '2' END
+            ELSE 
+                 CASE WHEN CAST(Time AS TIME) >= '07:00:00' AND CAST(Time AS TIME) <= '15:45:00' THEN '1'
+                      WHEN CAST(Time AS TIME) > '15:45:00' AND CAST(Time AS TIME) <= '23:15:00' THEN '2'
+                      ELSE '3' END
+            END AS Shift
 FROM AssemblyLossTime 
-WHERE Date >= @StartDate AND Date <= @EndDate";
+WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
             if (!string.IsNullOrEmpty(MachineLine) && MachineLine != "All")
                 query += " AND MachineCode = @MachineLine";
             return query;
@@ -603,6 +638,10 @@ WHERE Date >= @StartDate AND Date <= @EndDate";
         {
             try
             {
+                var day8Records = currentRecords.Where(r => r.Date.Day == 8).ToList();
+                var debugText = "Day 8 Records:\n" + string.Join("\n", day8Records.Select(r => $"Shift: {r.Shift}, Category: {r.Category}, Start: {r.Start}, End: {r.End}, Duration: {r.Duration}"));
+                System.IO.File.WriteAllText(@"C:\Users\RIAN SETYO\.gemini\antigravity\brain\a634f69d-2fd0-4405-895b-30382f749c1d\debug.txt", debugText);
+
                 int daysInMonth = DateTime.DaysInMonth(SelectedYear, SelectedMonth);
                 var days = Enumerable.Range(1, daysInMonth).ToArray();
                 var dailyGroups = currentRecords
@@ -912,13 +951,7 @@ WHERE Date >= @StartDate AND Date <= @EndDate";
         private List<(TimeSpan Start, TimeSpan End)> GetAllBreakTimes()
         {
             if (_cachedBreakTimes != null) return _cachedBreakTimes;
-            var breakTimes = new List<(TimeSpan Start, TimeSpan End)>();
-            breakTimes.AddRange(FixedBreakTimes);
-
-            if (DateTime.Today.DayOfWeek == DayOfWeek.Friday)
-                breakTimes.Add((new TimeSpan(11, 50, 0), new TimeSpan(13, 15, 0)));
-            else
-                breakTimes.Add((new TimeSpan(12, 0, 0), new TimeSpan(12, 45, 0)));
+            var breakTimes = new List<(TimeSpan Start, TimeSpan End)>(FixedBreakTimes);
 
             if (!string.IsNullOrEmpty(AdditionalBreakTime1Start) && !string.IsNullOrEmpty(AdditionalBreakTime1End))
                 if (TryParseTimeSpan(AdditionalBreakTime1Start, out TimeSpan s1) && TryParseTimeSpan(AdditionalBreakTime1End, out TimeSpan e1))
