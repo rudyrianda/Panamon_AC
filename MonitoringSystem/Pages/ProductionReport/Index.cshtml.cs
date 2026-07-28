@@ -132,7 +132,7 @@ namespace MonitoringSystem.Pages.ProductionReport
             return NotFound($"Template file not found.");
         }
 
-        private void LoadChartData()
+        public void LoadChartData()
         {
             this.connectionString = _configuration.GetConnectionString("DefaultConnection");
             var dailyLosses = GetDailyLossTimeTotals();
