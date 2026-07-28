@@ -18,10 +18,10 @@ namespace MonitoringSystem.Pages.Summary
         }
 
         [BindProperty(SupportsGet = true)]
-        public string FilterDate { get; set; }
+        public string? FilterDate { get; set; }
 
         [BindProperty(SupportsGet = true)]
-        public string FilterMachineLine { get; set; }
+        public string? FilterMachineLine { get; set; }
 
         public List<PwkData> listData { get; set; } = new();
 
@@ -395,7 +395,7 @@ namespace MonitoringSystem.Pages.Summary
                     var pPid = cmd.CreateParameter(); pPid.ParameterName = "@pid"; pPid.Value = DataId[i]; cmd.Parameters.Add(pPid);
 
                     var pVal = cmd.CreateParameter(); pVal.ParameterName = "@val";
-                    if (i < ManualPwk.Count && decimal.TryParse(ManualPwk[i], out decimal val))
+                    if (i < ManualPwk.Count && decimal.TryParse(ManualPwk[i], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal val))
                         pVal.Value = val;
                     else
                         pVal.Value = DBNull.Value;
@@ -412,6 +412,45 @@ namespace MonitoringSystem.Pages.Summary
             catch (Exception ex)
             {
                 _logger.LogError($"Error saving PWK: {ex.Message}");
+                TempData["StatusMessage"] = "error";
+                TempData["Message"] = $"Error: {ex.Message}";
+            }
+            return RedirectToPage(new { FilterDate, FilterMachineLine });
+        }
+
+        // ─── RESET PWK ─────────────────────────────────────────
+        public async Task<IActionResult> OnPostResetPwkAsync(string FilterDate, string FilterMachineLine)
+        {
+            try
+            {
+                var conn = _context.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var cmd = conn.CreateCommand();
+                
+                var machineFilter = string.IsNullOrEmpty(FilterMachineLine) ? "" : " AND MachineCode = @mc";
+                
+                cmd.CommandText = $"DELETE FROM PwkManualData WHERE ReportDate = @date {machineFilter}";
+
+                var pDate = cmd.CreateParameter();
+                pDate.ParameterName = "@date";
+                pDate.Value = string.IsNullOrEmpty(FilterDate) ? DateTime.Now.Date : DateTime.Parse(FilterDate).Date;
+                cmd.Parameters.Add(pDate);
+
+                if (!string.IsNullOrEmpty(FilterMachineLine))
+                {
+                    var pMc = cmd.CreateParameter(); pMc.ParameterName = "@mc"; pMc.Value = FilterMachineLine; cmd.Parameters.Add(pMc);
+                }
+
+                await cmd.ExecuteNonQueryAsync();
+                await conn.CloseAsync();
+
+                TempData["StatusMessage"] = "success";
+                TempData["Message"] = "Data PWK berhasil di-reset!";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error resetting PWK: {ex.Message}");
                 TempData["StatusMessage"] = "error";
                 TempData["Message"] = $"Error: {ex.Message}";
             }

@@ -782,8 +782,12 @@
                             </select>
                         </div>
                         <button type="submit" class="btn btn-primary">Search</button>
-                        <a href="/Summary/Pwk" class="btn btn-danger">Reset</a>
+                        <button type="submit" form="form-reset-pwk" class="btn btn-danger" onclick="return confirm('Apakah Anda yakin ingin mereset/menghapus data PWK untuk tanggal ini?');">Reset Data</button>
                         <button type="submit" form="form-pwk" class="btn btn-success" style="background-color: rgba(46,125,50,0.95); border: 2px solid #81c784; color: #fff;">Save PWK</button>
+                    </form>
+                    <form id="form-reset-pwk" method="post" asp-page-handler="ResetPwk">
+                        <input type="hidden" name="FilterDate" value="@Model.FilterDate" />
+                        <input type="hidden" name="FilterMachineLine" value="@Model.FilterMachineLine" />
                     </form>
                 </div>
             </div>
@@ -845,7 +849,7 @@
                                         @if (item != null)
                                         {
                                             <input type="number" step="0.01" class="form-control manual-pwk-input" name="ManualPwk[@i]"
-                                                   value="@(item.ManualPwk?.ToString() ?? "")" placeholder="masukan angka" />
+                                                   value="@(item.ManualPwk?.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) ?? "")" placeholder="masukan angka" />
                                         }
                                     </td>
 
@@ -882,10 +886,10 @@
                             <tr class="pwk-total-row">
                                 <td colspan="2" class="text-end align-middle" style="font-weight: bold; font-size: 14px; padding-right: 15px; letter-spacing: 0.5px;">TOTAL</td>
                                 <td class="col-manual">
-                                    <input type="text" class="form-control text-center" id="total-manual-pwk" value="@totalManualPwk" readonly style="font-weight: bold; color: #ffffff !important; background-color: rgba(0,0,0,0.2) !important; border-color: rgba(255,255,255,0.1) !important;" />
+                                    <input type="text" class="form-control text-center" id="total-manual-pwk" value="@totalManualPwk.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" readonly style="font-weight: bold; color: #ffffff !important; background-color: rgba(0,0,0,0.2) !important; border-color: rgba(255,255,255,0.1) !important;" />
                                 </td>
                                 <td class="col-actual">
-                                    <input type="text" class="form-control text-center" value="@totalActual" readonly style="font-weight: bold; color: #ffffff !important; background-color: rgba(0,0,0,0.2) !important; border-color: rgba(255,255,255,0.1) !important;" />
+                                    <input type="text" class="form-control text-center" value="@totalActual.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" readonly style="font-weight: bold; color: #ffffff !important; background-color: rgba(0,0,0,0.2) !important; border-color: rgba(255,255,255,0.1) !important;" />
                                 </td>
                                 <td></td>
                             </tr>
