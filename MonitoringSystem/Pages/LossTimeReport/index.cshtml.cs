@@ -13,6 +13,8 @@ using OfficeOpenXml;
 using MonitoringSystem.Models;
 using MonitoringSystem.Data;
 using System;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 
 namespace MonitoringSystem.Pages.LossTimeReport
 {
@@ -20,10 +22,15 @@ namespace MonitoringSystem.Pages.LossTimeReport
     {
         private readonly ApplicationDbContext _context;
         private readonly string _connectionString;
-        public indexModel(ApplicationDbContext context, IConfiguration configuration)
+        private readonly IConfiguration _configuration;
+        private readonly IWebHostEnvironment _webHostEnvironment;
+
+        public indexModel(ApplicationDbContext context, IConfiguration configuration, IWebHostEnvironment webHostEnvironment)
         {
             _context = context;
+            _configuration = configuration;
             _connectionString = configuration.GetConnectionString("DefaultConnection");
+            _webHostEnvironment = webHostEnvironment;
         }
         //public indexModel(ApplicationDbContext context, IConfiguration configuration)
         //{
@@ -56,20 +63,17 @@ namespace MonitoringSystem.Pages.LossTimeReport
         // Menampung total Working Loss saja (untuk ringkasan & grafik)
         public double[] TotalActualPerMonth { get; set; } = new double[12];
         public double[] TotalPlanPerMonth { get; set; } = new double[12];
-        public double[] ActualRatios { get; set; } = new double[12];
-        public double[] PlanRatios { get; set; } = new double[12];
+        public double[] RatioActualVsBp { get; set; } = new double[12];
+        public double[] RatioLossVsWt { get; set; } = new double[12];
 
         public void OnGet()
         {
-            string[] months = { "April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March" };
+            string[] months = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
 
             var actualsRaw = GetDetailedActualData(SelectedYear, MachineLine);
 
             var planQuery = _context.LossTimePlans.AsQueryable();
-            planQuery = planQuery.Where(x =>
-                (x.Year == SelectedYear && x.Month >= 4) ||
-                (x.Year == SelectedYear + 1 && x.Month <= 3)
-            );
+            planQuery = planQuery.Where(x => x.Year == SelectedYear);
 
             if (MachineLine != "All") planQuery = planQuery.Where(x => x.MachineLine == MachineLine);
 
@@ -112,14 +116,14 @@ namespace MonitoringSystem.Pages.LossTimeReport
                 var catActuals = actualsRaw.Where(x => x.Category == cat);
                 foreach (var item in catActuals)
                 {
-                    int arrayIndex = (item.Month - 4 + 12) % 12;
+                    int arrayIndex = item.Month - 1;
                     actArr[arrayIndex] = Math.Round(item.Total, 1);
                 }
 
                 var catPlans = plansRaw.Where(x => x.Category == cat);
                 foreach (var item in catPlans)
                 {
-                    int arrayIndex = (item.Month - 4 + 12) % 12;
+                    int arrayIndex = item.Month - 1;
                     planArr[arrayIndex] = Math.Round(item.Total, 1);
                 }
 
@@ -138,15 +142,17 @@ namespace MonitoringSystem.Pages.LossTimeReport
                     .Where(x => GetCategoryGroup(x.Key) == "Working Loss")
                     .Sum(x => x.Value[i]);
 
-                int monthNum = (i + 4) > 12 ? (i + 4) - 12 : (i + 4);
+                int monthNum = i + 1;
 
-                var pRatio = plansRatioRaw.FirstOrDefault(x => x.Month == monthNum);
-                PlanRatios[i] = pRatio != null ? (double)pRatio.RatioVal : 0;
+                if (TotalPlanPerMonth[i] > 0)
+                {
+                    RatioActualVsBp[i] = Math.Round((TotalActualPerMonth[i] / TotalPlanPerMonth[i]) * 100, 2);
+                }
 
                 double workingTime = workingTimeRaw.ContainsKey(monthNum) ? workingTimeRaw[monthNum] : 0;
                 if (workingTime > 0)
                 {
-                    ActualRatios[i] = Math.Round((TotalActualPerMonth[i] / workingTime) * 100, 2);
+                    RatioLossVsWt[i] = Math.Round((TotalActualPerMonth[i] / workingTime) * 100, 2);
                 }
             }
 
@@ -158,8 +164,8 @@ namespace MonitoringSystem.Pages.LossTimeReport
                 // Filter dictionary agar JS Chart hanya merender Working Loss
                 Actuals = DetailActuals.Where(x => LegendCategories.Contains(x.Key)).ToDictionary(x => x.Key, x => x.Value),
                 Plans = DetailPlans.Where(x => LegendCategories.Contains(x.Key)).ToDictionary(x => x.Key, x => x.Value),
-                RatioActual = ActualRatios,
-                RatioPlan = PlanRatios
+                RatioActualVsBp = RatioActualVsBp,
+                RatioLossVsWt = RatioLossVsWt
             };
 
             ChartDataJson = System.Text.Json.JsonSerializer.Serialize(chartPayload);
@@ -213,20 +219,17 @@ namespace MonitoringSystem.Pages.LossTimeReport
         private List<MonthlyCategoryData> GetDetailedActualData(int fiscalYear, string line)
         {
             var rawList = new List<MonthlyCategoryData>();
-            DateTime startDate = new DateTime(fiscalYear, 4, 1);
-            DateTime endDate = new DateTime(fiscalYear + 1, 3, 31);
+            DateTime startDate = new DateTime(fiscalYear, 1, 1);
+            DateTime endDate = new DateTime(fiscalYear, 12, 31);
 
-            var actualsQuery = _context.LossTimeActuals.Where(x =>
-                (x.Year == fiscalYear && x.Month >= 4) ||
-                (x.Year == fiscalYear + 1 && x.Month <= 3)
-            );
+            var actualsQuery = _context.LossTimeActuals.Where(x => x.Year == fiscalYear);
             if (line != "All") actualsQuery = actualsQuery.Where(x => x.MachineLine == line);
 
             // Cek bulan mana yang sudah ada di LossTimeActuals
             var monthsWithActuals = actualsQuery.Select(x => x.Month).Distinct().ToList();
 
             // Semua bulan fiscal year
-            var allFiscalMonths = new List<int> { 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3 };
+            var allFiscalMonths = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
 
             // Bulan yang BELUM ada di LossTimeActuals → fallback
             var monthsMissing = allFiscalMonths.Where(m => !monthsWithActuals.Contains(m)).ToList();
@@ -259,8 +262,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
             {
                 var dateConditions = string.Join(" OR ", monthsMissing.Select(m =>
                 {
-                    int year = m >= 4 ? fiscalYear : fiscalYear + 1;
-                    return $"(YEAR(Date) = {year} AND MONTH(Date) = {m})";
+                    return $"(YEAR(Date) = {fiscalYear} AND MONTH(Date) = {m})";
                 }));
 
                 string query = $@"SELECT MONTH(Date) AS MonthVal, Reason, 
@@ -314,31 +316,27 @@ namespace MonitoringSystem.Pages.LossTimeReport
         private Dictionary<int, double> GetMonthlyWorkingTime(int fiscalYear, string line)
         {
             var result = new Dictionary<int, double>();
-            string query = @"SELECT MONTH(Date) as MonthVal, SUM(WorkingTime) as TotalWT 
-                             FROM ProductionData WHERE Date >= @Start AND Date <= @End";
-            if (line != "All") query += " AND MachineCode = @MachineCode";
-            query += " GROUP BY MONTH(Date)";
             try
             {
-                using (var conn = new SqlConnection(_connectionString))
+                for (int m = 1; m <= 12; m++)
                 {
-                    conn.Open();
-                    using (var cmd = new SqlCommand(query, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@Start", new DateTime(fiscalYear, 4, 1));
-                        cmd.Parameters.AddWithValue("@End", new DateTime(fiscalYear + 1, 3, 31));
-                        if (line != "All") cmd.Parameters.AddWithValue("@MachineCode", line);
-                        using (var reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                result[Convert.ToInt32(reader["MonthVal"])] = reader["TotalWT"] != DBNull.Value ? Convert.ToDouble(reader["TotalWT"]) : 0;
-                            }
-                        }
-                    }
+                    var pr = new MonitoringSystem.Pages.ProductionReport.IndexModel(_webHostEnvironment, _configuration);
+                    pr.SelectedYear = fiscalYear;
+                    pr.SelectedMonth = m;
+                    pr.MachineLine = line;
+                    pr.SelectedShifts = new List<string> { "All" };
+                    
+                    // Panggil LoadChartData yang akan memproses DailyWorkTime
+                    pr.LoadChartData();
+                    
+                    double totalWorkMinutes = pr.DailyWorkTime.Sum();
+                    result.Add(m, totalWorkMinutes);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error getting Monthly Working Time from ProductionReport Logic: " + ex.Message);
+            }
             return result;
         }
 
@@ -359,7 +357,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
                         {
                             var catName = NormalizeCategoryName(sheet.Cells[row, 2].Text);
                             if (string.IsNullOrEmpty(catName) || catName.Contains("Total")) continue;
-                            int[] months = { 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3 };
+                            int[] months = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
                             int col = 3;
                             foreach (var m in months)
                             {
@@ -370,15 +368,14 @@ namespace MonitoringSystem.Pages.LossTimeReport
                                     Category = catName,
                                     MachineLine = UploadMachineLine,
                                     Month = m,
-                                    Year = m >= 4 ? SelectedYear : SelectedYear + 1,
+                                    Year = SelectedYear,
                                     TargetMinutes = tVal,
                                     Ratio = rVal * 100
                                 });
                                 col += 2;
                             }
                         }
-                        var old = _context.LossTimePlans.Where(x => x.MachineLine == UploadMachineLine &&
-                            ((x.Year == SelectedYear && x.Month >= 4) || (x.Year == SelectedYear + 1 && x.Month <= 3)));
+                        var old = _context.LossTimePlans.Where(x => x.MachineLine == UploadMachineLine && x.Year == SelectedYear);
                         _context.LossTimePlans.RemoveRange(old);
                         _context.LossTimePlans.AddRange(newPlans);
                         await _context.SaveChangesAsync();
