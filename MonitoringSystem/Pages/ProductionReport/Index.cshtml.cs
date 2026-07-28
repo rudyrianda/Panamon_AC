@@ -27,14 +27,14 @@ namespace MonitoringSystem.Pages.ProductionReport
         public List<decimal> NormalData { get; private set; } = new List<decimal>();
         public List<decimal> OvertimeData { get; private set; } = new List<decimal>();
         public List<int> OriginalPlanData { get; private set; } = new List<int>();
-        public List<int> PlanData { get; private set; } = new List<int>();
+        public List<int?> PlanData { get; private set; } = new List<int?>();
         public List<int> OriginalPlanOvertimeData { get; private set; } = new List<int>();
         public List<int> NoOfDirectWorkers { get; private set; } = new List<int>();
         public List<int> DailyWorkTime { get; private set; } = new List<int>();
         public List<int> OvertimeOperators { get; private set; } = new List<int>();
         public List<int> OvertimeMinutes { get; private set; } = new List<int>();
         public List<int> DailyLossTime { get; private set; } = new List<int>();
-        public List<int> PlanOvertimeData { get; private set; } = new List<int>();
+        public List<int?> PlanOvertimeData { get; private set; } = new List<int?>();
         public List<int> EffectivePlanData { get; private set; } = new List<int>();
         public List<int> EffectivePlanOvertimeData { get; private set; } = new List<int>();
         public List<double> DailyNetManHours { get; private set; } = new List<double>();
@@ -52,8 +52,8 @@ namespace MonitoringSystem.Pages.ProductionReport
             public TimeSpan NonShift_EndTime { get; set; }
             public decimal Overtime_Unit { get; set; } = 0;
             public TimeSpan Overtime_EndTime { get; set; } = TimeSpan.Zero;
-            public int Plan { get; set; }
-            public int PlanOvertime { get; set; } = 0;
+            public int? Plan { get; set; } = null;
+            public int? PlanOvertime { get; set; } = null;
             public int OriginalPlan { get; set; } = 0;
             public int OtOriginalPlan { get; set; } = 0;
             public int NoOfOperator { get; set; } = 0;
@@ -72,6 +72,7 @@ namespace MonitoringSystem.Pages.ProductionReport
             public int Shift3_ActiveCount { get; set; } = 0;
             public int NonShift_ActiveCount { get; set; } = 0;
             public int Overtime_ActiveCount { get; set; } = 0;
+            public bool HasAnyPlan { get; set; } = false;
         }
 
         public class RestTime { public int Duration { get; set; } public TimeSpan StartTime { get; set; } public TimeSpan EndTime { get; set; } }
@@ -167,7 +168,7 @@ namespace MonitoringSystem.Pages.ProductionReport
             {
                 var conditions = SelectedShifts.Select(s => {
                     string suffix = s == "NS" ? "NS" : s;
-                    return $"(pr.Shift LIKE '%{s}%' OR pr.QtyShift{suffix} > 0 OR pr.OvtShift{suffix} > 0)";
+                    return $"(pr.Shift LIKE '%{s}%' OR pr.QtyShift{suffix} IS NOT NULL OR pr.OvtShift{suffix} IS NOT NULL)";
                 });
                 planShiftFilter = $"AND ({string.Join(" OR ", conditions)})";
 
@@ -230,6 +231,15 @@ namespace MonitoringSystem.Pages.ProductionReport
                     : "AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')")}
       {planShiftFilter}
     GROUP BY DAY(pp.CurrentDate)";
+
+            string anyPlanSql = $@"
+    SELECT DISTINCT DAY(pp.CurrentDate) as Day
+    FROM ProductionPlan pp
+    INNER JOIN ProductionRecords pr ON pp.Id = pr.PlanId
+    WHERE YEAR(pp.CurrentDate) = @SelectedYear 
+      AND MONTH(pp.CurrentDate) = @SelectedMonth
+      AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')
+      {planShiftFilter}";
 
             string actualSql = $@"
 WITH ShiftData AS (
@@ -407,8 +417,26 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                                 var d = combinedData.FirstOrDefault(x => x.Day == (int)reader["Day"]);
                                 if (d != null)
                                 {
-                                    d.Plan = Convert.ToInt32(reader["TotalPlanQuantity"]);
-                                    d.PlanOvertime = Convert.ToInt32(reader["TotalPlanOvertime"]);
+                                    d.Plan = reader["TotalPlanQuantity"] != DBNull.Value ? Convert.ToInt32(reader["TotalPlanQuantity"]) : (int?)null;
+                                    d.PlanOvertime = reader["TotalPlanOvertime"] != DBNull.Value ? Convert.ToInt32(reader["TotalPlanOvertime"]) : (int?)null;
+                                }
+                            }
+                        }
+                    }
+
+                    using (var anyPlanCmd = new SqlCommand(anyPlanSql, conn))
+                    {
+                        anyPlanCmd.Parameters.AddWithValue("@SelectedYear", SelectedYear);
+                        anyPlanCmd.Parameters.AddWithValue("@SelectedMonth", SelectedMonth);
+
+                        using (var reader = anyPlanCmd.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                var d = combinedData.FirstOrDefault(x => x.Day == (int)reader["Day"]);
+                                if (d != null)
+                                {
+                                    d.HasAnyPlan = true;
                                 }
                             }
                         }
@@ -647,11 +675,23 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
 
             for (int i = 0; i < PlanData.Count; i++)
             {
-                int effectiveNormal = PlanData[i] > 0 ? PlanData[i] : OriginalPlanData[i];
-                EffectivePlanData.Add(effectiveNormal);
+                var data = combinedData[i];
+                if (!data.HasAnyPlan)
+                {
+                    int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : OriginalPlanData[i];
+                    EffectivePlanData.Add(effectiveNormal);
 
-                int effectiveOt = PlanOvertimeData[i] > 0 ? PlanOvertimeData[i] : OriginalPlanOvertimeData[i];
-                EffectivePlanOvertimeData.Add(effectiveOt);
+                    int effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
+                    EffectivePlanOvertimeData.Add(effectiveOt);
+                }
+                else
+                {
+                    int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : 0;
+                    EffectivePlanData.Add(effectiveNormal);
+
+                    int effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : 0;
+                    EffectivePlanOvertimeData.Add(effectiveOt);
+                }
             }
         }
 
