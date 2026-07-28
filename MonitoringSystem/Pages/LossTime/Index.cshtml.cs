@@ -638,9 +638,6 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
         {
             try
             {
-                var day8Records = currentRecords.Where(r => r.Date.Day == 8).ToList();
-                var debugText = "Day 8 Records:\n" + string.Join("\n", day8Records.Select(r => $"Shift: {r.Shift}, Category: {r.Category}, Start: {r.Start}, End: {r.End}, Duration: {r.Duration}"));
-                System.IO.File.WriteAllText(@"C:\Users\RIAN SETYO\.gemini\antigravity\brain\a634f69d-2fd0-4405-895b-30382f749c1d\debug.txt", debugText);
 
                 int daysInMonth = DateTime.DaysInMonth(SelectedYear, SelectedMonth);
                 var days = Enumerable.Range(1, daysInMonth).ToArray();
