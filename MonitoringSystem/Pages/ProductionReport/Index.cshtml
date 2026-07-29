@@ -945,9 +945,9 @@
                         <td style="text-align: left;">Loss Time</td>
                         @for (int i = 0; i < Model.DailyLossTime.Count; i++)
                         {
-                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.DailyLossTime[i] > 0 ? Model.DailyLossTime[i].ToString("N0") : "0")</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.DailyLossTime[i] > 0 ? Model.DailyLossTime[i].ToString("0.##") : "0")</td>
                         }
-                        <td style="font-weight: 700;">@Model.DailyLossTime.Sum().ToString("N0")</td>
+                        <td style="font-weight: 700;">@Model.DailyLossTime.Sum().ToString("0.##")</td>
                     </tr>
 
                     <!-- TOTAL LOAD TIME - SATU KOLOM PENUH, DIBAWAH LOSS TIME -->

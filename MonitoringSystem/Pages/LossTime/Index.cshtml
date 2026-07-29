@@ -1055,12 +1055,22 @@
                               rows="5" style="resize: vertical; font-size:14px;"></textarea>
                     <div id="editReasonError" class="text-danger mt-1" style="font-size:12px; display:none;"></div>
                 </div>
+
+                <div id="attachmentsSection" style="display:none; margin-top:15px; border-top: 1px solid #444; padding-top: 10px;">
+                    <h6><i class="fas fa-file-alt"></i> Uploaded Files</h6>
+                    <div id="attachmentsList" class="mt-2"></div>
+                </div>
             </div>
             <div class="modal-footer d-flex justify-content-between align-items-center">
                 <div>
                     <button type="button" id="btnEditReason" class="btn btn-warning btn-sm text-dark fw-bold">
                         <i class="fas fa-pencil-alt me-1"></i> Edit
                     </button>
+                    <button type="button" id="btnUploadFile" class="btn btn-primary btn-sm fw-bold">
+                        <i class="fas fa-upload me-1"></i> Upload
+                    </button>
+                    <input type="file" id="hiddenFileInput" style="display:none;" />
+
                     <button type="button" id="btnSaveReason" class="btn btn-success btn-sm fw-bold" style="display:none;">
                         <i class="fas fa-save me-1"></i> Save
                     </button>
@@ -1543,7 +1553,14 @@
                                         const isMTT = label === MTT_CATEGORY_NAME;
                                         return isMTT ? '⚙️ ' + label : label;
                                     },
-                                    label: (c) => `${c.dataset.label}: ${c.raw} min`
+                                    label: (c) => `${c.dataset.label}: ${c.raw} min`,
+                                    footer: (tooltipItems) => {
+                                        let total = 0;
+                                        tooltipItems.forEach(item => {
+                                            total += parseFloat(item.raw) || 0;
+                                        });
+                                        return 'Total: ' + Math.round(total * 100) / 100 + ' min';
+                                    }
                                 }
                             }
                         },
@@ -1648,7 +1665,16 @@
                                 bodyColor: colors.textColor, titleColor: colors.textColor,
                                 borderColor: colors.tooltipBorder, backgroundColor: colors.tooltipBg,
                                 mode: 'index', intersect: false,
-                                callbacks: { label: (c) => `${c.dataset.label}: ${c.raw} min` }
+                                callbacks: { 
+                                    label: (c) => `${c.dataset.label}: ${c.raw} min`,
+                                    footer: (tooltipItems) => {
+                                        let total = 0;
+                                        tooltipItems.forEach(item => {
+                                            total += parseFloat(item.raw) || 0;
+                                        });
+                                        return 'Total: ' + Math.round(total * 100) / 100 + ' min';
+                                    }
+                                }
                             }
                         },
                         scales: {
@@ -1725,6 +1751,15 @@
                     p.textContent = (reason && reason.trim() !== '') ? reason : 'No detailed reason provided.';
 
                     setReasonViewMode();
+
+                    // Otomatis tampilkan attachments saat modal dibuka
+                    const attachmentsSection = document.getElementById('attachmentsSection');
+                    if (recordId && recordSource) {
+                        if (attachmentsSection) attachmentsSection.style.display = 'block';
+                        if (window.loadAttachments) window.loadAttachments(recordId, recordSource);
+                    } else {
+                        if (attachmentsSection) attachmentsSection.style.display = 'none';
+                    }
                 });
             }
 
@@ -1879,4 +1914,187 @@
             this.innerHTML = originalHTML;
         }
     });
+
+    // ATTACHMENTS LOGIC
+    document.addEventListener('DOMContentLoaded', function() {
+        const btnUploadFile = document.getElementById('btnUploadFile');
+        const hiddenFileInput = document.getElementById('hiddenFileInput');
+        const btnViewFiles = document.getElementById('btnViewFiles');
+        const attachmentsSection = document.getElementById('attachmentsSection');
+        const attachmentsList = document.getElementById('attachmentsList');
+        const modal = document.getElementById('detailedReasonModal');
+
+        if(btnUploadFile && hiddenFileInput) {
+            btnUploadFile.addEventListener('click', () => {
+                const recordSource = modal.getAttribute('data-current-record-source');
+                if(recordSource !== 'Assembly') {
+                    showCustomToast('Upload file hanya didukung untuk data Assembly', 'error');
+                    return;
+                }
+                hiddenFileInput.click();
+            });
+
+            hiddenFileInput.addEventListener('change', async function() {
+                if(!this.files || this.files.length === 0) return;
+                const file = this.files[0];
+                if(file.size > 5 * 1024 * 1024) {
+                    showCustomToast('Ukuran file maksimal 5MB', 'error');
+                    this.value = '';
+                    return;
+                }
+
+                const recordId = modal.getAttribute('data-current-record-id');
+                const recordSource = modal.getAttribute('data-current-record-source');
+
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('recordId', recordId);
+                formData.append('recordSource', recordSource);
+                
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                if(token) formData.append('__RequestVerificationToken', token);
+
+                btnUploadFile.disabled = true;
+                btnUploadFile.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                try {
+                    const response = await fetch('?handler=UploadAttachment', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+                    if(result.success) {
+                        showCustomToast('File berhasil diupload', 'success');
+                        if (window.loadAttachments) window.loadAttachments(recordId, recordSource);
+                        attachmentsSection.style.display = 'block';
+                    } else {
+                        showCustomToast(result.message || 'Gagal upload file', 'error');
+                    }
+                } catch (e) {
+                    showCustomToast('Error: ' + e.message, 'error');
+                } finally {
+                    btnUploadFile.disabled = false;
+                    btnUploadFile.innerHTML = '<i class="fas fa-upload me-1"></i> Upload';
+                    this.value = ''; // reset file input
+                }
+            });
+        }
+
+        // btnViewFiles has been removed, attachments load automatically on modal open
+
+        // Intercept setReasonEditMode to toggle delete buttons
+        const originalEdit = document.getElementById('btnEditReason');
+        if(originalEdit) {
+            originalEdit.addEventListener('click', () => {
+                document.querySelectorAll('.delete-attachment-btn').forEach(btn => btn.style.display = 'inline-block');
+                attachmentsSection.style.display = 'block'; // Ensure section is visible when editing
+            });
+        }
+
+        const originalCancelEdit = document.getElementById('btnCancelEdit');
+        if(originalCancelEdit) {
+            originalCancelEdit.addEventListener('click', () => {
+                document.querySelectorAll('.delete-attachment-btn').forEach(btn => btn.style.display = 'none');
+            });
+        }
+        
+        const originalSaveEdit = document.getElementById('btnSaveReason');
+        if(originalSaveEdit) {
+            originalSaveEdit.addEventListener('click', () => {
+                document.querySelectorAll('.delete-attachment-btn').forEach(btn => btn.style.display = 'none');
+            });
+        }
+
+        modal.addEventListener('hidden.bs.modal', function () {
+            const section = document.getElementById('attachmentsSection');
+            const list = document.getElementById('attachmentsList');
+            if (section) section.style.display = 'none';
+            if (list) list.innerHTML = '';
+        });
+
+        window.loadAttachments = async function(recordId, recordSource) {
+            const list = document.getElementById('attachmentsList');
+            if (!list) return;
+            
+            list.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+            try {
+                const response = await fetch(`?handler=Attachments&recordId=${recordId}&recordSource=${recordSource}&_t=${new Date().getTime()}`);
+                const result = await response.json();
+                
+                if(result.success) {
+                    if(!result.data || result.data.length === 0) {
+                        list.innerHTML = '<div class="text-muted small">No attachments found.</div>';
+                        return;
+                    }
+                    let html = '';
+                    const isEditMode = document.getElementById('detailedReasonEditMode').style.display !== 'none';
+                    
+                    result.data.forEach(item => {
+                        const deleteBtnDisplay = isEditMode ? 'inline-block' : 'none';
+                        const downloadUrl = `${window.location.pathname}?handler=DownloadAttachment&id=${item.id}`;
+                        
+                        html += `
+                            <div class="d-flex align-items-center mb-2 bg-secondary bg-opacity-25 p-2 rounded" id="attachment-item-${item.id}">
+                                <a href="${downloadUrl}" target="_blank" class="text-info text-decoration-none me-auto text-truncate" style="max-width: 80%;" title="${item.originalFileName}">
+                                    <i class="fas fa-paperclip me-2"></i>${item.originalFileName}
+                                </a>
+                                <span class="text-muted small me-3">${item.uploadedAt}</span>
+                                <button class="btn btn-sm btn-danger delete-attachment-btn" style="display:${deleteBtnDisplay};" data-id="${item.id}" title="Delete File">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        `;
+                    });
+                    list.innerHTML = html;
+
+                    // Bind delete buttons
+                    document.querySelectorAll('.delete-attachment-btn').forEach(btn => {
+                        btn.addEventListener('click', async function() {
+                            if(!confirm('Apakah anda yakin ingin menghapus file ini?')) return;
+                            
+                            const id = this.getAttribute('data-id');
+                            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                            const formData = new FormData();
+                            formData.append('id', id);
+                            if(token) formData.append('__RequestVerificationToken', token);
+                            
+                            const originalHtml = this.innerHTML;
+                            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                            this.disabled = true;
+
+                            try {
+                                const delResp = await fetch('?handler=DeleteAttachment', {
+                                    method: 'POST',
+                                    body: formData
+                                });
+                                const delResult = await delResp.json();
+                                if(delResult.success) {
+                                    const item = document.getElementById(`attachment-item-${id}`);
+                                    if(item) item.remove();
+                                    showCustomToast('File berhasil dihapus', 'success');
+                                    const currentList = document.getElementById('attachmentsList');
+                                    if(currentList && currentList.children.length === 0) {
+                                        currentList.innerHTML = '<div class="text-muted small">No attachments found.</div>';
+                                    }
+                                } else {
+                                    showCustomToast(delResult.message || 'Gagal menghapus file', 'error');
+                                    this.innerHTML = originalHtml;
+                                    this.disabled = false;
+                                }
+                            } catch(e) {
+                                showCustomToast('Error: ' + e.message, 'error');
+                                this.innerHTML = originalHtml;
+                                this.disabled = false;
+                            }
+                        });
+                    });
+                } else {
+                    list.innerHTML = `<div class="text-danger small">${result.message || 'Error loading attachments'}</div>`;
+                }
+            } catch(e) {
+                list.innerHTML = `<div class="text-danger small">Error: ${e.message}</div>`;
+            }
+        }
+    });
+
 </script>

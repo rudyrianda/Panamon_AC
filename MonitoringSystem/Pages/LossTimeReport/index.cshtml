@@ -2,7 +2,7 @@
 @model MonitoringSystem.Pages.LossTimeReport.indexModel
 @{
     ViewData["Title"] = "Loss Time Report";
-    string[] months = { "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar" };
+    string[] months = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
     /* Pa Adan Disini */
 }
 
@@ -568,7 +568,7 @@ main.pb-5 {
             <div class="chart-box-header">
                 <span class="chart-box-title">
                     Actual vs BP : @(Model.MachineLine == "All" ? "All Lines Combined" : Model.MachineLine)
-                    (Apr @Model.SelectedYear - Mar @(Model.SelectedYear + 1))
+                    (Jan @Model.SelectedYear - Dec @Model.SelectedYear)
                 </span>
                 <div class="chart-box-line"></div>
             </div>
@@ -763,6 +763,17 @@ main.pb-5 {
             colorIdx++;
         });
 
+        // ===== RATIO DATASETS =====
+        const isLight = document.body.classList.contains('light-mode');
+        
+        datasets.push({
+            type: 'line', label: 'Wt act loss (%)',
+            data: chartData.RatioLossVsWt,
+            borderColor: isLight ? '#666666' : '#FFFFFF', 
+            backgroundColor: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.2)', 
+            tension: 0.1, yAxisID: 'y_ratio_wt', order: 1, hidden: false
+        });
+
         // ============================================================
         // INIT CHART
         // ============================================================
@@ -789,10 +800,20 @@ main.pb-5 {
                         titleColor: c0.tooltipText,   // ✅ FIX: property langsung, bukan callback
                         bodyColor:  c0.tooltipText,   // ✅ FIX: property langsung, bukan callback
                         footerColor: c0.tooltipText,  // ✅ FIX: property langsung, bukan callback
-                        itemSort: function(a, b) { return b.parsed.y - a.parsed.y; },
+                        itemSort: function(a, b) {
+                            const lA = a.dataset.label || '';
+                            const lB = b.dataset.label || '';
+                            if (lA.includes('Wt act loss')) return 1;
+                            if (lB.includes('Wt act loss')) return -1;
+                            return b.parsed.y - a.parsed.y; 
+                        },
                         callbacks: {
                             label: function (context) {
                                 const label = context.dataset.label || '';
+                                if (label.includes('Ratio') || label.includes('Wt act loss')) {
+                                    if (context.parsed.y === null || context.parsed.y === undefined) return null;
+                                    return label + ': ' + context.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%';
+                                }
                                 if (!label.includes('(Act)')) return null;
                                 if (!context.parsed.y || context.parsed.y === 0) return null;
                                 return label.replace(' (Act)', '') + ': ' + context.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' min';
@@ -804,8 +825,8 @@ main.pb-5 {
                                 let totalAct = 0, totalBP = 0;
                                 chart.data.datasets.forEach((ds) => {
                                     const val = ds.data[dataIndex] || 0;
-                                    if (ds.label?.includes('(Act)')) totalAct += val;
-                                    else if (ds.label?.includes('(Plan)')) totalBP += val;
+                                    if (ds.label?.includes('(Act)') && !ds.label?.includes('Ratio')) totalAct += val;
+                                    else if (ds.label?.includes('(Plan)') && !ds.label?.includes('Ratio')) totalBP += val;
                                 });
                                 return [
                                     '─────────────────',
@@ -822,7 +843,7 @@ main.pb-5 {
                             generateLabels: function (chart) {
                                 const original = Chart.defaults.plugins.legend.labels.generateLabels;
                                 const labels = original.call(this, chart);
-                                return labels.filter(l => l.text.includes('(Act)'))
+                                return labels.filter(l => l.text.includes('(Act)') || l.text.includes('Ratio') || l.text.includes('Wt act loss'))
                                              .map(l => { l.text = l.text.replace(' (Act)', ''); return l; });
                             }
                         },
@@ -848,10 +869,10 @@ main.pb-5 {
                         ticks: { color: c0.textColor },
                         grid:  { color: c0.gridColor }
                     },
-                    y_ratio: {
-                        type: 'linear', display: false, position: 'right',
+                    y_ratio_wt: {
+                        type: 'linear', display: true, position: 'right',
                         grid: { drawOnChartArea: false },
-                        title: { display: true, text: 'Ratio (%)', color: c0.textColor },
+                        title: { display: true, text: 'WT vs Act Loss (%)', color: c0.textColor },
                         ticks: { color: c0.textColor, callback: v => v + '%' },
                         suggestedMax: 5
                     }
