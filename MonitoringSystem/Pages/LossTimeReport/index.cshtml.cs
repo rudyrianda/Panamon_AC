@@ -63,7 +63,6 @@ namespace MonitoringSystem.Pages.LossTimeReport
         // Menampung total Working Loss saja (untuk ringkasan & grafik)
         public double[] TotalActualPerMonth { get; set; } = new double[12];
         public double[] TotalPlanPerMonth { get; set; } = new double[12];
-        public double[] RatioActualVsBp { get; set; } = new double[12];
         public double[] RatioLossVsWt { get; set; } = new double[12];
 
         public void OnGet()
@@ -144,11 +143,6 @@ namespace MonitoringSystem.Pages.LossTimeReport
 
                 int monthNum = i + 1;
 
-                if (TotalPlanPerMonth[i] > 0)
-                {
-                    RatioActualVsBp[i] = Math.Round((TotalActualPerMonth[i] / TotalPlanPerMonth[i]) * 100, 2);
-                }
-
                 double workingTime = workingTimeRaw.ContainsKey(monthNum) ? workingTimeRaw[monthNum] : 0;
                 if (workingTime > 0)
                 {
@@ -164,7 +158,6 @@ namespace MonitoringSystem.Pages.LossTimeReport
                 // Filter dictionary agar JS Chart hanya merender Working Loss
                 Actuals = DetailActuals.Where(x => LegendCategories.Contains(x.Key)).ToDictionary(x => x.Key, x => x.Value),
                 Plans = DetailPlans.Where(x => LegendCategories.Contains(x.Key)).ToDictionary(x => x.Key, x => x.Value),
-                RatioActualVsBp = RatioActualVsBp,
                 RatioLossVsWt = RatioLossVsWt
             };
 

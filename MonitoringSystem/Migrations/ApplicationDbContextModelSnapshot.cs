@@ -326,6 +326,45 @@ namespace MonitoringSystem.Migrations
                     b.ToTable("LossTimeActuals");
                 });
 
+            modelBuilder.Entity("MonitoringSystem.Models.LossTimeAttachment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("RecordId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RecordSource")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("SavedFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LossTimeAttachments");
+                });
+
             modelBuilder.Entity("MonitoringSystem.Models.LossTimePlan", b =>
                 {
                     b.Property<int>("Id")

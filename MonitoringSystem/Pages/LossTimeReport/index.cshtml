@@ -766,16 +766,8 @@ main.pb-5 {
         // ===== RATIO DATASETS =====
         const isLight = document.body.classList.contains('light-mode');
         
-        bpDatasetIndices.push(datasets.length);
         datasets.push({
-            type: 'line', label: 'Act vs BP Ratio (%)',
-            data: chartData.RatioActualVsBp,
-            borderColor: '#FACC15', backgroundColor: 'rgba(255, 215, 0, 0.2)',
-            tension: 0.1, yAxisID: 'y_ratio_bp', order: 1
-        });
-
-        datasets.push({
-            type: 'line', label: 'Loss vs WT Ratio (%)',
+            type: 'line', label: 'WT vs Act Loss (%)',
             data: chartData.RatioLossVsWt,
             borderColor: isLight ? '#666666' : '#FFFFFF', 
             backgroundColor: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.2)', 
@@ -871,16 +863,10 @@ main.pb-5 {
                         ticks: { color: c0.textColor },
                         grid:  { color: c0.gridColor }
                     },
-                    y_ratio_bp: {
-                        type: 'linear', display: true, position: 'right',
-                        grid: { drawOnChartArea: false },
-                        title: { display: true, text: 'Act vs BP Ratio (%)', color: '#FACC15' },
-                        ticks: { color: '#FACC15', callback: v => v + '%' }
-                    },
                     y_ratio_wt: {
                         type: 'linear', display: true, position: 'right',
                         grid: { drawOnChartArea: false },
-                        title: { display: true, text: 'Loss vs WT Ratio (%)', color: c0.textColor },
+                        title: { display: true, text: 'WT vs Act Loss (%)', color: c0.textColor },
                         ticks: { color: c0.textColor, callback: v => v + '%' },
                         suggestedMax: 5
                     }

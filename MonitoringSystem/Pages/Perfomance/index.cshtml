@@ -1,4 +1,4 @@
-﻿@page
+@page
 @using MonitoringSystem.Pages.Performance
 @model MonitoringSystem.Pages.Performance.PerformanceModel
 @{
@@ -571,7 +571,7 @@
                     </tr>
                     <tr>
                         <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">LOSS TIME</td>
-                        <td class="perf-td fs-4 fw-bold w-50 py-3">@totalLossTime min</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3">@Math.Round(totalLossTime, 1) min</td>
                     </tr>
                 </tbody>
             </table>
