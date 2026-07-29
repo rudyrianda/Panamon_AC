@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using MonitoringSystem.Models;
 using static MonitoringSystem.Pages.Shared.ApplyBreakFilterModel;
@@ -17,6 +17,7 @@ namespace MonitoringSystem.Data
         public DbSet<AdditionalBreakTime> AdditionalBreakTimes { get; set; }
         public DbSet<HourlyPlanData> HourlyPlanData { get; set; }
         public DbSet<LossTimeActual> LossTimeActuals { get; set; }
+        public DbSet<LossTimeAttachment> LossTimeAttachments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

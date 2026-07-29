@@ -1306,6 +1306,162 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                 return new JsonResult(new { success = false, message = "Server error: " + ex.Message });
             }
         }
+        public async Task<IActionResult> OnPostUploadAttachmentAsync()
+        {
+            try
+            {
+                var form = Request.Form;
+                var file = form.Files.FirstOrDefault();
+                string recordSource = form["recordSource"].ToString();
+
+                if (file == null || file.Length == 0)
+                    return new JsonResult(new { success = false, message = "File tidak ditemukan atau kosong." });
+
+                if (file.Length > 10 * 1024 * 1024) // 10MB limit
+                    return new JsonResult(new { success = false, message = "Ukuran file melebihi batas 10MB." });
+
+                if (!int.TryParse(form["recordId"], out int recordId) || recordId <= 0)
+                    return new JsonResult(new { success = false, message = "Record ID tidak valid." });
+
+                if (recordSource != "Assembly")
+                    return new JsonResult(new { success = false, message = "Upload hanya didukung untuk data Assembly." });
+
+                string uploadFolder = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "LossTimeAttachments");
+                if (!Directory.Exists(uploadFolder))
+                    Directory.CreateDirectory(uploadFolder);
+
+                string originalFileName = file.FileName;
+                string extension = Path.GetExtension(originalFileName);
+                string savedFileName = $"{Guid.NewGuid()}{extension}";
+                string filePath = Path.Combine(uploadFolder, savedFileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                var attachment = new LossTimeAttachment
+                {
+                    RecordSource = recordSource,
+                    RecordId = recordId,
+                    OriginalFileName = originalFileName,
+                    SavedFileName = savedFileName,
+                    FilePath = filePath,
+                    UploadedAt = DateTime.Now
+                };
+
+                _context.LossTimeAttachments.Add(attachment);
+                await _context.SaveChangesAsync();
+
+                return new JsonResult(new { success = true, message = "File berhasil diupload.", attachmentId = attachment.Id });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ OnPostUploadAttachment error: {ex.Message}");
+                return new JsonResult(new { success = false, message = "Server error: " + ex.Message });
+            }
+        }
+
+        public IActionResult OnGetAttachments(int recordId, string recordSource)
+        {
+            try
+            {
+                var attachments = _context.LossTimeAttachments
+                    .Where(a => a.RecordId == recordId && a.RecordSource == recordSource)
+                    .OrderByDescending(a => a.UploadedAt)
+                    .Select(a => new
+                    {
+                        a.Id,
+                        a.OriginalFileName,
+                        UploadedAt = a.UploadedAt.ToString("dd-MM-yyyy HH:mm")
+                    })
+                    .ToList();
+
+                return new JsonResult(new { success = true, data = attachments });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ OnGetAttachments error: {ex.Message}");
+                return new JsonResult(new { success = false, message = "Server error: " + ex.Message });
+            }
+        }
+
+        public IActionResult OnGetDownloadAttachment(int id)
+        {
+            try
+            {
+                var attachment = _context.LossTimeAttachments.Find(id);
+                if (attachment == null) return NotFound("Attachment tidak ditemukan.");
+
+                if (!System.IO.File.Exists(attachment.FilePath))
+                    return NotFound("File fisik tidak ditemukan di server.");
+
+                string contentType = GetContentType(attachment.FilePath);
+                var fileBytes = System.IO.File.ReadAllBytes(attachment.FilePath);
+                
+                Response.Headers.Add("Content-Disposition", $"inline; filename=\"{attachment.OriginalFileName}\"");
+                return File(fileBytes, contentType);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ OnGetDownloadAttachment error: {ex.Message}");
+                return BadRequest("Server error: " + ex.Message);
+            }
+        }
+
+        public async Task<IActionResult> OnPostDeleteAttachmentAsync()
+        {
+            try
+            {
+                var form = Request.Form;
+                if (!int.TryParse(form["id"], out int attachmentId) || attachmentId <= 0)
+                    return new JsonResult(new { success = false, message = "ID tidak valid." });
+
+                var attachment = await _context.LossTimeAttachments.FindAsync(attachmentId);
+                if (attachment == null)
+                    return new JsonResult(new { success = false, message = "File tidak ditemukan di database." });
+
+                if (System.IO.File.Exists(attachment.FilePath))
+                {
+                    System.IO.File.Delete(attachment.FilePath);
+                }
+
+                _context.LossTimeAttachments.Remove(attachment);
+                await _context.SaveChangesAsync();
+
+                return new JsonResult(new { success = true, message = "File berhasil dihapus." });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ OnPostDeleteAttachment error: {ex.Message}");
+                return new JsonResult(new { success = false, message = "Server error: " + ex.Message });
+            }
+        }
+
+        private string GetContentType(string path)
+        {
+            var types = GetMimeTypes();
+            var ext = Path.GetExtension(path).ToLowerInvariant();
+            return types.ContainsKey(ext) ? types[ext] : "application/octet-stream";
+        }
+
+        private Dictionary<string, string> GetMimeTypes()
+        {
+            return new Dictionary<string, string>
+            {
+                {".txt", "text/plain"},
+                {".pdf", "application/pdf"},
+                {".doc", "application/vnd.ms-word"},
+                {".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+                {".xls", "application/vnd.ms-excel"},
+                {".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},  
+                {".png", "image/png"},
+                {".jpg", "image/jpeg"},
+                {".jpeg", "image/jpeg"},
+                {".gif", "image/gif"},
+                {".csv", "text/csv"}
+            };
+        }
 
     }  // ← tutup class IndexModel
 

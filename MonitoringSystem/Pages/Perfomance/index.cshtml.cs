@@ -63,7 +63,7 @@ namespace MonitoringSystem.Pages.Performance
         public int CachedPlanTaktTime { get; set; }
         public int CachedEfficiency { get; set; }
         public int CachedWorkingTime { get; set; }
-        public int CachedLossTime { get; set; }
+        public double CachedLossTime { get; set; }
         public int CachedDefect { get; set; }
 
         public List<ProductionAchievement> listProdAchieve = new List<ProductionAchievement>();
@@ -971,9 +971,9 @@ namespace MonitoringSystem.Pages.Performance
             return totalMinutes;
         }
 
-        public int GetLossTimeBySummaryLogic()
+        public double GetLossTimeBySummaryLogic()
         {
-            int totalLossMinutes = 0;
+            double totalLossMinutes = 0;
 
             try
             {
@@ -1007,7 +1007,7 @@ namespace MonitoringSystem.Pages.Performance
                             cmd.Parameters.AddWithValue("@MachineCode", MachineCode);
                             var result = cmd.ExecuteScalar();
                             if (result != null && result != DBNull.Value)
-                                totalLossMinutes = (int)Convert.ToDouble(result);
+                                totalLossMinutes = Convert.ToDouble(result);
                         }
                         return totalLossMinutes;
                     }
@@ -1016,11 +1016,11 @@ namespace MonitoringSystem.Pages.Performance
                     TimeSpan shiftStart = new TimeSpan(7, 0, 0);
                     TimeSpan shiftEnd = new TimeSpan(23, 15, 0);
 
-                    string lossQuery = @"SELECT Time, EndDateTime 
+                    string lossQuery = @"SELECT Time, EndDateTime, LossTime 
                                  FROM AssemblyLossTime
                                  WHERE CAST(Date AS DATE) = @SelectedDate AND MachineCode = @MachineCode;";
 
-                    var lossList = new List<(TimeSpan Start, TimeSpan End)>();
+                    var lossList = new List<(TimeSpan Start, TimeSpan End, int DurationSec)>();
                     using (SqlCommand cmd = new SqlCommand(lossQuery, connection))
                     {
                         cmd.Parameters.AddWithValue("@SelectedDate", SelectedDate);
@@ -1031,8 +1031,9 @@ namespace MonitoringSystem.Pages.Performance
                             {
                                 var start = reader.GetTimeSpan(0);
                                 var end = reader.GetTimeSpan(1);
+                                int durationSec = reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
                                 if (end < start) end = end.Add(TimeSpan.FromDays(1));
-                                lossList.Add((start, end));
+                                lossList.Add((start, end, durationSec));
                             }
                         }
                     }
@@ -1054,7 +1055,7 @@ namespace MonitoringSystem.Pages.Performance
                                     !breaks.Any(b => l.Start < b.End && l.End > b.Start))
                         .ToList();
 
-                    totalLossMinutes = (int)validLoss.Sum(l => (l.End - l.Start).TotalMinutes);
+                    totalLossMinutes = validLoss.Sum(l => l.DurationSec / 60.0);
                 }
             }
             catch (Exception ex)
