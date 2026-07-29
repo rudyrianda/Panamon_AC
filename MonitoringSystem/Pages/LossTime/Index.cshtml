@@ -1069,9 +1069,6 @@
                     <button type="button" id="btnUploadFile" class="btn btn-primary btn-sm fw-bold">
                         <i class="fas fa-upload me-1"></i> Upload
                     </button>
-                    <button type="button" id="btnViewFiles" class="btn btn-info btn-sm text-white fw-bold">
-                        <i class="fas fa-eye me-1"></i> View
-                    </button>
                     <input type="file" id="hiddenFileInput" style="display:none;" />
 
                     <button type="button" id="btnSaveReason" class="btn btn-success btn-sm fw-bold" style="display:none;">
@@ -1556,7 +1553,14 @@
                                         const isMTT = label === MTT_CATEGORY_NAME;
                                         return isMTT ? '⚙️ ' + label : label;
                                     },
-                                    label: (c) => `${c.dataset.label}: ${c.raw} min`
+                                    label: (c) => `${c.dataset.label}: ${c.raw} min`,
+                                    footer: (tooltipItems) => {
+                                        let total = 0;
+                                        tooltipItems.forEach(item => {
+                                            total += parseFloat(item.raw) || 0;
+                                        });
+                                        return 'Total: ' + Math.round(total * 100) / 100 + ' min';
+                                    }
                                 }
                             }
                         },
@@ -1661,7 +1665,16 @@
                                 bodyColor: colors.textColor, titleColor: colors.textColor,
                                 borderColor: colors.tooltipBorder, backgroundColor: colors.tooltipBg,
                                 mode: 'index', intersect: false,
-                                callbacks: { label: (c) => `${c.dataset.label}: ${c.raw} min` }
+                                callbacks: { 
+                                    label: (c) => `${c.dataset.label}: ${c.raw} min`,
+                                    footer: (tooltipItems) => {
+                                        let total = 0;
+                                        tooltipItems.forEach(item => {
+                                            total += parseFloat(item.raw) || 0;
+                                        });
+                                        return 'Total: ' + Math.round(total * 100) / 100 + ' min';
+                                    }
+                                }
                             }
                         },
                         scales: {
@@ -1738,6 +1751,15 @@
                     p.textContent = (reason && reason.trim() !== '') ? reason : 'No detailed reason provided.';
 
                     setReasonViewMode();
+
+                    // Otomatis tampilkan attachments saat modal dibuka
+                    const attachmentsSection = document.getElementById('attachmentsSection');
+                    if (recordId && recordSource) {
+                        if (attachmentsSection) attachmentsSection.style.display = 'block';
+                        if (window.loadAttachments) window.loadAttachments(recordId, recordSource);
+                    } else {
+                        if (attachmentsSection) attachmentsSection.style.display = 'none';
+                    }
                 });
             }
 
@@ -1915,8 +1937,8 @@
             hiddenFileInput.addEventListener('change', async function() {
                 if(!this.files || this.files.length === 0) return;
                 const file = this.files[0];
-                if(file.size > 10 * 1024 * 1024) {
-                    showCustomToast('Ukuran file maksimal 10MB', 'error');
+                if(file.size > 5 * 1024 * 1024) {
+                    showCustomToast('Ukuran file maksimal 5MB', 'error');
                     this.value = '';
                     return;
                 }
@@ -1943,7 +1965,7 @@
                     const result = await response.json();
                     if(result.success) {
                         showCustomToast('File berhasil diupload', 'success');
-                        loadAttachments(recordId, recordSource);
+                        if (window.loadAttachments) window.loadAttachments(recordId, recordSource);
                         attachmentsSection.style.display = 'block';
                     } else {
                         showCustomToast(result.message || 'Gagal upload file', 'error');
@@ -1958,19 +1980,7 @@
             });
         }
 
-        if(btnViewFiles) {
-            btnViewFiles.addEventListener('click', () => {
-                const isHidden = attachmentsSection.style.display === 'none';
-                if(isHidden) {
-                    const recordId = modal.getAttribute('data-current-record-id');
-                    const recordSource = modal.getAttribute('data-current-record-source');
-                    loadAttachments(recordId, recordSource);
-                    attachmentsSection.style.display = 'block';
-                } else {
-                    attachmentsSection.style.display = 'none';
-                }
-            });
-        }
+        // btnViewFiles has been removed, attachments load automatically on modal open
 
         // Intercept setReasonEditMode to toggle delete buttons
         const originalEdit = document.getElementById('btnEditReason');
@@ -1996,30 +2006,36 @@
         }
 
         modal.addEventListener('hidden.bs.modal', function () {
-            attachmentsSection.style.display = 'none';
-            attachmentsList.innerHTML = '';
+            const section = document.getElementById('attachmentsSection');
+            const list = document.getElementById('attachmentsList');
+            if (section) section.style.display = 'none';
+            if (list) list.innerHTML = '';
         });
 
-        async function loadAttachments(recordId, recordSource) {
-            attachmentsList.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+        window.loadAttachments = async function(recordId, recordSource) {
+            const list = document.getElementById('attachmentsList');
+            if (!list) return;
+            
+            list.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
             try {
-                const response = await fetch(`?handler=Attachments&recordId=${recordId}&recordSource=${recordSource}`);
+                const response = await fetch(`?handler=Attachments&recordId=${recordId}&recordSource=${recordSource}&_t=${new Date().getTime()}`);
                 const result = await response.json();
                 
                 if(result.success) {
                     if(!result.data || result.data.length === 0) {
-                        attachmentsList.innerHTML = '<div class="text-muted small">No attachments found.</div>';
+                        list.innerHTML = '<div class="text-muted small">No attachments found.</div>';
                         return;
                     }
-                    
                     let html = '';
                     const isEditMode = document.getElementById('detailedReasonEditMode').style.display !== 'none';
                     
                     result.data.forEach(item => {
                         const deleteBtnDisplay = isEditMode ? 'inline-block' : 'none';
+                        const downloadUrl = `${window.location.pathname}?handler=DownloadAttachment&id=${item.id}`;
+                        
                         html += `
                             <div class="d-flex align-items-center mb-2 bg-secondary bg-opacity-25 p-2 rounded" id="attachment-item-${item.id}">
-                                <a href="?handler=DownloadAttachment&id=${item.id}" target="_blank" class="text-info text-decoration-none me-auto text-truncate" style="max-width: 80%;" title="${item.originalFileName}">
+                                <a href="${downloadUrl}" target="_blank" class="text-info text-decoration-none me-auto text-truncate" style="max-width: 80%;" title="${item.originalFileName}">
                                     <i class="fas fa-paperclip me-2"></i>${item.originalFileName}
                                 </a>
                                 <span class="text-muted small me-3">${item.uploadedAt}</span>
@@ -2029,7 +2045,7 @@
                             </div>
                         `;
                     });
-                    attachmentsList.innerHTML = html;
+                    list.innerHTML = html;
 
                     // Bind delete buttons
                     document.querySelectorAll('.delete-attachment-btn').forEach(btn => {
@@ -2053,10 +2069,12 @@
                                 });
                                 const delResult = await delResp.json();
                                 if(delResult.success) {
-                                    document.getElementById(`attachment-item-${id}`).remove();
+                                    const item = document.getElementById(`attachment-item-${id}`);
+                                    if(item) item.remove();
                                     showCustomToast('File berhasil dihapus', 'success');
-                                    if(attachmentsList.children.length === 0) {
-                                        attachmentsList.innerHTML = '<div class="text-muted small">No attachments found.</div>';
+                                    const currentList = document.getElementById('attachmentsList');
+                                    if(currentList && currentList.children.length === 0) {
+                                        currentList.innerHTML = '<div class="text-muted small">No attachments found.</div>';
                                     }
                                 } else {
                                     showCustomToast(delResult.message || 'Gagal menghapus file', 'error');
@@ -2071,10 +2089,10 @@
                         });
                     });
                 } else {
-                    attachmentsList.innerHTML = `<div class="text-danger small">${result.message || 'Error loading attachments'}</div>`;
+                    list.innerHTML = `<div class="text-danger small">${result.message || 'Error loading attachments'}</div>`;
                 }
             } catch(e) {
-                attachmentsList.innerHTML = `<div class="text-danger small">Error: ${e.message}</div>`;
+                list.innerHTML = `<div class="text-danger small">Error: ${e.message}</div>`;
             }
         }
     });

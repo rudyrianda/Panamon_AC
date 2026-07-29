@@ -58,88 +58,27 @@ namespace MonitoringSystem.Pages.Summary
                     ? "" : "AND o.MachineCode = @filterMachine";
 
                 cmd.CommandText = $@"
-                    WITH ShiftData AS (
-                        SELECT 
-                            o.Product_Id,
-                            ISNULL(m.ProductName, o.Product_Id) AS Model,
-                            o.MachineCode,
-                            CAST(@filterDate AS DATE) AS ReportDate,
-                            o.SDate,
-                            o.TotalUnit,
-                            o.ShiftMode AS Mode_Asli_Mesin,
-                            CASE 
-                                WHEN o.ShiftMode = 'NON-SHIFT' THEN
-                                    CASE 
-                                        WHEN MONTH(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 7 AND YEAR(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 2026 AND DAY(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) <= 5 THEN 'NON-SHIFT'
-                                        WHEN CAST(o.SDate AS TIME) >= '07:00:00' AND CAST(o.SDate AS TIME) <= '15:45:00' THEN 'SHIFT 1'
-                                        WHEN CAST(o.SDate AS TIME) > '15:45:00' AND CAST(o.SDate AS TIME) <= '18:00:00' THEN 'OVERTIME SHIFT 1'
-                                        WHEN CAST(o.SDate AS TIME) > '18:00:00' AND CAST(o.SDate AS TIME) <= '23:15:00' THEN 'OVERTIME SHIFT 3'
-                                        ELSE 'SHIFT 3'
-                                    END
-                                WHEN o.ShiftMode LIKE 'OVERTIME%' THEN
-                                    CASE 
-                                        WHEN MONTH(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 7 AND YEAR(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 2026 AND DAY(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) <= 5 THEN 'OVERTIME'
-                                        WHEN CAST(o.SDate AS TIME) >= '15:45:00' AND CAST(o.SDate AS TIME) <= '18:00:00' THEN 'OVERTIME SHIFT 1'
-                                        WHEN CAST(o.SDate AS TIME) > '18:00:00' AND CAST(o.SDate AS TIME) <= '23:15:00' THEN 'OVERTIME SHIFT 3'
-                                        WHEN CAST(o.SDate AS TIME) > '23:15:00' OR CAST(o.SDate AS TIME) <= '07:00:00' THEN 'SHIFT 3'
-                                        ELSE 'OVERTIME'
-                                    END
-                                WHEN o.ShiftMode = 'SHIFT 2' AND MONTH(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 7 AND YEAR(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 2026 THEN
-                                    CASE 
-                                        WHEN CAST(o.SDate AS TIME) >= '07:00:00' AND CAST(o.SDate AS TIME) <= '15:45:00' THEN 'SHIFT 1'
-                                        WHEN CAST(o.SDate AS TIME) > '15:45:00' AND CAST(o.SDate AS TIME) <= '18:00:00' THEN 'OVERTIME SHIFT 1'
-                                        WHEN CAST(o.SDate AS TIME) > '18:00:00' AND CAST(o.SDate AS TIME) <= '23:15:00' THEN 'OVERTIME SHIFT 3'
-                                        ELSE 'SHIFT 3'
-                                    END
-                                WHEN o.ShiftMode = 'SHIFT 3' AND CAST(o.SDate AS TIME) > '18:00:00' AND CAST(o.SDate AS TIME) <= '23:15:00' THEN 'OVERTIME SHIFT 3'
-                                ELSE o.ShiftMode
-                            END AS Status_Di_Web,
-                            o.SN_GOOD
-                        FROM OEESN o
-                        LEFT JOIN MasterData m ON m.Product_Id = o.Product_Id
-                        WHERE o.SDate >= DATEADD(HOUR, 7, @filterDate)
-                          AND o.SDate < DATEADD(HOUR, 31, @filterDate)
-                        {machineFilter}
-                    ),
-                    LaggedData AS (
-                        SELECT 
-                            Product_Id,
-                            Model,
-                            MachineCode,
-                            ReportDate,
-                            TotalUnit,
-                            SN_GOOD,
-                            LAG(TotalUnit) OVER (PARTITION BY ReportDate, MachineCode, Mode_Asli_Mesin, Status_Di_Web ORDER BY SDate) AS PreviousUnit
-                        FROM ShiftData
-                    ),
-                    ShiftDataFiltered AS (
-                        SELECT 
-                            Product_Id,
-                            Model,
-                            MachineCode,
-                            ReportDate,
-                            SN_GOOD,
-                            CASE
-                                WHEN PreviousUnit IS NULL THEN 0
-                                WHEN TotalUnit < PreviousUnit THEN 0
-                                ELSE TotalUnit - PreviousUnit
-                            END AS DeltaUnit
-                        FROM LaggedData
-                    )
                     SELECT 
                         o.Product_Id AS Data_Id,
-                        o.Model,
-                        SUM(o.DeltaUnit) AS Actual,
+                        ISNULL(m.ProductName, o.Product_Id) AS Model,
+                        COUNT(o.Product_Id) AS Actual,
                         o.MachineCode,
                         MIN(o.SN_GOOD) AS SerialFirst,
                         MAX(o.SN_GOOD) AS SerialLast,
                         MAX(pmd.ManualCount) AS ManualPwk
-                    FROM ShiftDataFiltered o
+                    FROM OEESN o
+                    LEFT JOIN MasterData m ON m.Product_Id = o.Product_Id
                     LEFT JOIN PwkManualData pmd ON pmd.ReportDate = CAST(@filterDate AS DATE) 
                                                AND pmd.MachineCode = o.MachineCode 
                                                AND pmd.Product_Id = o.Product_Id
-                    GROUP BY o.Product_Id, o.Model, o.MachineCode
-                    ORDER BY o.MachineCode, o.Model";
+                    WHERE o.SDate >= DATEADD(HOUR, 7, @filterDate)
+                      AND o.SDate < DATEADD(HOUR, 31, @filterDate)
+                      {machineFilter}
+                    GROUP BY 
+                        o.Product_Id, 
+                        ISNULL(m.ProductName, o.Product_Id),
+                        o.MachineCode
+                    ORDER BY o.MachineCode, Model";
 
                 var pDate = cmd.CreateParameter();
                 pDate.ParameterName = "@filterDate";

@@ -1317,8 +1317,8 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                 if (file == null || file.Length == 0)
                     return new JsonResult(new { success = false, message = "File tidak ditemukan atau kosong." });
 
-                if (file.Length > 10 * 1024 * 1024) // 10MB limit
-                    return new JsonResult(new { success = false, message = "Ukuran file melebihi batas 10MB." });
+                if (file.Length > 5 * 1024 * 1024) // 5MB limit
+                    return new JsonResult(new { success = false, message = "Ukuran file melebihi batas 5MB." });
 
                 if (!int.TryParse(form["recordId"], out int recordId) || recordId <= 0)
                     return new JsonResult(new { success = false, message = "Record ID tidak valid." });
@@ -1329,6 +1329,24 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                 string uploadFolder = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "LossTimeAttachments");
                 if (!Directory.Exists(uploadFolder))
                     Directory.CreateDirectory(uploadFolder);
+
+                // Hapus file lama jika ada (hanya diizinkan 1 file per record)
+                var existingAttachments = _context.LossTimeAttachments
+                    .Where(a => a.RecordId == recordId && a.RecordSource == recordSource)
+                    .ToList();
+
+                foreach (var existing in existingAttachments)
+                {
+                    if (System.IO.File.Exists(existing.FilePath))
+                    {
+                        try { System.IO.File.Delete(existing.FilePath); } catch { }
+                    }
+                }
+
+                if (existingAttachments.Any())
+                {
+                    _context.LossTimeAttachments.RemoveRange(existingAttachments);
+                }
 
                 string originalFileName = file.FileName;
                 string extension = Path.GetExtension(originalFileName);

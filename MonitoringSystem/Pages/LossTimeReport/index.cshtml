@@ -767,7 +767,7 @@ main.pb-5 {
         const isLight = document.body.classList.contains('light-mode');
         
         datasets.push({
-            type: 'line', label: 'WT vs Act Loss (%)',
+            type: 'line', label: 'Wt act loss (%)',
             data: chartData.RatioLossVsWt,
             borderColor: isLight ? '#666666' : '#FFFFFF', 
             backgroundColor: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.2)', 
@@ -800,11 +800,17 @@ main.pb-5 {
                         titleColor: c0.tooltipText,   // ✅ FIX: property langsung, bukan callback
                         bodyColor:  c0.tooltipText,   // ✅ FIX: property langsung, bukan callback
                         footerColor: c0.tooltipText,  // ✅ FIX: property langsung, bukan callback
-                        itemSort: function(a, b) { return b.parsed.y - a.parsed.y; },
+                        itemSort: function(a, b) {
+                            const lA = a.dataset.label || '';
+                            const lB = b.dataset.label || '';
+                            if (lA.includes('Wt act loss')) return 1;
+                            if (lB.includes('Wt act loss')) return -1;
+                            return b.parsed.y - a.parsed.y; 
+                        },
                         callbacks: {
                             label: function (context) {
                                 const label = context.dataset.label || '';
-                                if (label.includes('Ratio')) {
+                                if (label.includes('Ratio') || label.includes('Wt act loss')) {
                                     if (context.parsed.y === null || context.parsed.y === undefined) return null;
                                     return label + ': ' + context.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%';
                                 }
@@ -837,7 +843,7 @@ main.pb-5 {
                             generateLabels: function (chart) {
                                 const original = Chart.defaults.plugins.legend.labels.generateLabels;
                                 const labels = original.call(this, chart);
-                                return labels.filter(l => l.text.includes('(Act)') || l.text.includes('Ratio'))
+                                return labels.filter(l => l.text.includes('(Act)') || l.text.includes('Ratio') || l.text.includes('Wt act loss'))
                                              .map(l => { l.text = l.text.replace(' (Act)', ''); return l; });
                             }
                         },

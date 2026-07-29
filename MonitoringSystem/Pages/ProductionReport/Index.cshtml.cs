@@ -33,7 +33,7 @@ namespace MonitoringSystem.Pages.ProductionReport
         public List<int> DailyWorkTime { get; private set; } = new List<int>();
         public List<int> OvertimeOperators { get; private set; } = new List<int>();
         public List<int> OvertimeMinutes { get; private set; } = new List<int>();
-        public List<int> DailyLossTime { get; private set; } = new List<int>();
+        public List<double> DailyLossTime { get; private set; } = new List<double>();
         public List<int?> PlanOvertimeData { get; private set; } = new List<int?>();
         public List<int> EffectivePlanData { get; private set; } = new List<int>();
         public List<int> EffectivePlanOvertimeData { get; private set; } = new List<int>();
@@ -616,7 +616,7 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                     lossDurationSec = 0;
                 }
 
-                DailyLossTime.Add(lossDurationSec / 60);
+                DailyLossTime.Add(lossDurationSec / 60.0);
 
                 var dayType = DetermineTypeOfDay(new DateTime(SelectedYear, SelectedMonth, data.Day).DayOfWeek);
                 
