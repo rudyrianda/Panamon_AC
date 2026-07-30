@@ -1,0 +1,117 @@
+@page
+@model MonitoringSystem.Pages.ExcelViewer.IndexModel
+@{
+    ViewData["Title"] = "Excel Viewer";
+}
+
+<div class="container-fluid mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0 text-white"><i class="fas fa-file-excel mr-2"></i> Document Viewer - Excel (SheetJS)</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-4">
+                <label for="excelFile" class="form-label font-weight-bold">Pilih file Excel (.xlsx, .xls) untuk dilihat:</label>
+                <div class="custom-file">
+                    <input type="file" class="custom-file-input" id="excelFile" accept=".xlsx, .xls, .csv">
+                    <label class="custom-file-label" for="excelFile">Pilih file...</label>
+                </div>
+            </div>
+            
+            <hr />
+            
+            <h6 class="font-weight-bold mb-3">Preview Data:</h6>
+            <div id="excel-preview-container" class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                <div id="preview-message" class="text-center p-5 text-muted border border-dashed rounded bg-light">
+                    <i class="fas fa-upload fa-3x mb-3 text-secondary"></i>
+                    <p class="mb-0">Pilih file Excel untuk melihat pratinjau data di sini.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- Library SheetJS untuk membaca file Excel di Browser -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <script>
+        // Fungsi untuk me-render data array buffer ke tabel HTML
+        function renderExcelData(data) {
+            var container = document.getElementById('excel-preview-container');
+            try {
+                // Membaca file workbook (file excel keseluruhan)
+                var workbook = XLSX.read(data, {type: 'array'});
+                
+                // Kita ambil sheet (halaman) pertama saja
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+                
+                // Mengubah isi sheet menjadi Tabel HTML
+                var htmlStr = XLSX.utils.sheet_to_html(worksheet, {
+                    id: "excel-table"
+                });
+                
+                // Kosongkan container lalu masukkan tabel HTML yang baru digenerate
+                container.innerHTML = htmlStr;
+                
+                // Styling tabel menggunakan class bawaan Bootstrap agar rapi
+                var table = document.getElementById('excel-table');
+                if(table) {
+                    table.className = "table table-bordered table-striped table-hover table-sm";
+                    table.style.whiteSpace = "nowrap"; // Mencegah teks turun baris di dalam kolom
+                }
+            } catch (error) {
+                console.error(error);
+                container.innerHTML = '<div class="alert alert-danger">Terjadi kesalahan saat membaca file. Pastikan format file adalah Excel yang valid.</div>';
+            }
+        }
+
+        // Cek apakah ada parameter fileUrl di URL (untuk buka file otomatis dari klik link)
+        const urlParams = new URLSearchParams(window.location.search);
+        const fileUrl = urlParams.get('fileUrl');
+
+        if (fileUrl) {
+            var container = document.getElementById('excel-preview-container');
+            container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Mengunduh & Membaca file Excel...</p></div>';
+            
+            // Sembunyikan input file karena mode view otomatis
+            document.querySelector('.mb-4').style.display = 'none';
+
+            fetch(fileUrl)
+                .then(response => {
+                    if (!response.ok) throw new Error("Gagal mengambil file");
+                    return response.arrayBuffer();
+                })
+                .then(data => {
+                    renderExcelData(new Uint8Array(data));
+                })
+                .catch(error => {
+                    console.error(error);
+                    container.innerHTML = '<div class="alert alert-danger">Terjadi kesalahan saat mengunduh file Excel dari server.</div>';
+                });
+        }
+
+        // Update tulisan di custom file input saat file dipilih (Bootstrap 4 style)
+        document.getElementById('excelFile').addEventListener('change', function(e) {
+            var fileName = e.target.files[0] ? e.target.files[0].name : "Pilih file...";
+            var label = e.target.nextElementSibling;
+            if(label) label.innerText = fileName;
+        });
+
+        // Proses pembacaan file Excel (Manual Upload)
+        document.getElementById('excelFile').addEventListener('change', function(e) {
+            var file = e.target.files[0];
+            if (!file) return;
+
+            var container = document.getElementById('excel-preview-container');
+            container.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Membaca file Excel...</p></div>';
+
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                renderExcelData(new Uint8Array(e.target.result));
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    </script>
+}

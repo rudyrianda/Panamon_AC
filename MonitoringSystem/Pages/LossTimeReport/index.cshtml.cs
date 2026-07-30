@@ -67,12 +67,15 @@ namespace MonitoringSystem.Pages.LossTimeReport
 
         public void OnGet()
         {
-            string[] months = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
+            string[] months = { "April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March" };
 
             var actualsRaw = GetDetailedActualData(SelectedYear, MachineLine);
 
             var planQuery = _context.LossTimePlans.AsQueryable();
-            planQuery = planQuery.Where(x => x.Year == SelectedYear);
+            planQuery = planQuery.Where(x =>
+                (x.Year == SelectedYear && x.Month >= 4) ||
+                (x.Year == SelectedYear + 1 && x.Month <= 3)
+            );
 
             if (MachineLine != "All") planQuery = planQuery.Where(x => x.MachineLine == MachineLine);
 
@@ -115,14 +118,14 @@ namespace MonitoringSystem.Pages.LossTimeReport
                 var catActuals = actualsRaw.Where(x => x.Category == cat);
                 foreach (var item in catActuals)
                 {
-                    int arrayIndex = item.Month - 1;
+                    int arrayIndex = (item.Month - 4 + 12) % 12;
                     actArr[arrayIndex] = Math.Round(item.Total, 1);
                 }
 
                 var catPlans = plansRaw.Where(x => x.Category == cat);
                 foreach (var item in catPlans)
                 {
-                    int arrayIndex = item.Month - 1;
+                    int arrayIndex = (item.Month - 4 + 12) % 12;
                     planArr[arrayIndex] = Math.Round(item.Total, 1);
                 }
 
@@ -141,7 +144,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
                     .Where(x => GetCategoryGroup(x.Key) == "Working Loss")
                     .Sum(x => x.Value[i]);
 
-                int monthNum = i + 1;
+                int monthNum = (i + 4) > 12 ? (i + 4) - 12 : (i + 4);
 
                 double workingTime = workingTimeRaw.ContainsKey(monthNum) ? workingTimeRaw[monthNum] : 0;
                 if (workingTime > 0)
@@ -212,17 +215,20 @@ namespace MonitoringSystem.Pages.LossTimeReport
         private List<MonthlyCategoryData> GetDetailedActualData(int fiscalYear, string line)
         {
             var rawList = new List<MonthlyCategoryData>();
-            DateTime startDate = new DateTime(fiscalYear, 1, 1);
-            DateTime endDate = new DateTime(fiscalYear, 12, 31);
+            DateTime startDate = new DateTime(fiscalYear, 4, 1);
+            DateTime endDate = new DateTime(fiscalYear + 1, 3, 31);
 
-            var actualsQuery = _context.LossTimeActuals.Where(x => x.Year == fiscalYear);
+            var actualsQuery = _context.LossTimeActuals.Where(x =>
+                (x.Year == fiscalYear && x.Month >= 4) ||
+                (x.Year == fiscalYear + 1 && x.Month <= 3)
+            );
             if (line != "All") actualsQuery = actualsQuery.Where(x => x.MachineLine == line);
 
             // Cek bulan mana yang sudah ada di LossTimeActuals
             var monthsWithActuals = actualsQuery.Select(x => x.Month).Distinct().ToList();
 
             // Semua bulan fiscal year
-            var allFiscalMonths = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+            var allFiscalMonths = new List<int> { 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3 };
 
             // Bulan yang BELUM ada di LossTimeActuals → fallback
             var monthsMissing = allFiscalMonths.Where(m => !monthsWithActuals.Contains(m)).ToList();
@@ -255,7 +261,8 @@ namespace MonitoringSystem.Pages.LossTimeReport
             {
                 var dateConditions = string.Join(" OR ", monthsMissing.Select(m =>
                 {
-                    return $"(YEAR(Date) = {fiscalYear} AND MONTH(Date) = {m})";
+                    int year = m >= 4 ? fiscalYear : fiscalYear + 1;
+                    return $"(YEAR(Date) = {year} AND MONTH(Date) = {m})";
                 }));
 
                 string query = $@"SELECT MONTH(Date) AS MonthVal, Reason, 
@@ -314,7 +321,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
                 for (int m = 1; m <= 12; m++)
                 {
                     var pr = new MonitoringSystem.Pages.ProductionReport.IndexModel(_webHostEnvironment, _configuration);
-                    pr.SelectedYear = fiscalYear;
+                    pr.SelectedYear = m >= 4 ? fiscalYear : fiscalYear + 1;
                     pr.SelectedMonth = m;
                     pr.MachineLine = line;
                     pr.SelectedShifts = new List<string> { "All" };
@@ -350,7 +357,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
                         {
                             var catName = NormalizeCategoryName(sheet.Cells[row, 2].Text);
                             if (string.IsNullOrEmpty(catName) || catName.Contains("Total")) continue;
-                            int[] months = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+                            int[] months = { 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3 };
                             int col = 3;
                             foreach (var m in months)
                             {
@@ -361,14 +368,15 @@ namespace MonitoringSystem.Pages.LossTimeReport
                                     Category = catName,
                                     MachineLine = UploadMachineLine,
                                     Month = m,
-                                    Year = SelectedYear,
+                                    Year = m >= 4 ? SelectedYear : SelectedYear + 1,
                                     TargetMinutes = tVal,
                                     Ratio = rVal * 100
                                 });
                                 col += 2;
                             }
                         }
-                        var old = _context.LossTimePlans.Where(x => x.MachineLine == UploadMachineLine && x.Year == SelectedYear);
+                        var old = _context.LossTimePlans.Where(x => x.MachineLine == UploadMachineLine &&
+                            ((x.Year == SelectedYear && x.Month >= 4) || (x.Year == SelectedYear + 1 && x.Month <= 3)));
                         _context.LossTimePlans.RemoveRange(old);
                         _context.LossTimePlans.AddRange(newPlans);
                         await _context.SaveChangesAsync();
