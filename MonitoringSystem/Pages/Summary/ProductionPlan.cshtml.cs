@@ -612,6 +612,11 @@ namespace MonitoringSystem.Pages.Shared
         public async Task<IActionResult> OnPostDeleteRecordAsync()
         {
             string recordId = Request.Form["RecordId"];
+            string filterDateString = Request.Form["FilterDate"];
+            string filterMachine = Request.Form["FilterMachineCode"];
+            if (string.IsNullOrEmpty(filterMachine)) filterMachine = FilterMachineCode ?? "MCH1-01";
+            if (string.IsNullOrEmpty(filterDateString) && FilterDate.HasValue) filterDateString = FilterDate.Value.ToString("yyyy-MM-dd");
+            if (string.IsNullOrEmpty(filterDateString)) filterDateString = DateTime.Now.ToString("yyyy-MM-dd");
             try
             {
                 using (var connection = new SqlConnection(this.connectionString))
@@ -624,7 +629,7 @@ namespace MonitoringSystem.Pages.Shared
                         int rowsAffected = await commandDelete.ExecuteNonQueryAsync();
                         TempData["StatusMessage"] = rowsAffected > 0 ? "success" : "error";
                         TempData["Message"] = rowsAffected > 0 ? "Data deleted successfully" : "Data not found";
-                        return RedirectToPage();
+                        return RedirectToPage(new { FilterDate = filterDateString, FilterMachineCode = filterMachine });
                     }
                 }
             }
@@ -633,14 +638,20 @@ namespace MonitoringSystem.Pages.Shared
                 Console.WriteLine("Exception: " + ex.ToString());
                 TempData["StatusMessage"] = "error";
                 TempData["Message"] = "Error deleting records: " + ex.Message;
-                return RedirectToPage(new { FilterDate = CurrentDate.ToString("yyyy-MM-dd"), FilterMachineCode = FilterMachineCode });
+                return RedirectToPage(new { FilterDate = filterDateString, FilterMachineCode = filterMachine });
             }
         }
 
         public async Task<IActionResult> OnPostDeleteAllRecord()
         {
             int planId = 0;
-            CurrentDate = DateTime.Now.Date;
+            string filterDateString = Request.Form["FilterDate"];
+            string filterMachine = Request.Form["FilterMachineCode"];
+            if (string.IsNullOrEmpty(filterMachine)) filterMachine = FilterMachineCode ?? "MCH1-01";
+            if (string.IsNullOrEmpty(filterDateString) && FilterDate.HasValue) filterDateString = FilterDate.Value.ToString("yyyy-MM-dd");
+            if (string.IsNullOrEmpty(filterDateString)) filterDateString = DateTime.Now.ToString("yyyy-MM-dd");
+            
+            CurrentDate = DateTime.TryParse(filterDateString, out DateTime pd) ? pd.Date : DateTime.Now.Date;
             try
             {
                 using (var connection = new SqlConnection(this.connectionString))
@@ -657,14 +668,15 @@ namespace MonitoringSystem.Pages.Shared
                     }
 
                     // Hanya delete ProductionRecords (Change Plan), TIDAK hapus SapPlan
-                    string queryDelete = "DELETE FROM ProductionRecords WHERE PlanId = @PlanId;";
+                    string queryDelete = "DELETE FROM ProductionRecords WHERE PlanId = @PlanId AND MachineCode = @MachineCode;";
                     using (SqlCommand commandDelete = new SqlCommand(queryDelete, connection))
                     {
                         commandDelete.Parameters.AddWithValue("@PlanId", planId);
+                        commandDelete.Parameters.AddWithValue("@MachineCode", filterMachine);
                         int rowsAffected = await commandDelete.ExecuteNonQueryAsync();
                         TempData["StatusMessage"] = rowsAffected > 0 ? "success" : "error";
                         TempData["Message"] = rowsAffected > 0 ? "Data deleted successfully" : "Data not found";
-                        return RedirectToPage();
+                        return RedirectToPage(new { FilterDate = filterDateString, FilterMachineCode = filterMachine });
                     }
                 }
             }
@@ -673,7 +685,7 @@ namespace MonitoringSystem.Pages.Shared
                 Console.WriteLine("Exception: " + ex.ToString());
                 TempData["StatusMessage"] = "error";
                 TempData["Message"] = "Error deleting data: " + ex.Message;
-                return Page();
+                return RedirectToPage(new { FilterDate = filterDateString, FilterMachineCode = filterMachine });
             }
         }
 

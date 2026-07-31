@@ -977,50 +977,15 @@ namespace MonitoringSystem.Pages.Performance
 
             try
             {
+                var breakTimes = GetAllBreakTimes(SelectedDate);
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     connection.Open();
 
-                    // Cek dulu apakah ada data di LossTimeActuals untuk hari ini
-                    string checkSql = @"SELECT COUNT(1) FROM LossTimeActuals 
-                                WHERE Month = @Month AND Year = @Year AND MachineLine = @MachineCode";
-                    bool hasActuals = false;
-                    using (SqlCommand cmd = new SqlCommand(checkSql, connection))
-                    {
-                        cmd.Parameters.AddWithValue("@Month", SelectedDate.Month);
-                        cmd.Parameters.AddWithValue("@Year", SelectedDate.Year);
-                        cmd.Parameters.AddWithValue("@MachineCode", MachineCode);
-                        hasActuals = (int)cmd.ExecuteScalar() > 0;
-                    }
-
-                    if (hasActuals)
-                    {
-                        // Pakai LossTimeActuals
-                        string actualsSql = @"SELECT SUM(Minutes) FROM LossTimeActuals
-                                      WHERE Month = @Month AND Year = @Year 
-                                      AND Day = @Day AND MachineLine = @MachineCode AND Minutes > 0";
-                        using (SqlCommand cmd = new SqlCommand(actualsSql, connection))
-                        {
-                            cmd.Parameters.AddWithValue("@Month", SelectedDate.Month);
-                            cmd.Parameters.AddWithValue("@Year", SelectedDate.Year);
-                            cmd.Parameters.AddWithValue("@Day", SelectedDate.Day);
-                            cmd.Parameters.AddWithValue("@MachineCode", MachineCode);
-                            var result = cmd.ExecuteScalar();
-                            if (result != null && result != DBNull.Value)
-                                totalLossMinutes = Convert.ToDouble(result);
-                        }
-                        return totalLossMinutes;
-                    }
-
-                    // Fallback: pakai AssemblyLossTime (kode lama)
-                    TimeSpan shiftStart = new TimeSpan(7, 0, 0);
-                    TimeSpan shiftEnd = new TimeSpan(23, 15, 0);
-
-                    string lossQuery = @"SELECT Time, EndDateTime, LossTime 
+                    string lossQuery = @"SELECT CAST(Time AS TIME) AS StartTime, CAST(EndDateTime AS TIME) AS EndTime, LossTime 
                                  FROM AssemblyLossTime
                                  WHERE CAST(Date AS DATE) = @SelectedDate AND MachineCode = @MachineCode;";
 
-                    var lossList = new List<(TimeSpan Start, TimeSpan End, int DurationSec)>();
                     using (SqlCommand cmd = new SqlCommand(lossQuery, connection))
                     {
                         cmd.Parameters.AddWithValue("@SelectedDate", SelectedDate);
@@ -1029,33 +994,19 @@ namespace MonitoringSystem.Pages.Performance
                         {
                             while (reader.Read())
                             {
-                                var start = reader.GetTimeSpan(0);
-                                var end = reader.GetTimeSpan(1);
+                                var startTime = reader.IsDBNull(0) ? TimeSpan.Zero : reader.GetTimeSpan(0);
+                                var endTime = reader.IsDBNull(1) ? TimeSpan.Zero : reader.GetTimeSpan(1);
                                 int durationSec = reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
-                                if (end < start) end = end.Add(TimeSpan.FromDays(1));
-                                lossList.Add((start, end, durationSec));
+                                
+                                if (endTime < startTime) endTime = endTime.Add(TimeSpan.FromDays(1));
+                                
+                                // LOGIKA SAMA DENGAN DETAIL LOSS (skip jika bertabrakan dengan break)
+                                if (IsInBreakTime(startTime, endTime, breakTimes)) continue;
+
+                                totalLossMinutes += durationSec / 60.0;
                             }
                         }
                     }
-
-                    var breaks = new List<(TimeSpan Start, TimeSpan End)>();
-                    string restQuery = "SELECT StartTime, EndTime FROM RestTime WHERE DayType = @DayType;";
-                    using (SqlCommand cmd = new SqlCommand(restQuery, connection))
-                    {
-                        cmd.Parameters.AddWithValue("@DayType", DetermineTypeOfDay(SelectedDate.DayOfWeek));
-                        using (SqlDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                                breaks.Add((reader.GetTimeSpan(0), reader.GetTimeSpan(1)));
-                        }
-                    }
-
-                    var validLoss = lossList
-                        .Where(l => l.Start >= shiftStart && l.End <= shiftEnd &&
-                                    !breaks.Any(b => l.Start < b.End && l.End > b.Start))
-                        .ToList();
-
-                    totalLossMinutes = validLoss.Sum(l => l.DurationSec / 60.0);
                 }
             }
             catch (Exception ex)
@@ -1064,6 +1015,42 @@ namespace MonitoringSystem.Pages.Performance
             }
 
             return totalLossMinutes;
+        }
+
+        private readonly List<(TimeSpan Start, TimeSpan End)> FixedBreakTimes = new List<(TimeSpan, TimeSpan)>
+        {
+            (new TimeSpan(7, 0, 0), new TimeSpan(7, 5, 0)),
+            (new TimeSpan(9, 30, 0), new TimeSpan(9, 35, 0)),
+            (new TimeSpan(15, 30, 0), new TimeSpan(15, 35, 0)),
+            (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
+        };
+
+        private bool IsInBreakTime(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
+        {
+            foreach (var (breakStart, breakEnd) in breakTimes)
+            {
+                if (startTime < breakEnd && endTime > breakStart) return true;
+            }
+            return false;
+        }
+
+        private List<(TimeSpan Start, TimeSpan End)> GetAllBreakTimes(DateTime date)
+        {
+            var breakTimes = new List<(TimeSpan Start, TimeSpan End)>(FixedBreakTimes);
+            var targetDate = DateOnly.FromDateTime(date);
+            var latestBreakTime = _context.AdditionalBreakTimes
+                .Where(bt => bt.Date == targetDate)
+                .OrderByDescending(bt => bt.CreatedAt)
+                .FirstOrDefault();
+
+            if (latestBreakTime != null)
+            {
+                if (latestBreakTime.BreakTime1Start.HasValue && latestBreakTime.BreakTime1End.HasValue)
+                    breakTimes.Add((latestBreakTime.BreakTime1Start.Value.ToTimeSpan(), latestBreakTime.BreakTime1End.Value.ToTimeSpan()));
+                if (latestBreakTime.BreakTime2Start.HasValue && latestBreakTime.BreakTime2End.HasValue)
+                    breakTimes.Add((latestBreakTime.BreakTime2Start.Value.ToTimeSpan(), latestBreakTime.BreakTime2End.Value.ToTimeSpan()));
+            }
+            return breakTimes;
         }
 
         public int GetCurrentSUT()

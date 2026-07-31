@@ -2,7 +2,7 @@
 @model MonitoringSystem.Pages.LossTimeReport.indexModel
 @{
     ViewData["Title"] = "Loss Time Report";
-    string[] months = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+    string[] months = { "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar" };
     /* Pa Adan Disini */
 }
 
@@ -793,10 +793,13 @@ main.pb-5 {
                         mode: 'index', intersect: false,
                         position: 'nearest',
                         caretSize: 8,
-                        caretPadding: 10,
+                        caretPadding: 40,
                         backgroundColor: c0.tooltipBg,
                         borderColor: c0.tooltipBorder,
                         borderWidth: 1,
+                        padding: 12,
+                        titleFont: { weight: 'bold', size: 15 },
+                        bodyFont: { size: 13 },
                         titleColor: c0.tooltipText,   // ✅ FIX: property langsung, bukan callback
                         bodyColor:  c0.tooltipText,   // ✅ FIX: property langsung, bukan callback
                         footerColor: c0.tooltipText,  // ✅ FIX: property langsung, bukan callback

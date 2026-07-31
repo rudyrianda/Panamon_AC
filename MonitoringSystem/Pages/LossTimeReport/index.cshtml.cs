@@ -42,6 +42,42 @@ namespace MonitoringSystem.Pages.LossTimeReport
         //    _context = context;
         //}
 
+        private readonly List<(TimeSpan Start, TimeSpan End)> FixedBreakTimes = new List<(TimeSpan, TimeSpan)>
+        {
+            (new TimeSpan(7, 0, 0), new TimeSpan(7, 5, 0)),
+            (new TimeSpan(9, 30, 0), new TimeSpan(9, 35, 0)),
+            (new TimeSpan(15, 30, 0), new TimeSpan(15, 35, 0)),
+            (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
+        };
+
+        private bool IsInBreakTime(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
+        {
+            foreach (var (breakStart, breakEnd) in breakTimes)
+            {
+                if (startTime < breakEnd && endTime > breakStart) return true;
+            }
+            return false;
+        }
+
+        private List<(TimeSpan Start, TimeSpan End)> GetAllBreakTimes()
+        {
+            var breakTimes = new List<(TimeSpan Start, TimeSpan End)>(FixedBreakTimes);
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var latestBreakTime = _context.AdditionalBreakTimes
+                .Where(bt => bt.Date == today)
+                .OrderByDescending(bt => bt.CreatedAt)
+                .FirstOrDefault();
+
+            if (latestBreakTime != null)
+            {
+                if (latestBreakTime.BreakTime1Start.HasValue && latestBreakTime.BreakTime1End.HasValue)
+                    breakTimes.Add((latestBreakTime.BreakTime1Start.Value.ToTimeSpan(), latestBreakTime.BreakTime1End.Value.ToTimeSpan()));
+                if (latestBreakTime.BreakTime2Start.HasValue && latestBreakTime.BreakTime2End.HasValue)
+                    breakTimes.Add((latestBreakTime.BreakTime2Start.Value.ToTimeSpan(), latestBreakTime.BreakTime2End.Value.ToTimeSpan()));
+            }
+            return breakTimes;
+        }
+
         [BindProperty(SupportsGet = true)]
         public int SelectedYear { get; set; } = DateTime.Today.Year;
 
@@ -80,7 +116,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
             if (MachineLine != "All") planQuery = planQuery.Where(x => x.MachineLine == MachineLine);
 
             var plansRaw = planQuery.ToList()
-                .GroupBy(x => new { Category = NormalizeCategoryName(x.Category), Month = x.Month })
+                .GroupBy(x => new { Category = NormalizeCategoryName(x.Category, true), Month = x.Month })
                 .Select(g => new { Category = g.Key.Category, Month = g.Key.Month, Total = g.Sum(x => x.TargetMinutes) })
                 .ToList();
 
@@ -119,14 +155,14 @@ namespace MonitoringSystem.Pages.LossTimeReport
                 foreach (var item in catActuals)
                 {
                     int arrayIndex = (item.Month - 4 + 12) % 12;
-                    actArr[arrayIndex] = Math.Round(item.Total, 1);
+                    actArr[arrayIndex] = Math.Round(item.Total, 2);
                 }
 
                 var catPlans = plansRaw.Where(x => x.Category == cat);
                 foreach (var item in catPlans)
                 {
                     int arrayIndex = (item.Month - 4 + 12) % 12;
-                    planArr[arrayIndex] = Math.Round(item.Total, 1);
+                    planArr[arrayIndex] = Math.Round(item.Total, 2);
                 }
 
                 DetailActuals.Add(cat, actArr);
@@ -184,12 +220,11 @@ namespace MonitoringSystem.Pages.LossTimeReport
             return "Working Loss";
         }
 
-        private string NormalizeCategoryName(string input)
+        private string NormalizeCategoryName(string input, bool isPlan = false)
         {
             if (string.IsNullOrWhiteSpace(input)) return "Uncategorized";
             string name = input.Trim().ToLower();
 
-            // Sesuai request: changing -> change
             if (name.Contains("change model") || name.Contains("model changing"))
                 return "Model Change Loss";
 
@@ -199,8 +234,20 @@ namespace MonitoringSystem.Pages.LossTimeReport
             if (name.Contains("machine trouble") || name.Contains("machine tools trouble"))
                 return "Machine & Tools Trouble";
 
-            if (name.Contains("break time") || name.Contains("breaktime"))
-                return "Break Time";
+            // Map all fixed/management loss to Uncategorized so they show up under Working Loss
+            // HANYA UNTUK ACTUAL DATA. Untuk BP/Plan, JANGAN di-map agar mereka ter-filter keluar oleh GetCategoryGroup!
+            if (!isPlan)
+            {
+                if (name.Contains("break time") || name.Contains("breaktime") || name.Contains("company activity") ||
+                    name.Contains("stock opname") || name.Contains("maintenance") ||
+                    name.Contains("trial run") || name.Contains("training education") ||
+                    name.Contains("free talking") || name.Contains("no production day") ||
+                    name.Contains("morning assembly") || name.Contains("cleaning") ||
+                    name.Contains("general assy") || name.Contains("others") || name.Contains("fixed loss") || name.Contains("management loss"))
+                {
+                    return "Uncategorized";
+                }
+            }
 
             return new CultureInfo("en-US", false).TextInfo.ToTitleCase(name);
         }
@@ -265,16 +312,16 @@ namespace MonitoringSystem.Pages.LossTimeReport
                     return $"(YEAR(Date) = {year} AND MONTH(Date) = {m})";
                 }));
 
-                string query = $@"SELECT MONTH(Date) AS MonthVal, Reason, 
-                                 SUM(LossTime) / 60.0 AS TotalMinutes
-                          FROM AssemblyLossTime 
-                          WHERE ({dateConditions})";
+                string query = $@"SELECT MONTH(Date) AS MonthVal, Reason, LossTime,
+                                         CAST(Time AS TIME) AS StartTime, CAST(EndDateTime AS TIME) AS EndTime
+                                  FROM AssemblyLossTime 
+                                  WHERE ({dateConditions})";
 
                 if (line != "All") query += " AND MachineCode = @MachineCode";
-                query += " GROUP BY MONTH(Date), Reason";
 
                 try
                 {
+                    var breakTimes = GetAllBreakTimes();
                     using (var conn = new SqlConnection(_connectionString))
                     {
                         conn.Open();
@@ -285,11 +332,23 @@ namespace MonitoringSystem.Pages.LossTimeReport
                             {
                                 while (reader.Read())
                                 {
+                                    int monthVal = Convert.ToInt32(reader["MonthVal"]);
+                                    string reason = reader["Reason"]?.ToString();
+                                    int durationSec = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : Convert.ToInt32(reader["LossTime"]);
+                                    
+                                    TimeSpan startTime = reader.IsDBNull(reader.GetOrdinal("StartTime")) ? TimeSpan.Zero : reader.GetTimeSpan(reader.GetOrdinal("StartTime"));
+                                    TimeSpan endTime = reader.IsDBNull(reader.GetOrdinal("EndTime")) ? TimeSpan.Zero : reader.GetTimeSpan(reader.GetOrdinal("EndTime"));
+                                    
+                                    if (endTime < startTime) endTime = endTime.Add(TimeSpan.FromDays(1));
+                                    
+                                    // LOGIC SAMAKAN DENGAN DETAIL LOSS (Skip Break Time)
+                                    if (IsInBreakTime(startTime, endTime, breakTimes)) continue;
+
                                     rawList.Add(new MonthlyCategoryData
                                     {
-                                        Month = Convert.ToInt32(reader["MonthVal"]),
-                                        Category = NormalizeCategoryName(reader["Reason"]?.ToString()),
-                                        Total = Convert.ToDouble(reader["TotalMinutes"])
+                                        Month = monthVal,
+                                        Category = NormalizeCategoryName(reason),
+                                        Total = durationSec / 60.0
                                     });
                                 }
                             }

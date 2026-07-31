@@ -1,4 +1,4 @@
-﻿/* ========== LIGHT MODE BACKGROUND ========== */
+/* ========== LIGHT MODE BACKGROUND ========== */
 html.light-mode {
     background-color: #e8f0f7;
     background-image: url('../assets/BackgroundPanamonLight.jpg');
@@ -332,6 +332,12 @@ body.light-mode {
             color: rgba(26, 26, 46, 0.55) !important;
             border-color: rgba(0, 0, 0, 0.10) !important;
         }
+
+    /* ========== PRODUCTION ACHIEVEMENT TABLE ========== */
+    body.light-mode #productionTable tbody td,
+    body.light-mode #productionTable tbody td:last-child {
+        color: #1a1a2e !important;
+    }
 
     /* ========== DETAIL LOSS TIME TABLE ========== */
     body.light-mode #lossTimeTable thead th {
