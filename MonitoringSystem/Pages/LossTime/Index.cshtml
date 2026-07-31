@@ -1547,6 +1547,11 @@
                             tooltip: {
                                 bodyColor: colors.textColor, titleColor: colors.textColor,
                                 borderColor: colors.tooltipBorder, backgroundColor: colors.tooltipBg,
+                                borderWidth: 1,
+                                padding: 12,
+                                titleFont: { weight: 'bold', size: 15 },
+                                bodyFont: { size: 13 },
+                                caretPadding: 40,
                                 callbacks: {
                                     title: (ctx) => {
                                         const label = (summaryChartData.fullLabels || [])[ctx[0].dataIndex] || '';
@@ -1665,6 +1670,11 @@
                                 bodyColor: colors.textColor, titleColor: colors.textColor,
                                 borderColor: colors.tooltipBorder, backgroundColor: colors.tooltipBg,
                                 mode: 'index', intersect: false,
+                                borderWidth: 1,
+                                padding: 12,
+                                titleFont: { weight: 'bold', size: 15 },
+                                bodyFont: { size: 13 },
+                                caretPadding: 40,
                                 callbacks: { 
                                     label: (c) => `${c.dataset.label}: ${c.raw} min`,
                                     footer: (tooltipItems) => {

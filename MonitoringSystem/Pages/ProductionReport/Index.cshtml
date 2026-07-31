@@ -586,7 +586,7 @@
        BARIS TOTAL PLAN & TOTAL ACTUAL - ELEGAN & LEMBUT
        ======================================== */
     #productionTable tbody tr.bg-row-total > td {
-        background-color: rgba(255, 255, 255, 0.015) !important;
+        background-color: rgba(255, 255, 255, 0.02) !important;
     }
 
     /* ========================================
@@ -605,7 +605,7 @@
        KOLOM TOTAL (SEBELAH KANAN) - SAMA LEMBUT SEPERTI BARIS TOTAL
        ======================================== */
     #productionTable tbody td:last-child {
-        background-color: rgba(255, 255, 255, 0.015) !important;
+        background-color: rgba(255, 255, 255, 0.02) !important;
         color: #ffffff !important;
         font-weight: 700;
     }
@@ -619,7 +619,7 @@
     #productionTable tbody tr:nth-child(4) > td:nth-child(2),
     #productionTable tbody tr:nth-child(10) > td:nth-child(2),
     #productionTable tbody tr:nth-child(11) > td:nth-child(2) {
-        background-color: rgba(255, 255, 255, 0.015) !important;
+        background-color: rgba(255, 255, 255, 0.02) !important;
     }
 
     /* BARIS TOTAL PLAN & TOTAL ACTUAL - bold aja */
@@ -1160,8 +1160,10 @@
                             backgroundColor: tooltipBgColor,
                             borderColor: isLightMode ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.2)',
                             borderWidth: 1,
-                            padding: 10,
-                            titleFont: { weight: 'bold' }
+                            padding: 12,
+                            titleFont: { weight: 'bold', size: 15 },
+                            bodyFont: { size: 13 },
+                            caretPadding: 40
                         }
                     }
                 }

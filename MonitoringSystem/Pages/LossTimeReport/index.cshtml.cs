@@ -42,6 +42,42 @@ namespace MonitoringSystem.Pages.LossTimeReport
         //    _context = context;
         //}
 
+        private readonly List<(TimeSpan Start, TimeSpan End)> FixedBreakTimes = new List<(TimeSpan, TimeSpan)>
+        {
+            (new TimeSpan(7, 0, 0), new TimeSpan(7, 5, 0)),
+            (new TimeSpan(9, 30, 0), new TimeSpan(9, 35, 0)),
+            (new TimeSpan(15, 30, 0), new TimeSpan(15, 35, 0)),
+            (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
+        };
+
+        private bool IsInBreakTime(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
+        {
+            foreach (var (breakStart, breakEnd) in breakTimes)
+            {
+                if (startTime < breakEnd && endTime > breakStart) return true;
+            }
+            return false;
+        }
+
+        private List<(TimeSpan Start, TimeSpan End)> GetAllBreakTimes()
+        {
+            var breakTimes = new List<(TimeSpan Start, TimeSpan End)>(FixedBreakTimes);
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var latestBreakTime = _context.AdditionalBreakTimes
+                .Where(bt => bt.Date == today)
+                .OrderByDescending(bt => bt.CreatedAt)
+                .FirstOrDefault();
+
+            if (latestBreakTime != null)
+            {
+                if (latestBreakTime.BreakTime1Start.HasValue && latestBreakTime.BreakTime1End.HasValue)
+                    breakTimes.Add((latestBreakTime.BreakTime1Start.Value.ToTimeSpan(), latestBreakTime.BreakTime1End.Value.ToTimeSpan()));
+                if (latestBreakTime.BreakTime2Start.HasValue && latestBreakTime.BreakTime2End.HasValue)
+                    breakTimes.Add((latestBreakTime.BreakTime2Start.Value.ToTimeSpan(), latestBreakTime.BreakTime2End.Value.ToTimeSpan()));
+            }
+            return breakTimes;
+        }
+
         [BindProperty(SupportsGet = true)]
         public int SelectedYear { get; set; } = DateTime.Today.Year;
 
@@ -67,17 +103,20 @@ namespace MonitoringSystem.Pages.LossTimeReport
 
         public void OnGet()
         {
-            string[] months = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
+            string[] months = { "April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March" };
 
             var actualsRaw = GetDetailedActualData(SelectedYear, MachineLine);
 
             var planQuery = _context.LossTimePlans.AsQueryable();
-            planQuery = planQuery.Where(x => x.Year == SelectedYear);
+            planQuery = planQuery.Where(x =>
+                (x.Year == SelectedYear && x.Month >= 4) ||
+                (x.Year == SelectedYear + 1 && x.Month <= 3)
+            );
 
             if (MachineLine != "All") planQuery = planQuery.Where(x => x.MachineLine == MachineLine);
 
             var plansRaw = planQuery.ToList()
-                .GroupBy(x => new { Category = NormalizeCategoryName(x.Category), Month = x.Month })
+                .GroupBy(x => new { Category = NormalizeCategoryName(x.Category, true), Month = x.Month })
                 .Select(g => new { Category = g.Key.Category, Month = g.Key.Month, Total = g.Sum(x => x.TargetMinutes) })
                 .ToList();
 
@@ -115,15 +154,15 @@ namespace MonitoringSystem.Pages.LossTimeReport
                 var catActuals = actualsRaw.Where(x => x.Category == cat);
                 foreach (var item in catActuals)
                 {
-                    int arrayIndex = item.Month - 1;
-                    actArr[arrayIndex] = Math.Round(item.Total, 1);
+                    int arrayIndex = (item.Month - 4 + 12) % 12;
+                    actArr[arrayIndex] = Math.Round(item.Total, 2);
                 }
 
                 var catPlans = plansRaw.Where(x => x.Category == cat);
                 foreach (var item in catPlans)
                 {
-                    int arrayIndex = item.Month - 1;
-                    planArr[arrayIndex] = Math.Round(item.Total, 1);
+                    int arrayIndex = (item.Month - 4 + 12) % 12;
+                    planArr[arrayIndex] = Math.Round(item.Total, 2);
                 }
 
                 DetailActuals.Add(cat, actArr);
@@ -141,7 +180,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
                     .Where(x => GetCategoryGroup(x.Key) == "Working Loss")
                     .Sum(x => x.Value[i]);
 
-                int monthNum = i + 1;
+                int monthNum = (i + 4) > 12 ? (i + 4) - 12 : (i + 4);
 
                 double workingTime = workingTimeRaw.ContainsKey(monthNum) ? workingTimeRaw[monthNum] : 0;
                 if (workingTime > 0)
@@ -181,12 +220,11 @@ namespace MonitoringSystem.Pages.LossTimeReport
             return "Working Loss";
         }
 
-        private string NormalizeCategoryName(string input)
+        private string NormalizeCategoryName(string input, bool isPlan = false)
         {
             if (string.IsNullOrWhiteSpace(input)) return "Uncategorized";
             string name = input.Trim().ToLower();
 
-            // Sesuai request: changing -> change
             if (name.Contains("change model") || name.Contains("model changing"))
                 return "Model Change Loss";
 
@@ -196,8 +234,20 @@ namespace MonitoringSystem.Pages.LossTimeReport
             if (name.Contains("machine trouble") || name.Contains("machine tools trouble"))
                 return "Machine & Tools Trouble";
 
-            if (name.Contains("break time") || name.Contains("breaktime"))
-                return "Break Time";
+            // Map all fixed/management loss to Uncategorized so they show up under Working Loss
+            // HANYA UNTUK ACTUAL DATA. Untuk BP/Plan, JANGAN di-map agar mereka ter-filter keluar oleh GetCategoryGroup!
+            if (!isPlan)
+            {
+                if (name.Contains("break time") || name.Contains("breaktime") || name.Contains("company activity") ||
+                    name.Contains("stock opname") || name.Contains("maintenance") ||
+                    name.Contains("trial run") || name.Contains("training education") ||
+                    name.Contains("free talking") || name.Contains("no production day") ||
+                    name.Contains("morning assembly") || name.Contains("cleaning") ||
+                    name.Contains("general assy") || name.Contains("others") || name.Contains("fixed loss") || name.Contains("management loss"))
+                {
+                    return "Uncategorized";
+                }
+            }
 
             return new CultureInfo("en-US", false).TextInfo.ToTitleCase(name);
         }
@@ -212,17 +262,20 @@ namespace MonitoringSystem.Pages.LossTimeReport
         private List<MonthlyCategoryData> GetDetailedActualData(int fiscalYear, string line)
         {
             var rawList = new List<MonthlyCategoryData>();
-            DateTime startDate = new DateTime(fiscalYear, 1, 1);
-            DateTime endDate = new DateTime(fiscalYear, 12, 31);
+            DateTime startDate = new DateTime(fiscalYear, 4, 1);
+            DateTime endDate = new DateTime(fiscalYear + 1, 3, 31);
 
-            var actualsQuery = _context.LossTimeActuals.Where(x => x.Year == fiscalYear);
+            var actualsQuery = _context.LossTimeActuals.Where(x =>
+                (x.Year == fiscalYear && x.Month >= 4) ||
+                (x.Year == fiscalYear + 1 && x.Month <= 3)
+            );
             if (line != "All") actualsQuery = actualsQuery.Where(x => x.MachineLine == line);
 
             // Cek bulan mana yang sudah ada di LossTimeActuals
             var monthsWithActuals = actualsQuery.Select(x => x.Month).Distinct().ToList();
 
             // Semua bulan fiscal year
-            var allFiscalMonths = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+            var allFiscalMonths = new List<int> { 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3 };
 
             // Bulan yang BELUM ada di LossTimeActuals → fallback
             var monthsMissing = allFiscalMonths.Where(m => !monthsWithActuals.Contains(m)).ToList();
@@ -255,19 +308,20 @@ namespace MonitoringSystem.Pages.LossTimeReport
             {
                 var dateConditions = string.Join(" OR ", monthsMissing.Select(m =>
                 {
-                    return $"(YEAR(Date) = {fiscalYear} AND MONTH(Date) = {m})";
+                    int year = m >= 4 ? fiscalYear : fiscalYear + 1;
+                    return $"(YEAR(Date) = {year} AND MONTH(Date) = {m})";
                 }));
 
-                string query = $@"SELECT MONTH(Date) AS MonthVal, Reason, 
-                                 SUM(LossTime) / 60.0 AS TotalMinutes
-                          FROM AssemblyLossTime 
-                          WHERE ({dateConditions})";
+                string query = $@"SELECT MONTH(Date) AS MonthVal, Reason, LossTime,
+                                         CAST(Time AS TIME) AS StartTime, CAST(EndDateTime AS TIME) AS EndTime
+                                  FROM AssemblyLossTime 
+                                  WHERE ({dateConditions})";
 
                 if (line != "All") query += " AND MachineCode = @MachineCode";
-                query += " GROUP BY MONTH(Date), Reason";
 
                 try
                 {
+                    var breakTimes = GetAllBreakTimes();
                     using (var conn = new SqlConnection(_connectionString))
                     {
                         conn.Open();
@@ -278,11 +332,23 @@ namespace MonitoringSystem.Pages.LossTimeReport
                             {
                                 while (reader.Read())
                                 {
+                                    int monthVal = Convert.ToInt32(reader["MonthVal"]);
+                                    string reason = reader["Reason"]?.ToString();
+                                    int durationSec = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : Convert.ToInt32(reader["LossTime"]);
+                                    
+                                    TimeSpan startTime = reader.IsDBNull(reader.GetOrdinal("StartTime")) ? TimeSpan.Zero : reader.GetTimeSpan(reader.GetOrdinal("StartTime"));
+                                    TimeSpan endTime = reader.IsDBNull(reader.GetOrdinal("EndTime")) ? TimeSpan.Zero : reader.GetTimeSpan(reader.GetOrdinal("EndTime"));
+                                    
+                                    if (endTime < startTime) endTime = endTime.Add(TimeSpan.FromDays(1));
+                                    
+                                    // LOGIC SAMAKAN DENGAN DETAIL LOSS (Skip Break Time)
+                                    if (IsInBreakTime(startTime, endTime, breakTimes)) continue;
+
                                     rawList.Add(new MonthlyCategoryData
                                     {
-                                        Month = Convert.ToInt32(reader["MonthVal"]),
-                                        Category = NormalizeCategoryName(reader["Reason"]?.ToString()),
-                                        Total = Convert.ToDouble(reader["TotalMinutes"])
+                                        Month = monthVal,
+                                        Category = NormalizeCategoryName(reason),
+                                        Total = durationSec / 60.0
                                     });
                                 }
                             }
@@ -314,7 +380,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
                 for (int m = 1; m <= 12; m++)
                 {
                     var pr = new MonitoringSystem.Pages.ProductionReport.IndexModel(_webHostEnvironment, _configuration);
-                    pr.SelectedYear = fiscalYear;
+                    pr.SelectedYear = m >= 4 ? fiscalYear : fiscalYear + 1;
                     pr.SelectedMonth = m;
                     pr.MachineLine = line;
                     pr.SelectedShifts = new List<string> { "All" };
@@ -350,7 +416,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
                         {
                             var catName = NormalizeCategoryName(sheet.Cells[row, 2].Text);
                             if (string.IsNullOrEmpty(catName) || catName.Contains("Total")) continue;
-                            int[] months = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+                            int[] months = { 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3 };
                             int col = 3;
                             foreach (var m in months)
                             {
@@ -361,14 +427,15 @@ namespace MonitoringSystem.Pages.LossTimeReport
                                     Category = catName,
                                     MachineLine = UploadMachineLine,
                                     Month = m,
-                                    Year = SelectedYear,
+                                    Year = m >= 4 ? SelectedYear : SelectedYear + 1,
                                     TargetMinutes = tVal,
                                     Ratio = rVal * 100
                                 });
                                 col += 2;
                             }
                         }
-                        var old = _context.LossTimePlans.Where(x => x.MachineLine == UploadMachineLine && x.Year == SelectedYear);
+                        var old = _context.LossTimePlans.Where(x => x.MachineLine == UploadMachineLine &&
+                            ((x.Year == SelectedYear && x.Month >= 4) || (x.Year == SelectedYear + 1 && x.Month <= 3)));
                         _context.LossTimePlans.RemoveRange(old);
                         _context.LossTimePlans.AddRange(newPlans);
                         await _context.SaveChangesAsync();

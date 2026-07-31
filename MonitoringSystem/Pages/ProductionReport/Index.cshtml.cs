@@ -572,58 +572,11 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                     totalOtMinutes = totalOtMinutes * multiplierOT;
                 }
 
-                OvertimeMinutes.Add(totalOtMinutes);
-
-                int overtimeOpCount = (data.Overtime_Unit > 0 || totalOtMinutes > 0) ? data.NoOfOperator : 0;
-                OvertimeOperators.Add(overtimeOpCount);
-
-                decimal normalUnits = 0;
-                decimal overtimeUnits = 0;
-
-                bool hasNormalActivity = data.Shift1_Unit > 0
-                                      || data.Shift2_Unit > 0
-                                      || data.Shift3_Unit > 0
-                                      || data.NonShift_Unit > 0;
-
-                if (hasNormalActivity)
-                {
-                    normalUnits = data.Shift1_Unit
-                                + data.Shift2_Unit
-                                + data.Shift3_Unit
-                                + data.NonShift_Unit;
-
-                    overtimeUnits = data.Overtime_Unit;
-                }
-                else
-                {
-                    normalUnits = 0;
-                    overtimeUnits = data.Overtime_Unit;
-                }
-                NormalData.Add(normalUnits);
-                OvertimeData.Add(overtimeUnits);
-                NoOfDirectWorkers.Add(data.NoOfOperator);
-
-                dailyLosses.TryGetValue(data.Day, out int lossDurationSec);
-
-                bool isShiftActive = (data.Shift1_Unit > 0 || data.Shift1_EndTime != TimeSpan.Zero) ||
-                                     (data.Shift2_Unit > 0 || data.Shift2_EndTime != TimeSpan.Zero) ||
-                                     (data.Shift3_Unit > 0 || data.Shift3_EndTime != TimeSpan.Zero) ||
-                                     (data.NonShift_Unit > 0 || data.NonShift_EndTime != TimeSpan.Zero) ||
-                                     (data.Overtime_Unit > 0 || totalOtMinutes > 0);
-
-                if (!isShiftActive)
-                {
-                    lossDurationSec = 0;
-                }
-
-                DailyLossTime.Add(lossDurationSec / 60.0);
-
                 var dayType = DetermineTypeOfDay(new DateTime(SelectedYear, SelectedMonth, data.Day).DayOfWeek);
-                
+                bool isWeekend = (dayType == "WEEKEND");
+
                 int stdWorkingMinutes = 0;
                 double dailyManMinutes = 0;
-
-                bool isWeekend = (dayType == "WEEKEND");
 
                 if (data.Shift1_Unit > 0 || (!isWeekend && data.Shift1_EndTime != TimeSpan.Zero))
                 {
@@ -663,6 +616,75 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                     int otOps = data.Overtime_MaxOp > 0 ? data.Overtime_MaxOp : data.NoOfOperator;
                     dailyManMinutes += otOps * baseOtMinutes;
                 }
+
+                if (isWeekend)
+                {
+                    totalOtMinutes += stdWorkingMinutes;
+                    stdWorkingMinutes = 0;
+                }
+
+                OvertimeMinutes.Add(totalOtMinutes);
+
+                int overtimeOpCount = 0;
+                if (isWeekend)
+                {
+                    overtimeOpCount = data.NoOfOperator;
+                }
+                else
+                {
+                    overtimeOpCount = (data.Overtime_Unit > 0 || totalOtMinutes > 0) ? data.NoOfOperator : 0;
+                }
+                OvertimeOperators.Add(overtimeOpCount);
+
+                decimal normalUnits = 0;
+                decimal overtimeUnits = 0;
+
+                bool hasNormalActivity = data.Shift1_Unit > 0
+                                      || data.Shift2_Unit > 0
+                                      || data.Shift3_Unit > 0
+                                      || data.NonShift_Unit > 0;
+
+                if (isWeekend)
+                {
+                    normalUnits = 0;
+                    overtimeUnits = data.Shift1_Unit
+                                + data.Shift2_Unit
+                                + data.Shift3_Unit
+                                + data.NonShift_Unit
+                                + data.Overtime_Unit;
+                }
+                else if (hasNormalActivity)
+                {
+                    normalUnits = data.Shift1_Unit
+                                + data.Shift2_Unit
+                                + data.Shift3_Unit
+                                + data.NonShift_Unit;
+
+                    overtimeUnits = data.Overtime_Unit;
+                }
+                else
+                {
+                    normalUnits = 0;
+                    overtimeUnits = data.Overtime_Unit;
+                }
+                NormalData.Add(normalUnits);
+                OvertimeData.Add(overtimeUnits);
+                NoOfDirectWorkers.Add(data.NoOfOperator);
+
+                dailyLosses.TryGetValue(data.Day, out int lossDurationSec);
+
+                bool isShiftActive = (data.Shift1_Unit > 0 || data.Shift1_EndTime != TimeSpan.Zero) ||
+                                     (data.Shift2_Unit > 0 || data.Shift2_EndTime != TimeSpan.Zero) ||
+                                     (data.Shift3_Unit > 0 || data.Shift3_EndTime != TimeSpan.Zero) ||
+                                     (data.NonShift_Unit > 0 || data.NonShift_EndTime != TimeSpan.Zero) ||
+                                     (data.Overtime_Unit > 0 || totalOtMinutes > 0);
+
+                if (!isShiftActive)
+                {
+                    lossDurationSec = 0;
+                }
+
+                DailyLossTime.Add(lossDurationSec / 60.0);
 
                 int baseWorkMinutes = (normalUnits > 0 || overtimeUnits > 0) ? stdWorkingMinutes : 0;
                 int totalWorkMinutes = baseWorkMinutes + totalOtMinutes;

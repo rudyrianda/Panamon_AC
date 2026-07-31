@@ -915,6 +915,8 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <form method="post" asp-page-handler="InsertProduct">
+                        <input type="hidden" name="FilterMachineCode" value="@Model.FilterMachineCode" />
+                        <input type="hidden" name="FilterDate" value="@Model.CurrentDate.ToString("yyyy-MM-dd")" />
                         <div class="modal-body">
                             <div class="mb-3">
                                 <label for="new-model" class="col-form-label fw-bold">TAMBAHKAN MODEL BARU JIKA TIDAK ADA PILIHAN MODEL YANG DIINGINKAN</label>
@@ -1049,6 +1051,8 @@
                     </div>
                     <form method="post" asp-page-handler="DeleteRecord">
                         @Html.AntiForgeryToken()
+                        <input type="hidden" name="FilterMachineCode" value="@Model.FilterMachineCode" />
+                        <input type="hidden" name="FilterDate" value="@Model.CurrentDate.ToString("yyyy-MM-dd")" />
                         <div class="modal-body">
                             <label for="delete-model" class="col-form-label fw-bold">Apakah anda yakin ingin menghapus data ini ?</label>
                             <input type="hidden" id="delete-record-id" name="RecordId" />
@@ -1070,6 +1074,8 @@
                     </div>
                     <form method="post" asp-page-handler="DeleteAllRecord">
                         @Html.AntiForgeryToken()
+                        <input type="hidden" name="FilterMachineCode" value="@Model.FilterMachineCode" />
+                        <input type="hidden" name="FilterDate" value="@Model.CurrentDate.ToString("yyyy-MM-dd")" />
                         <div class="modal-body">
                             <label for="delete-model" class="col-form-label fw-bold">Apakah anda yakin ingin me-reset semua data pada hari ini ?</label>
                             <input type="hidden" id="delete-record-id" name="RecordId" />
