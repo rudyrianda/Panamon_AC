@@ -602,7 +602,7 @@
                             <th scope="col" style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important;">ACTUAL</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="hourlyTableBody">
                         @if (sortedProdAchieve.Count > 0)
                         {
                             var previousTime = "";
@@ -708,10 +708,14 @@
 
                     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                     const data = await response.json();
-                    if (!data || !data.Labels || !data.Efficiency) throw new Error("Incomplete data received.");
+                    
+                    const labels = data.Labels || data.labels;
+                    const efficiency = data.Efficiency || data.efficiency;
 
-                    window.myChart.data.labels            = data.Labels;
-                    window.myChart.data.datasets[0].data  = data.Efficiency;
+                    if (!data || !labels || !efficiency) throw new Error("Incomplete data received.");
+
+                    window.myChart.data.labels            = labels;
+                    window.myChart.data.datasets[0].data  = efficiency;
                     window.myChart.update();
 
                     // Update UI table
@@ -737,12 +741,63 @@
                     updateElem("val-defectRatio", data.defectRatio, " %");
                     updateElem("val-workingTime", data.workingTime, " min");
                     updateElem("val-lossTime", data.lossTime, " min");
+
+                    // Rebuild Hourly Table
+                    const hourlyList = data.hourlyList || data.hourlylist;
+                    if(hourlyList && Array.isArray(hourlyList)) {
+                        const tbody = document.getElementById("hourlyTableBody");
+                        if(tbody) {
+                            tbody.innerHTML = "";
+                            
+                            // Group by time to determine rowspan
+                            const timeCounts = {};
+                            hourlyList.forEach(item => {
+                                timeCounts[item.time] = (timeCounts[item.time] || 0) + 1;
+                            });
+
+                            let previousTime = "";
+                            hourlyList.forEach(item => {
+                                const tr = document.createElement("tr");
+                                
+                                if (previousTime !== item.time) {
+                                    const tdTime = document.createElement("td");
+                                    tdTime.rowSpan = timeCounts[item.time];
+                                    tdTime.className = "fw-bold";
+                                    tdTime.textContent = item.time;
+                                    tr.appendChild(tdTime);
+                                    previousTime = item.time;
+                                }
+
+                                const tdModel = document.createElement("td");
+                                tdModel.className = "fw-bold";
+                                tdModel.textContent = item.model;
+                                tr.appendChild(tdModel);
+
+                                const tdPlan = document.createElement("td");
+                                tdPlan.className = "fw-bold";
+                                tdPlan.textContent = item.plan;
+                                tr.appendChild(tdPlan);
+
+                                const tdActual = document.createElement("td");
+                                tdActual.className = "fw-bold";
+                                tdActual.textContent = item.actual;
+                                tr.appendChild(tdActual);
+
+                                tbody.appendChild(tr);
+                            });
+                        }
+                    }
+
                 } catch (error) {
                     console.error("Failed to fetch updated data:", error.message);
                 }
             }
 
-            // ✅ OPTIMASI: interval 20 detik
-            setInterval(fetchUpdatedChartData, 20000);
+            // Panggil otomatis jika user ubah filter
+            document.getElementById('MachineCode').addEventListener('change', fetchUpdatedChartData);
+            document.querySelector('input[name="SelectedDate"]').addEventListener('change', fetchUpdatedChartData);
+
+            // ✅ OPTIMASI: interval 5 detik
+            setInterval(fetchUpdatedChartData, 5000);
         </script>
 }
