@@ -351,6 +351,40 @@ namespace MonitoringSystem.Pages.Performance
                     actTaktTime = Math.Round((netWorkingTime / Convert.ToDouble(CachedActual)) * 60, 2);
                 }
 
+                // Hitung Hourly Table Data
+                var sortedProdAchieve = listProdAchieve
+                    .OrderBy(p => p.StartTime)
+                    .ThenBy(p => p.Model)
+                    .ToList();
+
+                var currentTime = DateTime.Now.TimeOfDay;
+                var currentDate = DateTime.Now.Date;
+                var listRestTime = GetRestTime(DetermineTypeOfDay(DateTime.Today.DayOfWeek));
+                var previousModel = "";
+
+                var hourlyList = new List<object>();
+                foreach (var item in sortedProdAchieve)
+                {
+                    var planPerHour = CalculatePlanPerHour(
+                        item.Model,
+                        previousModel,
+                        item.StartTime,
+                        item.EndTime,
+                        currentTime,
+                        currentDate,
+                        item.SUT,
+                        listRestTime
+                    );
+                    previousModel = item.Model;
+
+                    hourlyList.Add(new {
+                        time = item.Time ?? "00:00 - 00:00",
+                        model = item.Model ?? "NULL",
+                        plan = planPerHour,
+                        actual = item.Actual
+                    });
+                }
+
                 return new JsonResult(new
                 {
                     Labels = labels ?? new List<string>(),
@@ -364,7 +398,8 @@ namespace MonitoringSystem.Pages.Performance
                     actTaktTime = actTaktTime > 0 ? actTaktTime : 0,
                     defectRatio = defectRatio,
                     workingTime = CachedWorkingTime > 0 ? CachedWorkingTime : 0,
-                    lossTime = Math.Round(CachedLossTime, 1)
+                    lossTime = Math.Round(CachedLossTime, 1),
+                    hourlyList = hourlyList
                 });
             }
             catch (Exception ex)
@@ -437,6 +472,40 @@ namespace MonitoringSystem.Pages.Performance
             double netOperatingTimeSeconds = (workingTime - lossTime) * 60;
             if (netOperatingTimeSeconds <= 0 || cumulativeActual <= 0 || planTaktTime <= 0) return 0;
             return Math.Round(Math.Min((cumulativeActual * planTaktTime) / netOperatingTimeSeconds * 100, 120), 2);
+        }
+
+        public int CalculatePlanPerHour(string currentModel, string previousModel, TimeSpan startTime, TimeSpan endTime,
+                                         TimeSpan currentTime, DateTime currentDate, int sut,
+                                         List<RestTime> listRestTime)
+        {
+            var firstTimeModel = TimeSpan.Zero;
+            var lastTimeModel = TimeSpan.Zero;
+            var qtyPlan = 1;
+            int planPerHour = 1;
+
+            if (currentModel != null)
+            {
+                firstTimeModel = GetFirstTimeModel(startTime, endTime, currentModel);
+                lastTimeModel = GetLastTimeModel(startTime, endTime, currentModel);
+                qtyPlan = GetModelPlan(currentModel);
+            }
+
+            if (SelectedDate == currentDate)
+            {
+                planPerHour = currentTime >= startTime && currentTime <= endTime
+                    ? (currentModel == previousModel
+                        ? CalculatePlan(startTime, currentTime, sut, listRestTime)
+                        : CalculatePlan(firstTimeModel, lastTimeModel, sut, listRestTime))
+                    : (currentTime > endTime
+                        ? CalculatePlan(startTime, endTime, sut, listRestTime)
+                        : 0);
+            }
+            else
+            {
+                planPerHour = CalculatePlan(startTime, endTime, sut, listRestTime);
+            }
+
+            return planPerHour > qtyPlan ? qtyPlan : planPerHour;
         }
 
         private int CalculateHourlyPlan(ProductionAchievement achievement)
