@@ -117,6 +117,37 @@ namespace MonitoringSystem.Pages.ProductionReport
         [BindProperty] public int TargetMonth { get; set; }
         [BindProperty] public int TargetYear { get; set; }
 
+        public IActionResult OnGetAjaxUpdate()
+        {
+            if (!SelectedShifts.Any() || SelectedShifts.Contains("All"))
+                SelectedShifts = new List<string> { "All" };
+            else if (SelectedShifts.Count > 1 && SelectedShifts.Contains("All"))
+                SelectedShifts = new List<string> { "All" };
+
+            LoadChartData();
+
+            return new JsonResult(new
+            {
+                normalData = NormalData,
+                overtimeData = OvertimeData,
+                planData = PlanData,
+                planOvertimeData = PlanOvertimeData,
+                originalPlanData = OriginalPlanData,
+                originalPlanOvertimeData = OriginalPlanOvertimeData,
+                effectivePlanData = EffectivePlanData,
+                effectivePlanOtData = EffectivePlanOvertimeData,
+                chartLabels = ChartLabels,
+                noOfDirectWorkers = NoOfDirectWorkers,
+                overtimeOperators = OvertimeOperators,
+                overtimeMinutes = OvertimeMinutes,
+                dailyLossTime = DailyLossTime,
+                dailyWorkTime = DailyWorkTime,
+                dailyNetManHours = DailyNetManHours,
+                isCurrentMonthView = IsCurrentMonthView,
+                selectedShifts = SelectedShifts
+            });
+        }
+
         public IActionResult OnGetDownloadTemplate(string type)
         {
             if (string.IsNullOrEmpty(type) || (type.ToLower() != "cu" && type.ToLower() != "cs"))
@@ -249,34 +280,32 @@ WITH ShiftData AS (
             ELSE CAST(SDate AS DATE)
         END AS ReportDate,
         SDate,
+        Product_Id,
         TotalUnit,
         NoOfOperator,
         ShiftMode AS Mode_Asli_Mesin,
         CASE 
             WHEN ShiftMode = 'NON-SHIFT' THEN
-                CASE 
-                    WHEN MONTH(CAST(DATEADD(hour, -7, SDate) AS DATE)) = 7 AND YEAR(CAST(DATEADD(hour, -7, SDate) AS DATE)) = 2026 AND DAY(CAST(DATEADD(hour, -7, SDate) AS DATE)) <= 5 THEN 'NON-SHIFT'
-                    WHEN CAST(SDate AS TIME) >= '07:00:00' AND CAST(SDate AS TIME) <= '15:45:00' THEN 'SHIFT 1'
-                    WHEN CAST(SDate AS TIME) > '15:45:00' AND CAST(SDate AS TIME) <= '19:45:00' THEN 'OVERTIME SHIFT 1'
-                    WHEN CAST(SDate AS TIME) > '19:45:00' AND CAST(SDate AS TIME) <= '23:15:00' THEN 'OVERTIME SHIFT 3'
-                    ELSE 'SHIFT 3'
+                CASE
+                    WHEN CAST(SDate AS TIME) > '16:00:00' THEN 'OVERTIME'
+                    ELSE 'NON-SHIFT'
                 END
             WHEN ShiftMode LIKE 'OVERTIME%' THEN
                 CASE 
                     WHEN MONTH(CAST(DATEADD(hour, -7, SDate) AS DATE)) = 7 AND YEAR(CAST(DATEADD(hour, -7, SDate) AS DATE)) = 2026 AND DAY(CAST(DATEADD(hour, -7, SDate) AS DATE)) <= 5 THEN 'OVERTIME'
-                    WHEN CAST(SDate AS TIME) >= '15:45:00' AND CAST(SDate AS TIME) <= '19:45:00' THEN 'OVERTIME SHIFT 1'
-                    WHEN CAST(SDate AS TIME) > '19:45:00' AND CAST(SDate AS TIME) <= '23:15:00' THEN 'OVERTIME SHIFT 3'
-                    WHEN CAST(SDate AS TIME) > '23:15:00' OR CAST(SDate AS TIME) <= '07:00:00' THEN 'SHIFT 3'
+                    WHEN CAST(SDate AS TIME) >= '15:45:00' AND CAST(SDate AS TIME) <= '19:45:59' THEN 'OVERTIME SHIFT 1'
+                    WHEN CAST(SDate AS TIME) >= '19:46:00' AND CAST(SDate AS TIME) <= '23:14:59' THEN 'OVERTIME SHIFT 3'
+                    WHEN CAST(SDate AS TIME) >= '23:15:00' OR CAST(SDate AS TIME) < '07:00:00' THEN 'SHIFT 3'
                     ELSE 'OVERTIME'
                 END
-            WHEN ShiftMode = 'SHIFT 2' AND MONTH(CAST(DATEADD(hour, -7, SDate) AS DATE)) = 7 AND YEAR(CAST(DATEADD(hour, -7, SDate) AS DATE)) = 2026 THEN
+            WHEN ShiftMode = 'SHIFT 2' AND MONTH(CAST(DATEADD(hour, -7, SDate) AS DATE)) IN (7, 8) AND YEAR(CAST(DATEADD(hour, -7, SDate) AS DATE)) = 2026 THEN
                 CASE 
-                    WHEN CAST(SDate AS TIME) >= '07:00:00' AND CAST(SDate AS TIME) <= '15:45:00' THEN 'SHIFT 1'
-                    WHEN CAST(SDate AS TIME) > '15:45:00' AND CAST(SDate AS TIME) <= '19:45:00' THEN 'OVERTIME SHIFT 1'
-                    WHEN CAST(SDate AS TIME) > '19:45:00' AND CAST(SDate AS TIME) <= '23:15:00' THEN 'OVERTIME SHIFT 3'
+                    WHEN CAST(SDate AS TIME) >= '07:00:00' AND CAST(SDate AS TIME) <= '15:44:59' THEN 'SHIFT 1'
+                    WHEN CAST(SDate AS TIME) >= '15:45:00' AND CAST(SDate AS TIME) <= '19:45:59' THEN 'OVERTIME SHIFT 1'
+                    WHEN CAST(SDate AS TIME) >= '19:46:00' AND CAST(SDate AS TIME) <= '23:14:59' THEN 'OVERTIME SHIFT 3'
                     ELSE 'SHIFT 3'
                 END
-            WHEN ShiftMode = 'SHIFT 3' AND CAST(SDate AS TIME) > '19:45:00' AND CAST(SDate AS TIME) <= '23:15:00' THEN 'OVERTIME SHIFT 3'
+            WHEN ShiftMode = 'SHIFT 3' AND CAST(SDate AS TIME) >= '19:46:00' AND CAST(SDate AS TIME) <= '23:14:59' THEN 'OVERTIME SHIFT 3'
             ELSE ShiftMode
         END AS Status_Di_Web,
         MachineCode
@@ -295,14 +324,26 @@ GroupedData AS (
         MachineCode,
         Mode_Asli_Mesin,
         Status_Di_Web,
+        Product_Id,
         CASE 
-            WHEN MIN(TotalUnit) = MAX(TotalUnit) THEN 0
-            ELSE (MAX(TotalUnit) - MIN(TotalUnit)) 
+            WHEN YEAR(ReportDate) = 2026 AND MONTH(ReportDate) >= 3 AND MONTH(ReportDate) <= 7 THEN MAX(TotalUnit)
+            ELSE COUNT(Product_Id)
         END AS Estimasi_Produksi,
         MAX(SDate) AS Max_SDate,
         MAX(NoOfOperator) AS MaxOp
     FROM ShiftData
-    GROUP BY ReportDate, MachineCode, Mode_Asli_Mesin, Status_Di_Web
+    GROUP BY 
+        ReportDate, 
+        MachineCode, 
+        Mode_Asli_Mesin, 
+        Status_Di_Web, 
+        Product_Id,
+        CASE
+            WHEN CAST(SDate AS TIME) >= '07:00:00' AND CAST(SDate AS TIME) <= '15:44:59' THEN 1
+            WHEN CAST(SDate AS TIME) >= '15:45:00' AND CAST(SDate AS TIME) <= '19:45:59' THEN 2
+            WHEN CAST(SDate AS TIME) >= '19:46:00' AND CAST(SDate AS TIME) <= '23:14:59' THEN 3
+            ELSE 4
+        END
 ),
 MachineDaily AS (
     SELECT 
@@ -821,21 +862,21 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                 {
                     if (shift == "1") 
                     {
-                        if (SelectedYear == 2026 && SelectedMonth == 7)
+                        if (SelectedYear == 2026 && (SelectedMonth == 7 || SelectedMonth == 8))
                             conditions.Add("(CAST(Time AS TIME) >= '07:00:00' AND CAST(Time AS TIME) <= '19:45:00')");
                         else
                             conditions.Add("(CAST(Time AS TIME) >= '07:00:00' AND CAST(Time AS TIME) <= '15:45:00')");
                     }
                     else if (shift == "2") 
                     {
-                        if (SelectedYear == 2026 && SelectedMonth == 7)
+                        if (SelectedYear == 2026 && (SelectedMonth == 7 || SelectedMonth == 8))
                             conditions.Add("1=0");
                         else
                             conditions.Add("(CAST(Time AS TIME) > '15:45:00' AND CAST(Time AS TIME) <= '23:15:00')");
                     }
                     else if (shift == "3") 
                     {
-                        if (SelectedYear == 2026 && SelectedMonth == 7)
+                        if (SelectedYear == 2026 && (SelectedMonth == 7 || SelectedMonth == 8))
                             conditions.Add("(CAST(Time AS TIME) > '19:45:00' OR CAST(Time AS TIME) <= '07:00:00')");
                         else
                             conditions.Add("(CAST(Time AS TIME) > '23:15:00' OR CAST(Time AS TIME) <= '07:00:00')");
