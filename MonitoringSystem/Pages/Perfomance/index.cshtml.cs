@@ -333,18 +333,38 @@ namespace MonitoringSystem.Pages.Performance
                 MachineCode = !string.IsNullOrEmpty(machineCode) ? machineCode : "MCH1-01";
                 SelectedDate = selectedDate != default ? selectedDate : DateTime.Today;
 
-                // ✅ OPTIMASI: Load achievement dulu baru hitung chart — tidak query ulang
-                LoadBreakTimesFromDb();
-                GetHourlyAchievement();
+                LoadAllData();
 
                 var actualData = GetActualPerHour();
                 var labels = actualData.Select(data => data.EndTime).ToList();
                 var efficiencyData = CalculateCumulativeEfficiencyForChart(actualData);
 
+                var differenceProd = CachedActual - CachedTarget;
+                var defectRatio = (CachedActual > 0)
+                    ? Math.Round(100.0 - ((double)CachedDefect / CachedActual * 100.0))
+                    : 100.0;
+
+                double actTaktTime = 0;
+                var netWorkingTime = Convert.ToDouble(CachedWorkingTime) - Convert.ToDouble(CachedLossTime);
+                if (netWorkingTime > 0 && CachedActual > 0)
+                {
+                    actTaktTime = Math.Round((netWorkingTime / Convert.ToDouble(CachedActual)) * 60, 2);
+                }
+
                 return new JsonResult(new
                 {
                     Labels = labels ?? new List<string>(),
-                    Efficiency = efficiencyData ?? new List<double>()
+                    Efficiency = efficiencyData ?? new List<double>(),
+                    planProd = CachedPlan,
+                    targetProd = CachedTarget,
+                    actualProd = CachedActual,
+                    differenceProd = differenceProd,
+                    efficiencyValue = CachedEfficiency > 0 ? CachedEfficiency : 0,
+                    planTaktTime = CachedPlanTaktTime,
+                    actTaktTime = actTaktTime > 0 ? actTaktTime : 0,
+                    defectRatio = defectRatio,
+                    workingTime = CachedWorkingTime > 0 ? CachedWorkingTime : 0,
+                    lossTime = Math.Round(CachedLossTime, 1)
                 });
             }
             catch (Exception ex)
@@ -576,23 +596,14 @@ namespace MonitoringSystem.Pages.Performance
                 {
                     connection.Open();
                     string query = @"
-                WITH ShiftData AS (
-                    SELECT ShiftMode, TotalUnit
+                    SELECT COUNT(*)
                     FROM OEESN
                     WHERE MachineCode = @MachineCode
                       AND (
                             (CAST(SDate AS DATE) = @SelectedDate AND CAST(SDate AS TIME) >= '07:00:00')
                             OR
                             (CAST(SDate AS DATE) = DATEADD(DAY, 1, @SelectedDate) AND CAST(SDate AS TIME) < '07:00:00')
-                          )
-                )
-                SELECT
-                    ISNULL(MAX(CASE WHEN ShiftMode = 'SHIFT 1'   THEN TotalUnit END), 0)
-                  + ISNULL(MAX(CASE WHEN ShiftMode = 'SHIFT 2'   THEN TotalUnit END), 0)
-                  + ISNULL(MAX(CASE WHEN ShiftMode = 'SHIFT 3'   THEN TotalUnit END), 0)
-                  + ISNULL(MAX(CASE WHEN ShiftMode = 'NON-SHIFT' THEN TotalUnit END), 0)
-                  + ISNULL(MAX(CASE WHEN ShiftMode = 'OVERTIME'  THEN TotalUnit END), 0)
-                FROM ShiftData;";
+                          );";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
@@ -657,7 +668,7 @@ namespace MonitoringSystem.Pages.Performance
                            MasterData.SUT AS SUT,
                            COUNT(*) AS Actual
                     FROM OEESN
-                    JOIN Masterdata ON OEESN.Product_Id = MasterData.Product_Id
+                    JOIN Masterdata ON OEESN.Product_Id = MasterData.Product_Id AND Masterdata.MachineCode = @MachineCode
                     WHERE CAST(SDate As DATE) = @Date AND OEESN.MachineCode = @MachineCode
                     GROUP BY DATEDIFF(HOUR, 0, SDate), Masterdata.ProductName, MasterData.QtyHour, MasterData.SUT
                     ORDER BY MIN(OEESN.SDate);";

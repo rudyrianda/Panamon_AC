@@ -1095,12 +1095,12 @@
                     datasets: [
                         { type: 'line', label: 'Act Ratio (%)', data: ratioActualData, borderColor: '#FACC15', backgroundColor: 'rgba(255, 215, 0, 0.2)', tension: 0.1, yAxisID: 'y1' },
                         { type: 'line', label: 'Plan Ratio (%)', data: ratioPlanData, borderColor: isLightMode ? '#666666' : '#FFFFFF', backgroundColor: isLightMode ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.2)', tension: 0.1, yAxisID: 'y1' },
-                           { label: 'SAP Plan Normal', data: originalPlanData, backgroundColor: '#3cb9fc', borderColor: '#3cb9fc', barThickness: 15, stack: 'OriginalPlan', yAxisID: 'y' },
-            { label: 'SAP Plan Overtime', data: originalPlanOvertimeData, backgroundColor: '#1a3a6b', borderColor: '#1a3a6b', barThickness: 15, stack: 'OriginalPlan', yAxisID: 'y' },
-               { label: 'Change Plan', data: chartChangePlanData, backgroundColor: '#a32ca3', borderColor: '#a32ca3', barThickness: 15, stack: 'Plan', yAxisID: 'y' },
-            { label: 'Overtime Plan', data: chartChangePlanOtData, backgroundColor: '#6a1b9a', borderColor: '#6a1b9a', barThickness: 15, stack: 'Plan', yAxisID: 'y' },
-                        { label: 'Act Normal', data: normalData, backgroundColor: '#35FF00', borderColor: '#35FF00', barThickness: 15, stack: 'Actual', yAxisID: 'y' },
-                        { label: 'Act Overtime', data: overtimeData, backgroundColor: '#006330', borderColor: '#006330', barThickness: 15, stack: 'Actual', yAxisID: 'y' }
+                           { label: 'SAP Plan Normal', data: originalPlanData.map(v => v === 0 ? null : v), backgroundColor: '#3cb9fc', borderColor: '#3cb9fc', borderWidth: 0, barThickness: 15, stack: 'OriginalPlan', yAxisID: 'y' },
+            { label: 'SAP Plan Overtime', data: originalPlanOvertimeData.map(v => v === 0 ? null : v), backgroundColor: '#1a3a6b', borderColor: '#1a3a6b', borderWidth: 0, barThickness: 15, stack: 'OriginalPlan', yAxisID: 'y' },
+               { label: 'Change Plan', data: chartChangePlanData.map(v => v === 0 ? null : v), backgroundColor: '#a32ca3', borderColor: '#a32ca3', borderWidth: 0, barThickness: 15, stack: 'Plan', yAxisID: 'y' },
+            { label: 'Overtime Plan', data: chartChangePlanOtData.map(v => v === 0 ? null : v), backgroundColor: '#6a1b9a', borderColor: '#6a1b9a', borderWidth: 0, barThickness: 15, stack: 'Plan', yAxisID: 'y' },
+                        { label: 'Act Normal', data: normalData.map(v => v === 0 ? null : v), backgroundColor: '#35FF00', borderColor: '#35FF00', borderWidth: 0, barThickness: 15, stack: 'Actual', yAxisID: 'y' },
+                        { label: 'Act Overtime', data: overtimeData.map(v => v === 0 ? null : v), backgroundColor: '#006330', borderColor: '#006330', borderWidth: 0, barThickness: 15, stack: 'Actual', yAxisID: 'y' }
                     ]
                 },
                 options: {
@@ -1345,6 +1345,226 @@
                 dateFormat: "Y-m-d",
                 allowInput: true
             });
+
+            // ===== AJAX POLLING (AUTO REFRESH) =====
+            function fetchLatestData() {
+                const month = document.getElementById('SelectedMonth').value;
+                const year = document.getElementById('SelectedYear').value;
+                const machineLine = document.getElementById('MachineLine').value;
+
+                // kumpulkan shift yang dipilih
+                const shiftCheckboxes = document.querySelectorAll('input[name="SelectedShifts"]:checked');
+                let shiftsQuery = '';
+                shiftCheckboxes.forEach(cb => {
+                    shiftsQuery += `&SelectedShifts=${encodeURIComponent(cb.value)}`;
+                });
+
+                const url = `?handler=AjaxUpdate&SelectedMonth=${month}&SelectedYear=${year}&MachineLine=${machineLine}${shiftsQuery}`;
+
+                fetch(url)
+                    .then(response => {
+                        if (!response.ok) throw new Error('Network response was not ok');
+                        return response.json();
+                    })
+                    .then(data => {
+                        updateTableCells(data);
+                        updateChart(data);
+                    })
+                    .catch(error => console.error('Error fetching data:', error));
+            }
+
+            function updateTableCells(data) {
+                const tbody = document.querySelector('#productionTable tbody');
+                if(!tbody) return;
+                const rows = tbody.querySelectorAll('tr');
+                const daysInMonth = data.chartLabels.length;
+                const formatN0 = num => num ? num.toLocaleString('en-US') : "0";
+                const getCell = (rIdx, cIdx) => {
+                    if (rows[rIdx] && rows[rIdx].cells[cIdx]) return rows[rIdx].cells[cIdx];
+                    return { textContent: '' }; // safe fallback
+                };
+
+                let sumPlanNormal = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(0, i+2).textContent = formatN0(data.effectivePlanData[i]);
+                    sumPlanNormal += data.effectivePlanData[i] || 0;
+                }
+                getCell(0, daysInMonth+2).textContent = formatN0(sumPlanNormal);
+
+                let sumPlanOvt = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(1, i+1).textContent = formatN0(data.effectivePlanOtData[i]);
+                    sumPlanOvt += data.effectivePlanOtData[i] || 0;
+                }
+                getCell(1, daysInMonth+1).textContent = formatN0(sumPlanOvt);
+
+                let sumPlanTotal = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    const val = (data.effectivePlanData[i] || 0) + (data.effectivePlanOtData[i] || 0);
+                    getCell(2, i+1).textContent = formatN0(val);
+                    sumPlanTotal += val;
+                }
+                getCell(2, daysInMonth+1).textContent = formatN0(sumPlanTotal);
+
+                let sumActNormal = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(3, i+2).textContent = formatN0(data.normalData[i]);
+                    sumActNormal += data.normalData[i] || 0;
+                }
+                getCell(3, daysInMonth+2).textContent = formatN0(sumActNormal);
+
+                let sumActOvt = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(4, i+1).textContent = formatN0(data.overtimeData[i]);
+                    sumActOvt += data.overtimeData[i] || 0;
+                }
+                getCell(4, daysInMonth+1).textContent = formatN0(sumActOvt);
+
+                let sumActTotal = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    const val = (data.normalData[i] || 0) + (data.overtimeData[i] || 0);
+                    getCell(5, i+1).textContent = formatN0(val);
+                    sumActTotal += val;
+                }
+                getCell(5, daysInMonth+1).textContent = formatN0(sumActTotal);
+
+                let sumDiff = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    const act = (data.normalData[i] || 0) + (data.overtimeData[i] || 0);
+                    const plan = (data.effectivePlanData[i] || 0) + (data.effectivePlanOtData[i] || 0);
+                    getCell(6, i+1).textContent = formatN0(act - plan);
+                    sumDiff += (act - plan);
+                }
+                getCell(6, daysInMonth+1).textContent = formatN0(sumDiff);
+
+                for(let i=0; i<daysInMonth; i++) {
+                    const act = (data.normalData[i] || 0) + (data.overtimeData[i] || 0);
+                    const plan = (data.effectivePlanData[i] || 0) + (data.effectivePlanOtData[i] || 0);
+                    let ratio = "-";
+                    if(plan > 0) ratio = (act / plan * 100).toFixed(2).replace(/\.00$/, '') + "%";
+                    else if (act > 0) ratio = "N/A";
+                    getCell(7, i+1).textContent = ratio;
+                }
+                let monthRatio = "-";
+                if(sumPlanTotal > 0) monthRatio = (sumActTotal / sumPlanTotal * 100).toFixed(2).replace(/\.00$/, '') + "%";
+                else if (sumActTotal > 0) monthRatio = "N/A";
+                getCell(7, daysInMonth+1).textContent = monthRatio;
+
+                let maxWorkers = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(8, i+1).textContent = data.noOfDirectWorkers[i] > 0 ? data.noOfDirectWorkers[i] : "0";
+                    if(data.noOfDirectWorkers[i] > maxWorkers) maxWorkers = data.noOfDirectWorkers[i];
+                }
+                getCell(8, daysInMonth+1).textContent = maxWorkers > 0 ? maxWorkers : "0";
+
+                let maxOvtOp = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(9, i+2).textContent = data.overtimeOperators[i] > 0 ? data.overtimeOperators[i] : "0";
+                    if(data.overtimeOperators[i] > maxOvtOp) maxOvtOp = data.overtimeOperators[i];
+                }
+                getCell(9, daysInMonth+2).textContent = maxOvtOp > 0 ? maxOvtOp : "0";
+
+                let sumOvtMin = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(10, i+2).textContent = data.overtimeMinutes[i] > 0 ? formatN0(data.overtimeMinutes[i]) : "0";
+                    sumOvtMin += data.overtimeMinutes[i] || 0;
+                }
+                getCell(10, daysInMonth+2).textContent = formatN0(sumOvtMin);
+
+                let sumLossTime = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(11, i+1).textContent = data.dailyLossTime[i] > 0 ? data.dailyLossTime[i].toFixed(2).replace(/\.00$/, '') : "0";
+                    sumLossTime += data.dailyLossTime[i] || 0;
+                }
+                getCell(11, daysInMonth+1).textContent = sumLossTime > 0 ? sumLossTime.toFixed(2).replace(/\.00$/, '') : "0";
+
+                let sumLoadTime = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(12, i+1).textContent = data.dailyWorkTime[i] > 0 ? formatN0(data.dailyWorkTime[i]) : "0";
+                    sumLoadTime += data.dailyWorkTime[i] || 0;
+                }
+                getCell(12, daysInMonth+1).textContent = formatN0(sumLoadTime);
+
+                let sumNetManHours = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    const act = (data.normalData[i] || 0) + (data.overtimeData[i] || 0);
+                    const netManHours = data.dailyNetManHours[i] || 0;
+                    sumNetManHours += netManHours;
+                    let pph = "";
+                    if(act > 0 && netManHours > 0) pph = (act / netManHours).toFixed(2).replace(/\.00$/, '');
+                    getCell(13, i+1).textContent = pph;
+                }
+                let monthPph = "";
+                if(sumActTotal > 0 && sumNetManHours > 0) monthPph = (sumActTotal / sumNetManHours).toFixed(2).replace(/\.00$/, '');
+                getCell(13, daysInMonth+1).textContent = monthPph;
+                
+                document.getElementById('totalActualValue').textContent = formatN0(sumActTotal);
+                document.getElementById('totalPlanValue').textContent = formatN0(sumPlanTotal);
+                const totalPhhValueElem = document.getElementById('totalPhhValue');
+                if (totalPhhValueElem) totalPhhValueElem.textContent = monthPph;
+            }
+
+            function updateChart(data) {
+                const chart = Chart.getChart('dayChart');
+                if(!chart) return;
+
+                const today = new Date().getDate();
+                const isAllShift = !data.selectedShifts || data.selectedShifts.length === 0 || data.selectedShifts.includes("All");
+                const isNoShift = data.selectedShifts && data.selectedShifts.length === 1 && data.selectedShifts.includes("NS");
+
+                const chartChangePlanData = data.planData.map((v, i) => {
+                    const dayIndex = i + 1;
+                    if (isNoShift && dayIndex > 5) return null;
+                    if (v > 0) {
+                        return data.effectivePlanData[i];
+                    } else {
+                        if (isAllShift && data.isCurrentMonthView && (dayIndex === today || dayIndex === today + 1)) {
+                            return (data.originalPlanData[i] || 0) + (data.originalPlanOvertimeData[i] || 0);
+                        }
+                        return null;
+                    }
+                });
+
+                const chartChangePlanOtData = data.planOvertimeData.map((v, i) => v > 0 ? data.effectivePlanOtData[i] : null);
+
+                let totalActualSum = 0;
+                let totalPlanSum = 0;
+                const daysInMonth = data.chartLabels.length;
+                for (let i = 0; i < daysInMonth; i++) {
+                    totalActualSum += (data.normalData[i] || 0) + (data.overtimeData[i] || 0);
+                    totalPlanSum += (data.effectivePlanData[i] || 0) + (data.effectivePlanOtData[i] || 0);
+                }
+
+                const ratioActualData = [], ratioPlanData = [];
+                let runningActualTotal = 0, runningPlanTotal = 0;
+
+                for (let i = 0; i < daysInMonth; i++) {
+                    if (data.isCurrentMonthView && (i + 1) > today) {
+                        ratioActualData.push(null);
+                        ratioPlanData.push(null);
+                    } else {
+                        runningActualTotal += (data.normalData[i] || 0) + (data.overtimeData[i] || 0);
+                        runningPlanTotal += (data.effectivePlanData[i] || 0) + (data.effectivePlanOtData[i] || 0);
+                        ratioActualData.push((totalActualSum > 0) ? (runningActualTotal / totalActualSum) * 100 : 0);
+                        ratioPlanData.push((totalPlanSum > 0) ? (runningPlanTotal / totalPlanSum) * 100 : 0);
+                    }
+                }
+
+                // Update datasets in order
+                chart.data.datasets[0].data = ratioActualData;
+                chart.data.datasets[1].data = ratioPlanData;
+                chart.data.datasets[2].data = data.originalPlanData.map(v => v === 0 ? null : v);
+                chart.data.datasets[3].data = data.originalPlanOvertimeData.map(v => v === 0 ? null : v);
+                chart.data.datasets[4].data = chartChangePlanData.map(v => v === 0 ? null : v);
+                chart.data.datasets[5].data = chartChangePlanOtData.map(v => v === 0 ? null : v);
+                chart.data.datasets[6].data = data.normalData.map(v => v === 0 ? null : v);
+                chart.data.datasets[7].data = data.overtimeData.map(v => v === 0 ? null : v);
+
+                chart.update('none'); // Update without animation so it's seamless
+            }
+
+            // Mulai Auto-Refresh setiap 5 detik
+            setInterval(fetchLatestData, 5000);
 
         </script>
     }

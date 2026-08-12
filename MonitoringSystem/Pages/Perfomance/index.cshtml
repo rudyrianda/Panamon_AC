@@ -532,46 +532,46 @@
                 <tbody>
                     <tr>
                         <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">PLAN</td>
-                        <td class="perf-td fs-4 fw-bold w-50 py-3">@planProd</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3" id="val-planProd">@planProd</td>
                     </tr>
                     <tr>
                         <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">TARGET</td>
-                        <td class="perf-td fs-4 fw-bold w-50 py-3">@targetProd</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3" id="val-targetProd">@targetProd</td>
                     </tr>
                     <tr>
                         <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">ACTUAL</td>
-                        <td class="perf-td fs-4 fw-bold w-50 py-3">@actualProd</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3" id="val-actualProd">@actualProd</td>
                     </tr>
                     <tr>
                         <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">DIFFERENCE</td>
-                        <td class="perf-td fs-4 fw-bold w-50 py-3 @(differenceProd > 0 ? "" : "text-danger")">@differenceProd</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3 @(differenceProd > 0 ? "" : "text-danger")" id="val-differenceProd">@differenceProd</td>
                     </tr>
                     <tr>
                         <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">EFFICIENCY</td>
-                        <td class="perf-td fs-4 fw-bold w-50 py-3">
+                        <td class="perf-td fs-4 fw-bold w-50 py-3" id="val-efficiencyValue">
                             @(efficiencyValue > 0 ? efficiencyValue : 0) %
                         </td>
                     </tr>
                     <tr>
                         <td rowspan="2" class="perf-th align-middle border border-end fs-4 fw-bold py-3">TAKE TIME</td>
                         <td class="perf-th fs-4 fw-bold py-3">PLAN</td>
-                        <td class="perf-td fs-4 fw-bold py-3">@planTaktTime s</td>
+                        <td class="perf-td fs-4 fw-bold py-3" id="val-planTaktTime">@planTaktTime s</td>
                     </tr>
                     <tr>
                         <td class="perf-th fs-4 fw-bold py-3">ACT</td>
-                        <td class="perf-td fs-4 fw-bold py-3">@(efficiencyMetrics.ActTaktTime > 0 ? efficiencyMetrics.ActTaktTime : 0) s</td>
+                        <td class="perf-td fs-4 fw-bold py-3" id="val-actTaktTime">@(efficiencyMetrics.ActTaktTime > 0 ? efficiencyMetrics.ActTaktTime : 0) s</td>
                     </tr>
                     <tr>
                         <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">PASS THROUGH RATIO</td>
-                        <td class="perf-td fs-4 fw-bold w-50 py-3">@defectRatio %</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3" id="val-defectRatio">@defectRatio %</td>
                     </tr>
                     <tr>
                         <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">WORKING TIME</td>
-                        <td class="perf-td fs-4 fw-bold w-50 py-3">@(workingTime > 0 ? workingTime : 0) min</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3" id="val-workingTime">@(workingTime > 0 ? workingTime : 0) min</td>
                     </tr>
                     <tr>
                         <td colspan="2" class="perf-th fs-4 fw-bold w-50 py-3">LOSS TIME</td>
-                        <td class="perf-td fs-4 fw-bold w-50 py-3">@Math.Round(totalLossTime, 1) min</td>
+                        <td class="perf-td fs-4 fw-bold w-50 py-3" id="val-lossTime">@Math.Round(totalLossTime, 1) min</td>
                     </tr>
                 </tbody>
             </table>
@@ -713,12 +713,36 @@
                     window.myChart.data.labels            = data.Labels;
                     window.myChart.data.datasets[0].data  = data.Efficiency;
                     window.myChart.update();
+
+                    // Update UI table
+                    const updateElem = (id, val, suffix = "") => {
+                        const el = document.getElementById(id);
+                        if(el) el.textContent = val + suffix;
+                    };
+                    
+                    updateElem("val-planProd", data.planProd);
+                    updateElem("val-targetProd", data.targetProd);
+                    updateElem("val-actualProd", data.actualProd);
+                    
+                    const diffEl = document.getElementById("val-differenceProd");
+                    if(diffEl) {
+                        diffEl.textContent = data.differenceProd;
+                        if(data.differenceProd <= 0) diffEl.classList.add("text-danger");
+                        else diffEl.classList.remove("text-danger");
+                    }
+
+                    updateElem("val-efficiencyValue", data.efficiencyValue, " %");
+                    updateElem("val-planTaktTime", data.planTaktTime, " s");
+                    updateElem("val-actTaktTime", data.actTaktTime, " s");
+                    updateElem("val-defectRatio", data.defectRatio, " %");
+                    updateElem("val-workingTime", data.workingTime, " min");
+                    updateElem("val-lossTime", data.lossTime, " min");
                 } catch (error) {
                     console.error("Failed to fetch updated data:", error.message);
                 }
             }
 
-            // ✅ OPTIMASI: interval 15 detik — lebih ringan dari 10 detik
-            setInterval(fetchUpdatedChartData, 15000);
+            // ✅ OPTIMASI: interval 20 detik
+            setInterval(fetchUpdatedChartData, 20000);
         </script>
 }
