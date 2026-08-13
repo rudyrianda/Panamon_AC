@@ -234,22 +234,14 @@
 
     <!-- Break Time Filter Modal -->
     <div class="modal fade" id="breakTimeFilterModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 550px;">
             <div class="modal-content">
-                <div class="modal-header border-bottom border-secondary">
-                    <h5 class="modal-title text-white fw-bold">
-                        <i class="fa-solid fa-clock me-2"></i>Break Time Settings
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    @{
-                        var models = new MonitoringSystem.Pages.Shared.ApplyBreakFilterModel(
-                        (ApplicationDbContext)Context.RequestServices.GetService(typeof(ApplicationDbContext)));
-                        await models.LoadBreakTimesAsync();
-                        await Html.RenderPartialAsync("_BreakTimeFilterPartial", models);
-                    }
-                </div>
+                @{
+                    var models = new MonitoringSystem.Pages.Shared.ApplyBreakFilterModel(
+                    (ApplicationDbContext)Context.RequestServices.GetService(typeof(ApplicationDbContext)));
+                    await models.LoadBreakTimesAsync();
+                    await Html.RenderPartialAsync("_BreakTimeFilterPartial", models);
+                }
             </div>
         </div>
     </div>

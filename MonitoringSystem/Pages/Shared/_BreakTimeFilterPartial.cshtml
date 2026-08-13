@@ -1,22 +1,29 @@
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model MonitoringSystem.Pages.Shared.ApplyBreakFilterModel
 
-<form method="post" asp-page="/Shared/ApplyBreakFilter" asp-page-handler="SaveBreakTime" class="align-items-center text-center mx-4">
-    <div class="form-group mb-4">
-        <label for="SelectedDate" class="fw-bold mb-2">Select Date</label>
-        <input type="date" asp-for="SelectedDate" class="form-control text-center" id="BreakTimeSelectedDate" name="SelectedDate" value="@(Model?.SelectedDate != default ? Model.SelectedDate.ToString("yyyy-MM-dd") : DateTime.Today.ToString("yyyy-MM-dd"))" />
+<form method="post" asp-page="/Shared/ApplyBreakFilter" asp-page-handler="SaveBreakTime">
+    <div class="modal-header border-bottom border-secondary d-flex align-items-center">
+        <h5 class="modal-title text-white fw-bold mb-0">
+            <i class="fa-solid fa-clock me-2"></i>Break Time Settings
+        </h5>
+        <div class="ms-auto me-3">
+            <input type="date" asp-for="SelectedDate" class="form-control form-control-sm text-center" style="width: auto; background-color: #3b4252; color: #d8dee9; border-color: #4c566a;" id="BreakTimeSelectedDate" name="SelectedDate" value="@(Model?.SelectedDate != default ? Model.SelectedDate.ToString("yyyy-MM-dd") : DateTime.Today.ToString("yyyy-MM-dd"))" />
+        </div>
+        <button type="button" class="btn-close btn-close-white m-0" data-bs-dismiss="modal"></button>
     </div>
 
-    <div class="form-group mb-4">
-        <label class="fw-bold mb-2">Break Time</label>
-        <div class="d-flex gap-2">
-            <input type="time" asp-for="BreakTime1Start" class="form-control text-center" id="BreakTime1Start" name="BreakTime1Start" value="@(Model?.BreakTime1Start?.ToString(@"hh\:mm"))" />
-            <span class="align-self-center">-</span>
-            <input type="time" asp-for="BreakTime1End" class="form-control text-center" id="BreakTime1End" name="BreakTime1End" value="@(Model?.BreakTime1End?.ToString(@"hh\:mm"))" />
+    <div class="modal-body align-items-center text-center mx-4 mt-3">
+        <div class="form-group mb-4">
+            <label class="fw-bold mb-2">Break Time</label>
+            <div class="d-flex gap-2 justify-content-center">
+                <input type="time" asp-for="BreakTime1Start" class="form-control text-center" id="BreakTime1Start" name="BreakTime1Start" value="@(Model?.BreakTime1Start?.ToString(@"hh\:mm"))" />
+                <span class="align-self-center">-</span>
+                <input type="time" asp-for="BreakTime1End" class="form-control text-center" id="BreakTime1End" name="BreakTime1End" value="@(Model?.BreakTime1End?.ToString(@"hh\:mm"))" />
+            </div>
         </div>
+        
+        <button type="submit" class="btn btn-primary mb-3 px-4 rounded-pill">Save Break Time</button>
     </div>
-    
-    <button type="submit" class="btn btn-primary mb-3 px-4 rounded-pill">Save Break Time</button>
 </form>
 
 <script>
