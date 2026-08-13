@@ -265,10 +265,8 @@ namespace MonitoringSystem.Pages.ProductionReport
                     : "AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')")}
       {planShiftFilter}
     GROUP BY DAY(pp.CurrentDate)";
-<<<<<<< Updated upstream
 
-=======
->>>>>>> Stashed changes
+
             string anyPlanSql = $@"
     SELECT DISTINCT DAY(pp.CurrentDate) as Day
     FROM ProductionPlan pp
@@ -277,10 +275,6 @@ namespace MonitoringSystem.Pages.ProductionReport
       AND MONTH(pp.CurrentDate) = @SelectedMonth
       AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')
       {planShiftFilter}";
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
 
             string actualSql = $@"
 WITH ShiftData AS (
