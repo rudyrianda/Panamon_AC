@@ -449,8 +449,8 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                 {
                     conn.Open();
 
-                    bool isAugust2026 = (SelectedYear == 2026 && SelectedMonth == 8);
-                    if (isAugust2026)
+                    bool useAugustLogic = (SelectedYear == 2026 && SelectedMonth == 8);
+                    if (useAugustLogic)
                     {
                         planSql = $@"
 SELECT 
