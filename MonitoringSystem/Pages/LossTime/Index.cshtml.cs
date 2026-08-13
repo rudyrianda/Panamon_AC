@@ -15,19 +15,21 @@ namespace MonitoringSystem.Pages.LossTime
     {
         private readonly ApplicationDbContext _context;
 
-        public IndexModel(ApplicationDbContext context, IConfiguration configuration, IWebHostEnvironment webHostEnvironment)
+        public IndexModel(ApplicationDbContext context, IConfiguration configuration, IWebHostEnvironment webHostEnvironment, MonitoringSystem.Services.BreakTimeService breakTimeService)
         {
             _context = context;
             _configuration = configuration;
             connectionString = _configuration.GetConnectionString("DefaultConnection") ?? "";
             machineConnectionString = _configuration.GetConnectionString("MachineConnection") ?? "";
             _webHostEnvironment = webHostEnvironment;
+            _breakTimeService = breakTimeService;
         }
 
         private string connectionString;
         private string machineConnectionString;
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _webHostEnvironment;
+        private readonly MonitoringSystem.Services.BreakTimeService _breakTimeService;
 
         public List<LossTimeRecord> LossTimeData { get; set; } = new List<LossTimeRecord>();
         public int TotalDuration { get; set; }
@@ -48,10 +50,7 @@ namespace MonitoringSystem.Pages.LossTime
         [BindProperty] public string SelectedMachineName { get; set; } = "All";
         [BindProperty] public List<string> SelectedShifts { get; set; } = new List<string> { "1", "2", "3" };
         [BindProperty] public int SelectedPageSize { get; set; } = 10;
-        [BindProperty] public string AdditionalBreakTime1Start { get; set; } = "";
-        [BindProperty] public string AdditionalBreakTime1End { get; set; } = "";
-        [BindProperty] public string AdditionalBreakTime2Start { get; set; } = "";
-        [BindProperty] public string AdditionalBreakTime2End { get; set; } = "";
+
         [BindProperty] public IFormFile UploadedExcel { get; set; }
         [BindProperty] public string UploadMachineLine { get; set; }
 
@@ -169,13 +168,7 @@ namespace MonitoringSystem.Pages.LossTime
             { "Laser",                      "#C9CBCF" },
         };
 
-        private readonly List<(TimeSpan Start, TimeSpan End)> FixedBreakTimes = new List<(TimeSpan, TimeSpan)>
-        {
-            (new TimeSpan(7, 0, 0), new TimeSpan(7, 5, 0)),
-            (new TimeSpan(9, 30, 0), new TimeSpan(9, 35, 0)),
-            (new TimeSpan(15, 30, 0), new TimeSpan(15, 35, 0)),
-            (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
-        };
+
 
 
         public void OnGet(int pageNumber = 1, int pageSize = 10)
@@ -184,7 +177,6 @@ namespace MonitoringSystem.Pages.LossTime
             PageSize = pageSize;
             SelectedPageSize = pageSize;
             SetDatesFromMonthYear();
-            LoadBreakTimeForToday();
             LoadMachineNameList();
             LoadData();
         }
@@ -203,7 +195,6 @@ namespace MonitoringSystem.Pages.LossTime
             SetDatesFromMonthYear();
             if (SelectedShifts == null || !SelectedShifts.Any())
                 SelectedShifts = new List<string> { "1", "2", "3" };
-            LoadBreakTimeForToday();
             LoadMachineNameList();
             IsFiltering = true;
             LoadData();
@@ -212,8 +203,6 @@ namespace MonitoringSystem.Pages.LossTime
 
         public IActionResult OnPostChangePage(int pageNumber, int pageSize, int selectedMonth, int selectedYear,
             string machineLine, List<string> selectedShifts,
-            string additionalBreakTime1Start, string additionalBreakTime1End,
-            string additionalBreakTime2Start, string additionalBreakTime2End,
             string selectedSource = "Assembly", string selectedMachineName = "All")
         {
             CurrentPage = pageNumber;
@@ -223,10 +212,6 @@ namespace MonitoringSystem.Pages.LossTime
             SetDatesFromMonthYear();
             MachineLine = machineLine;
             SelectedShifts = selectedShifts ?? new List<string> { "1", "2", "3" };
-            AdditionalBreakTime1Start = additionalBreakTime1Start;
-            AdditionalBreakTime1End = additionalBreakTime1End;
-            AdditionalBreakTime2Start = additionalBreakTime2Start;
-            AdditionalBreakTime2End = additionalBreakTime2End;
             SelectedSource = selectedSource;
             SelectedMachineName = selectedMachineName;
             LoadMachineNameList();
@@ -249,7 +234,6 @@ namespace MonitoringSystem.Pages.LossTime
             CurrentPage = 1;
             SelectedSource = "Assembly";
             SelectedMachineName = "All";
-            LoadBreakTimeForToday();
             LoadMachineNameList();
             LoadData();
             return Page();
@@ -276,21 +260,7 @@ namespace MonitoringSystem.Pages.LossTime
             catch (Exception ex) { Console.WriteLine($"? LoadMachineNameList error: {ex.Message}"); }
         }
 
-        private void LoadBreakTimeForToday()
-        {
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            var latestBreakTime = _context.AdditionalBreakTimes
-                .Where(bt => bt.Date == today)
-                .OrderByDescending(bt => bt.CreatedAt)
-                .FirstOrDefault();
-            if (latestBreakTime != null)
-            {
-                AdditionalBreakTime1Start = latestBreakTime.BreakTime1Start?.ToString(@"hh\:mm");
-                AdditionalBreakTime1End = latestBreakTime.BreakTime1End?.ToString(@"hh\:mm");
-                AdditionalBreakTime2Start = latestBreakTime.BreakTime2Start?.ToString(@"hh\:mm");
-                AdditionalBreakTime2End = latestBreakTime.BreakTime2End?.ToString(@"hh\:mm");
-            }
-        }
+
 
         private bool TryParseTimeSpan(string timeString, out TimeSpan result)
         {
@@ -300,13 +270,19 @@ namespace MonitoringSystem.Pages.LossTime
             result = TimeSpan.Zero; return false;
         }
 
-        private bool IsInBreakTime(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
+        private int CalculateBreakOverlapSec(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
         {
+            int totalOverlapSec = 0;
             foreach (var (breakStart, breakEnd) in breakTimes)
             {
-                if (startTime < breakEnd && endTime > breakStart) return true;
+                if (startTime < breakEnd && endTime > breakStart)
+                {
+                    var overlapStart = startTime > breakStart ? startTime : breakStart;
+                    var overlapEnd = endTime < breakEnd ? endTime : breakEnd;
+                    totalOverlapSec += (int)(overlapEnd - overlapStart).TotalSeconds;
+                }
             }
-            return false;
+            return totalOverlapSec;
         }
 
         private void LoadData()
@@ -549,26 +525,21 @@ namespace MonitoringSystem.Pages.LossTime
                                 recordDate = recordDate.AddDays(-1);
                             }
                             
-                            var breaksForThisDay = new List<(TimeSpan, TimeSpan)>();
-                            breaksForThisDay.AddRange(this.FixedBreakTimes);
+                            int originalDuration = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : reader.GetInt32(reader.GetOrdinal("LossTime"));
+                            int overlapSec = CalculateBreakOverlapSec(startTime, endTime, breakTimes);
+                            int actualDuration = originalDuration - overlapSec;
 
-                            if (breakTimes != null)
-                                breaksForThisDay.AddRange(breakTimes);
-
-                            if (IsInBreakTime(startTime, endTime, breaksForThisDay)) continue;
+                            if (actualDuration <= 0) continue;
 
                             string reason = reader.IsDBNull(reader.GetOrdinal("Reason")) ? string.Empty : reader.GetString(reader.GetOrdinal("Reason"));
-
-                            if (recordDate < lastStart || recordDate > currEnd) continue;
-
                             records.Add(new LossTimeRecord
                             {
-                                RecordId = reader.IsDBNull(reader.GetOrdinal("Id")) ? 0 : reader.GetInt32(reader.GetOrdinal("Id")),
-                                Date = recordDate,
+                                Nomor = reader.IsDBNull(reader.GetOrdinal("Id")) ? 0 : reader.GetInt32(reader.GetOrdinal("Id")),
+                                Date = reader.IsDBNull(reader.GetOrdinal("Date")) ? DateTime.MinValue : reader.GetDateTime(reader.GetOrdinal("Date")),
                                 LossTime = reason,
                                 Start = startTime,
                                 End = endTime,
-                                Duration = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : reader.GetInt32(reader.GetOrdinal("LossTime")),
+                                Duration = actualDuration,
                                 Location = reader.IsDBNull(reader.GetOrdinal("MachineCode")) ? string.Empty : reader.GetString(reader.GetOrdinal("MachineCode")),
                                 Shift = reader.IsDBNull(reader.GetOrdinal("Shift")) ? string.Empty : reader.GetString(reader.GetOrdinal("Shift")),
                                 Category = CategorizeReason(reason),
@@ -586,7 +557,7 @@ namespace MonitoringSystem.Pages.LossTime
             string query = @"
 SELECT Id, Date, Reason, DetailedReason, MachineCode,
        CAST(Time AS TIME) AS StartTime, CAST(EndDateTime AS TIME) AS EndTime, LossTime, 
-       CASE WHEN MONTH(Date) = 7 AND YEAR(Date) = 2026 THEN
+       CASE WHEN MONTH(Date) IN (7, 8) AND YEAR(Date) = 2026 THEN
                  CASE WHEN CAST(Time AS TIME) >= '07:00:00' AND CAST(Time AS TIME) <= '19:45:00' THEN '1'
                       WHEN CAST(Time AS TIME) > '19:45:00' OR CAST(Time AS TIME) < '07:00:00' THEN '3'
                       ELSE '2' END
@@ -827,7 +798,13 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                         {
                             TimeSpan startTime = reader.GetTimeSpan(reader.GetOrdinal("StartTime"));
                             TimeSpan endTime = reader.GetTimeSpan(reader.GetOrdinal("EndTime"));
-                            if (IsInBreakTime(startTime, endTime, breakTimes)) continue;
+
+                            int originalDuration = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : reader.GetInt32(reader.GetOrdinal("LossTime"));
+                            int overlapSec = CalculateBreakOverlapSec(startTime, endTime, breakTimes);
+                            int actualDuration = originalDuration - overlapSec;
+
+                            if (actualDuration <= 0) continue;
+
                             string reason = reader.IsDBNull(reader.GetOrdinal("Reason")) ? string.Empty : reader.GetString(reader.GetOrdinal("Reason"));
                             LossTimeData.Add(new LossTimeRecord
                             {
@@ -836,7 +813,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                                 LossTime = reason,
                                 Start = startTime,
                                 End = endTime,
-                                Duration = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : reader.GetInt32(reader.GetOrdinal("LossTime")),
+                                Duration = actualDuration,
                                 Location = reader.IsDBNull(reader.GetOrdinal("MachineCode")) ? string.Empty : reader.GetString(reader.GetOrdinal("MachineCode")),
                                 Shift = reader.IsDBNull(reader.GetOrdinal("Shift")) ? string.Empty : reader.GetString(reader.GetOrdinal("Shift")),
                                 Category = CategorizeReason(reason),
@@ -867,7 +844,13 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                         {
                             TimeSpan startTime = reader.GetTimeSpan(reader.GetOrdinal("StartTime"));
                             TimeSpan endTime = reader.GetTimeSpan(reader.GetOrdinal("EndTime"));
-                            if (IsInBreakTime(startTime, endTime, breakTimes)) continue;
+                            
+                            int originalDuration = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : reader.GetInt32(reader.GetOrdinal("LossTime"));
+                            int overlapSec = CalculateBreakOverlapSec(startTime, endTime, breakTimes);
+                            int actualDuration = originalDuration - overlapSec;
+
+                            if (actualDuration <= 0) continue;
+
                             string reason = reader.IsDBNull(reader.GetOrdinal("Reason")) ? string.Empty : reader.GetString(reader.GetOrdinal("Reason"));
                             records.Add(new LossTimeRecord
                             {
@@ -875,7 +858,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                                 LossTime = reason,
                                 Start = startTime,
                                 End = endTime,
-                                Duration = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : reader.GetInt32(reader.GetOrdinal("LossTime")),
+                                Duration = actualDuration,
                                 Shift = reader.IsDBNull(reader.GetOrdinal("Shift")) ? string.Empty : reader.GetString(reader.GetOrdinal("Shift")),
                                 Category = CategorizeReason(reason)
                             });
@@ -948,14 +931,10 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
         private List<(TimeSpan Start, TimeSpan End)> GetAllBreakTimes()
         {
             if (_cachedBreakTimes != null) return _cachedBreakTimes;
-            var breakTimes = new List<(TimeSpan Start, TimeSpan End)>(FixedBreakTimes);
-
-            if (!string.IsNullOrEmpty(AdditionalBreakTime1Start) && !string.IsNullOrEmpty(AdditionalBreakTime1End))
-                if (TryParseTimeSpan(AdditionalBreakTime1Start, out TimeSpan s1) && TryParseTimeSpan(AdditionalBreakTime1End, out TimeSpan e1))
-                    breakTimes.Add((s1, e1));
-            if (!string.IsNullOrEmpty(AdditionalBreakTime2Start) && !string.IsNullOrEmpty(AdditionalBreakTime2End))
-                if (TryParseTimeSpan(AdditionalBreakTime2Start, out TimeSpan s2) && TryParseTimeSpan(AdditionalBreakTime2End, out TimeSpan e2))
-                    breakTimes.Add((s2, e2));
+            
+            var breakTimes = _breakTimeService.GetBreakTimesForDateAsync(StartSelectedDate).Result
+                .Select(b => (b.StartTime, b.EndTime))
+                .ToList();
 
             _cachedBreakTimes = breakTimes;
             return breakTimes;
@@ -1094,7 +1073,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
 
         public IActionResult OnPostExportExcel()
         {
-            LoadBreakTimeForToday();
+
             SetDatesFromMonthYear();
             List<LossTimeRecord> exportData;
             if (SelectedSource == "Machine")

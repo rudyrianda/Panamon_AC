@@ -25,12 +25,15 @@ namespace MonitoringSystem.Pages.LossTimeReport
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _webHostEnvironment;
 
-        public indexModel(ApplicationDbContext context, IConfiguration configuration, IWebHostEnvironment webHostEnvironment)
+        private readonly MonitoringSystem.Services.BreakTimeService _breakTimeService;
+
+        public indexModel(ApplicationDbContext context, IConfiguration configuration, IWebHostEnvironment webHostEnvironment, MonitoringSystem.Services.BreakTimeService breakTimeService)
         {
             _context = context;
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("DefaultConnection");
             _webHostEnvironment = webHostEnvironment;
+            _breakTimeService = breakTimeService;
         }
         //public indexModel(ApplicationDbContext context, IConfiguration configuration)
         //{
@@ -42,40 +45,26 @@ namespace MonitoringSystem.Pages.LossTimeReport
         //    _context = context;
         //}
 
-        private readonly List<(TimeSpan Start, TimeSpan End)> FixedBreakTimes = new List<(TimeSpan, TimeSpan)>
+        private int CalculateBreakOverlapSec(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
         {
-            (new TimeSpan(7, 0, 0), new TimeSpan(7, 5, 0)),
-            (new TimeSpan(9, 30, 0), new TimeSpan(9, 35, 0)),
-            (new TimeSpan(15, 30, 0), new TimeSpan(15, 35, 0)),
-            (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
-        };
-
-        private bool IsInBreakTime(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
-        {
+            int totalOverlapSec = 0;
             foreach (var (breakStart, breakEnd) in breakTimes)
             {
-                if (startTime < breakEnd && endTime > breakStart) return true;
+                if (startTime < breakEnd && endTime > breakStart)
+                {
+                    var overlapStart = startTime > breakStart ? startTime : breakStart;
+                    var overlapEnd = endTime < breakEnd ? endTime : breakEnd;
+                    totalOverlapSec += (int)(overlapEnd - overlapStart).TotalSeconds;
+                }
             }
-            return false;
+            return totalOverlapSec;
         }
 
         private List<(TimeSpan Start, TimeSpan End)> GetAllBreakTimes()
         {
-            var breakTimes = new List<(TimeSpan Start, TimeSpan End)>(FixedBreakTimes);
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            var latestBreakTime = _context.AdditionalBreakTimes
-                .Where(bt => bt.Date == today)
-                .OrderByDescending(bt => bt.CreatedAt)
-                .FirstOrDefault();
-
-            if (latestBreakTime != null)
-            {
-                if (latestBreakTime.BreakTime1Start.HasValue && latestBreakTime.BreakTime1End.HasValue)
-                    breakTimes.Add((latestBreakTime.BreakTime1Start.Value.ToTimeSpan(), latestBreakTime.BreakTime1End.Value.ToTimeSpan()));
-                if (latestBreakTime.BreakTime2Start.HasValue && latestBreakTime.BreakTime2End.HasValue)
-                    breakTimes.Add((latestBreakTime.BreakTime2Start.Value.ToTimeSpan(), latestBreakTime.BreakTime2End.Value.ToTimeSpan()));
-            }
-            return breakTimes;
+            return _breakTimeService.GetBreakTimesForDateAsync(DateTime.Today).Result
+                .Select(b => (b.StartTime, b.EndTime))
+                .ToList();
         }
 
         [BindProperty(SupportsGet = true)]
@@ -341,8 +330,11 @@ namespace MonitoringSystem.Pages.LossTimeReport
                                     
                                     if (endTime < startTime) endTime = endTime.Add(TimeSpan.FromDays(1));
                                     
-                                    // LOGIC SAMAKAN DENGAN DETAIL LOSS (Skip Break Time)
-                                    if (IsInBreakTime(startTime, endTime, breakTimes)) continue;
+                                    // LOGIC SAMAKAN DENGAN DETAIL LOSS (Overlap Break Time)
+                                    int overlapSec = CalculateBreakOverlapSec(startTime, endTime, breakTimes);
+                                    durationSec -= overlapSec;
+
+                                    if (durationSec <= 0) continue;
 
                                     rawList.Add(new MonthlyCategoryData
                                     {
@@ -379,7 +371,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
             {
                 for (int m = 1; m <= 12; m++)
                 {
-                    var pr = new MonitoringSystem.Pages.ProductionReport.IndexModel(_webHostEnvironment, _configuration);
+                    var pr = new MonitoringSystem.Pages.ProductionReport.IndexModel(_webHostEnvironment, _configuration, _breakTimeService);
                     pr.SelectedYear = m >= 4 ? fiscalYear : fiscalYear + 1;
                     pr.SelectedMonth = m;
                     pr.MachineLine = line;

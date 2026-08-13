@@ -232,23 +232,21 @@ namespace MonitoringSystem.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<TimeOnly?>("BreakTime1End")
-                        .HasColumnType("time");
-
-                    b.Property<TimeOnly?>("BreakTime1Start")
-                        .HasColumnType("time");
-
-                    b.Property<TimeOnly?>("BreakTime2End")
-                        .HasColumnType("time");
-
-                    b.Property<TimeOnly?>("BreakTime2Start")
-                        .HasColumnType("time");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time");
 
                     b.HasKey("Id");
 

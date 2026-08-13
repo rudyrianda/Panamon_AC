@@ -375,9 +375,10 @@
                         datasets: [
                             {
                                 label: 'Change Plan',
-                                data: chartData.ChangePlanData,
+                                data: chartData.ChangePlanData.map(v => v === 0 ? null : v),
                                 backgroundColor: '#a32ca3', // Purple
                                 borderColor: '#a32ca3',
+                                borderWidth: 0,
                                 maxBarThickness: 8,
                                 categoryPercentage: 0.8,
                                 barPercentage: 0.9,
@@ -385,9 +386,10 @@
                             },
                             {
                                 label: 'Act Normal',
-                                data: chartData.ActualNormalData,
+                                data: chartData.ActualNormalData.map(v => v === 0 ? null : v),
                                 backgroundColor: '#35FF00', // Light Green
                                 borderColor: '#35FF00',
+                                borderWidth: 0,
                                 maxBarThickness: 8,
                                 categoryPercentage: 0.8,
                                 barPercentage: 0.9,
@@ -395,9 +397,10 @@
                             },
                             {
                                 label: 'Act Overtime',
-                                data: chartData.ActualOvertimeData,
+                                data: chartData.ActualOvertimeData.map(v => v === 0 ? null : v),
                                 backgroundColor: '#006330', // Dark Green
                                 borderColor: '#006330',
+                                borderWidth: 0,
                                 maxBarThickness: 8,
                                 categoryPercentage: 0.8,
                                 barPercentage: 0.9,

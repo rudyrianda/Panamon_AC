@@ -374,12 +374,9 @@ namespace MonitoringSystem.Pages.BusinessUnitReport
                         ShiftMode AS Mode_Asli_Mesin,
                         CASE 
                             WHEN ShiftMode = 'NON-SHIFT' THEN
-                                CASE 
-                                    WHEN MONTH(CAST(DATEADD(hour, -7, SDate) AS DATE)) = 7 AND YEAR(CAST(DATEADD(hour, -7, SDate) AS DATE)) = 2026 AND DAY(CAST(DATEADD(hour, -7, SDate) AS DATE)) <= 5 THEN 'NON-SHIFT'
-                                    WHEN CAST(SDate AS TIME) >= '07:00:00' AND CAST(SDate AS TIME) <= '15:45:00' THEN 'SHIFT 1'
-                                    WHEN CAST(SDate AS TIME) > '15:45:00' AND CAST(SDate AS TIME) <= '18:00:00' THEN 'OVERTIME SHIFT 1'
-                                    WHEN CAST(SDate AS TIME) > '18:00:00' AND CAST(SDate AS TIME) <= '23:15:00' THEN 'OVERTIME SHIFT 3'
-                                    ELSE 'SHIFT 3'
+                                CASE
+                                    WHEN CAST(SDate AS TIME) > '16:00:00' THEN 'OVERTIME'
+                                    ELSE 'NON-SHIFT'
                                 END
                             WHEN ShiftMode LIKE 'OVERTIME%' THEN
                                 CASE 
@@ -389,7 +386,7 @@ namespace MonitoringSystem.Pages.BusinessUnitReport
                                     WHEN CAST(SDate AS TIME) > '23:15:00' OR CAST(SDate AS TIME) <= '07:00:00' THEN 'SHIFT 3'
                                     ELSE 'OVERTIME'
                                 END
-                            WHEN ShiftMode = 'SHIFT 2' AND MONTH(CAST(DATEADD(hour, -7, SDate) AS DATE)) = 7 AND YEAR(CAST(DATEADD(hour, -7, SDate) AS DATE)) = 2026 THEN
+                            WHEN ShiftMode = 'SHIFT 2' AND MONTH(CAST(DATEADD(hour, -7, SDate) AS DATE)) IN (7, 8) AND YEAR(CAST(DATEADD(hour, -7, SDate) AS DATE)) = 2026 THEN
                                 CASE 
                                     WHEN CAST(SDate AS TIME) >= '07:00:00' AND CAST(SDate AS TIME) <= '15:45:00' THEN 'SHIFT 1'
                                     WHEN CAST(SDate AS TIME) > '15:45:00' AND CAST(SDate AS TIME) <= '18:00:00' THEN 'OVERTIME SHIFT 1'

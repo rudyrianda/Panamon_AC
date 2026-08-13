@@ -33,28 +33,24 @@ namespace MonitoringSystem.Pages.Performance
         // ✅ FLAG: Pastikan LoadBreakTimes hanya dipanggil sekali per request
         private bool _breakTimesLoaded = false;
 
-        public PerformanceModel(ApplicationDbContext context, IServiceProvider serviceProvider)
+        private readonly MonitoringSystem.Services.BreakTimeService _breakTimeService;
+
+        public PerformanceModel(ApplicationDbContext context, IServiceProvider serviceProvider, MonitoringSystem.Services.BreakTimeService breakTimeService)
         {
             _context = context;
             _serviceProvider = serviceProvider;
+            _breakTimeService = breakTimeService;
         }
 
         public int TotalPlanForSummaryCU { get; set; }
         public int TotalPlanForSummaryCS { get; set; }
 
-        [BindProperty]
+        [BindProperty(SupportsGet = true)]
         public DateTime SelectedDate { get; set; } = DateTime.Now.Date;
 
-        [BindProperty]
+        [BindProperty(SupportsGet = true)]
         public string MachineCode { get; set; } = "MCH1-01";
 
-        // ✅ COMMENTED: Tabel AdditionalBreakTime belum ada di database
-        // Uncomment jika tabel sudah dibuat dengan script:
-        // CREATE TABLE AdditionalBreakTime (Id INT IDENTITY PRIMARY KEY, Date DATE, BreakTime1Start TIME, BreakTime1End TIME, BreakTime2Start TIME, BreakTime2End TIME, CreatedAt DATETIME DEFAULT GETDATE())
-        public TimeSpan? BreakTime1Start { get; set; }
-        public TimeSpan? BreakTime1End { get; set; }
-        public TimeSpan? BreakTime2Start { get; set; }
-        public TimeSpan? BreakTime2End { get; set; }
 
         // ✅ CACHE PROPERTIES: Hasil query disimpan sekali, dipakai berkali-kali di view
         public int CachedPlan { get; set; }
@@ -94,8 +90,12 @@ namespace MonitoringSystem.Pages.Performance
 
         public void OnGet()
         {
-            SelectedDate = DateTime.Today;
-            MachineCode = MachineCode;
+            if (string.IsNullOrEmpty(MachineCode))
+                MachineCode = "MCH1-01";
+
+            if (SelectedDate == default)
+                SelectedDate = DateTime.Today;
+
             LoadAllData();
         }
 
@@ -267,11 +267,7 @@ namespace MonitoringSystem.Pages.Performance
             if (_breakTimesLoaded) return;
             _breakTimesLoaded = true;
 
-            // Set semua null — fitur AdditionalBreakTime belum aktif
-            BreakTime1Start = null;
-            BreakTime1End = null;
-            BreakTime2Start = null;
-            BreakTime2End = null;
+
 
             // ============================================================
             // UNCOMMENT BLOK INI JIKA TABEL AdditionalBreakTime SUDAH ADA
@@ -945,6 +941,25 @@ namespace MonitoringSystem.Pages.Performance
                         totalQuantityPlan = (result != null && result != DBNull.Value)
                             ? Convert.ToInt32(result) : 0;
                     }
+
+                    if (totalQuantityPlan == 0)
+                    {
+                        string fallbackQuery = @"
+                        SELECT SUM(ISNULL(sp.SapPlanNormal, 0) + ISNULL(sp.SapPlanOvertime, 0))
+                        FROM SapPlan sp
+                        JOIN ProductionPlan pp ON sp.PlanId = pp.Id
+                        WHERE CAST(pp.CurrentDate AS DATE) = @SelectedDate
+                          AND sp.MachineCode = @MachineCode;";
+
+                        using (SqlCommand cmdFallback = new SqlCommand(fallbackQuery, connection))
+                        {
+                            cmdFallback.Parameters.AddWithValue("@SelectedDate", SelectedDate.Date);
+                            cmdFallback.Parameters.AddWithValue("@MachineCode", MachineCode);
+                            var resultFallback = cmdFallback.ExecuteScalar();
+                            totalQuantityPlan = (resultFallback != null && resultFallback != DBNull.Value)
+                                ? Convert.ToInt32(resultFallback) : 0;
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -1080,8 +1095,11 @@ namespace MonitoringSystem.Pages.Performance
                                 
                                 if (endTime < startTime) endTime = endTime.Add(TimeSpan.FromDays(1));
                                 
-                                // LOGIKA SAMA DENGAN DETAIL LOSS (skip jika bertabrakan dengan break)
-                                if (IsInBreakTime(startTime, endTime, breakTimes)) continue;
+                                // LOGIKA SAMA DENGAN DETAIL LOSS (hitung overlap)
+                                int overlapSec = CalculateBreakOverlapSec(startTime, endTime, breakTimes);
+                                durationSec -= overlapSec;
+
+                                if (durationSec <= 0) continue;
 
                                 totalLossMinutes += durationSec / 60.0;
                             }
@@ -1097,40 +1115,26 @@ namespace MonitoringSystem.Pages.Performance
             return totalLossMinutes;
         }
 
-        private readonly List<(TimeSpan Start, TimeSpan End)> FixedBreakTimes = new List<(TimeSpan, TimeSpan)>
+        private int CalculateBreakOverlapSec(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
         {
-            (new TimeSpan(7, 0, 0), new TimeSpan(7, 5, 0)),
-            (new TimeSpan(9, 30, 0), new TimeSpan(9, 35, 0)),
-            (new TimeSpan(15, 30, 0), new TimeSpan(15, 35, 0)),
-            (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
-        };
-
-        private bool IsInBreakTime(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
-        {
+            int totalOverlapSec = 0;
             foreach (var (breakStart, breakEnd) in breakTimes)
             {
-                if (startTime < breakEnd && endTime > breakStart) return true;
+                if (startTime < breakEnd && endTime > breakStart)
+                {
+                    var overlapStart = startTime > breakStart ? startTime : breakStart;
+                    var overlapEnd = endTime < breakEnd ? endTime : breakEnd;
+                    totalOverlapSec += (int)(overlapEnd - overlapStart).TotalSeconds;
+                }
             }
-            return false;
+            return totalOverlapSec;
         }
 
         private List<(TimeSpan Start, TimeSpan End)> GetAllBreakTimes(DateTime date)
         {
-            var breakTimes = new List<(TimeSpan Start, TimeSpan End)>(FixedBreakTimes);
-            var targetDate = DateOnly.FromDateTime(date);
-            var latestBreakTime = _context.AdditionalBreakTimes
-                .Where(bt => bt.Date == targetDate)
-                .OrderByDescending(bt => bt.CreatedAt)
-                .FirstOrDefault();
-
-            if (latestBreakTime != null)
-            {
-                if (latestBreakTime.BreakTime1Start.HasValue && latestBreakTime.BreakTime1End.HasValue)
-                    breakTimes.Add((latestBreakTime.BreakTime1Start.Value.ToTimeSpan(), latestBreakTime.BreakTime1End.Value.ToTimeSpan()));
-                if (latestBreakTime.BreakTime2Start.HasValue && latestBreakTime.BreakTime2End.HasValue)
-                    breakTimes.Add((latestBreakTime.BreakTime2Start.Value.ToTimeSpan(), latestBreakTime.BreakTime2End.Value.ToTimeSpan()));
-            }
-            return breakTimes;
+            return _breakTimeService.GetBreakTimesForDateAsync(date).Result
+                .Select(b => (b.StartTime, b.EndTime))
+                .ToList();
         }
 
         public int GetCurrentSUT()

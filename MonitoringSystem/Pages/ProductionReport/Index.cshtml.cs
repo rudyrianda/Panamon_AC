@@ -77,10 +77,13 @@ namespace MonitoringSystem.Pages.ProductionReport
 
         public class RestTime { public int Duration { get; set; } public TimeSpan StartTime { get; set; } public TimeSpan EndTime { get; set; } }
 
-        public IndexModel(IWebHostEnvironment webHostEnvironment, IConfiguration configuration)
+        private readonly MonitoringSystem.Services.BreakTimeService _breakTimeService;
+
+        public IndexModel(IWebHostEnvironment webHostEnvironment, IConfiguration configuration, MonitoringSystem.Services.BreakTimeService breakTimeService)
         {
             _webHostEnvironment = webHostEnvironment;
             _configuration = configuration;
+            _breakTimeService = breakTimeService;
             this.connectionString = _configuration.GetConnectionString("DefaultConnection");
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         }
@@ -263,14 +266,7 @@ namespace MonitoringSystem.Pages.ProductionReport
       {planShiftFilter}
     GROUP BY DAY(pp.CurrentDate)";
 
-            string anyPlanSql = $@"
-    SELECT DISTINCT DAY(pp.CurrentDate) as Day
-    FROM ProductionPlan pp
-    INNER JOIN ProductionRecords pr ON pp.Id = pr.PlanId
-    WHERE YEAR(pp.CurrentDate) = @SelectedYear 
-      AND MONTH(pp.CurrentDate) = @SelectedMonth
-      AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')
-      {planShiftFilter}";
+
 
             string actualSql = $@"
 WITH ShiftData AS (
@@ -460,24 +456,6 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                                 {
                                     d.Plan = reader["TotalPlanQuantity"] != DBNull.Value ? Convert.ToInt32(reader["TotalPlanQuantity"]) : (int?)null;
                                     d.PlanOvertime = reader["TotalPlanOvertime"] != DBNull.Value ? Convert.ToInt32(reader["TotalPlanOvertime"]) : (int?)null;
-                                }
-                            }
-                        }
-                    }
-
-                    using (var anyPlanCmd = new SqlCommand(anyPlanSql, conn))
-                    {
-                        anyPlanCmd.Parameters.AddWithValue("@SelectedYear", SelectedYear);
-                        anyPlanCmd.Parameters.AddWithValue("@SelectedMonth", SelectedMonth);
-
-                        using (var reader = anyPlanCmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                var d = combinedData.FirstOrDefault(x => x.Day == (int)reader["Day"]);
-                                if (d != null)
-                                {
-                                    d.HasAnyPlan = true;
                                 }
                             }
                         }
@@ -739,22 +717,12 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
             for (int i = 0; i < PlanData.Count; i++)
             {
                 var data = combinedData[i];
-                if (!data.HasAnyPlan)
-                {
-                    int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : OriginalPlanData[i];
-                    EffectivePlanData.Add(effectiveNormal);
+                
+                int effectiveNormal = (PlanData[i].HasValue && PlanData[i].Value > 0) ? PlanData[i].Value : OriginalPlanData[i];
+                EffectivePlanData.Add(effectiveNormal);
 
-                    int effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
-                    EffectivePlanOvertimeData.Add(effectiveOt);
-                }
-                else
-                {
-                    int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : 0;
-                    EffectivePlanData.Add(effectiveNormal);
-
-                    int effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : 0;
-                    EffectivePlanOvertimeData.Add(effectiveOt);
-                }
+                int effectiveOt = (PlanOvertimeData[i].HasValue && PlanOvertimeData[i].Value > 0) ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
+                EffectivePlanOvertimeData.Add(effectiveOt);
             }
         }
 
@@ -933,33 +901,26 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                                 var dayType = DetermineTypeOfDay(fullDate.DayOfWeek);
                                 
                                 // Copy-paste Break Times dari Detail Loss Time
-                                var breakTimes = new List<(TimeSpan Start, TimeSpan End)>
-                                {
-                                    (new TimeSpan(7, 0, 0), new TimeSpan(7, 5, 0)),
-                                    (new TimeSpan(9, 30, 0), new TimeSpan(9, 35, 0)),
-                                    (new TimeSpan(15, 30, 0), new TimeSpan(15, 35, 0)),
-                                    (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
-                                };
-                                // Tambahkan additional breaks
-                                foreach (var ab in GetAdditionalBreakTimesForDate(fullDate))
-                                {
-                                    breakTimes.Add(ab);
-                                }
+                                var breakTimes = _breakTimeService.GetBreakTimesForDateAsync(fullDate).Result
+                                    .Select(b => (b.StartTime, b.EndTime))
+                                    .ToList();
 
-                                bool isInBreakTime = false;
+                                int actualDurationSec = duration;
                                 foreach (var (breakStart, breakEnd) in breakTimes)
                                 {
                                     if (startTime < breakEnd && endTime > breakStart)
                                     {
-                                        isInBreakTime = true;
-                                        break;
+                                        var overlapStart = startTime > breakStart ? startTime : breakStart;
+                                        var overlapEnd = endTime < breakEnd ? endTime : breakEnd;
+                                        int overlapSec = (int)(overlapEnd - overlapStart).TotalSeconds;
+                                        actualDurationSec -= overlapSec;
                                     }
                                 }
 
-                                if (!isInBreakTime)
+                                if (actualDurationSec > 0)
                                 {
                                     if (!dailyTotals.ContainsKey(day)) dailyTotals[day] = 0;
-                                    dailyTotals[day] += duration;
+                                    dailyTotals[day] += actualDurationSec;
                                 }
                             }
                         }
@@ -969,39 +930,6 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
             catch (Exception ex) { Console.WriteLine($"Error fetching loss time: {ex.Message}"); }
 
             return dailyTotals;
-        }
-
-        private List<(TimeSpan Start, TimeSpan End)> GetAdditionalBreakTimesForDate(DateTime date)
-        {
-            var additionalBreaks = new List<(TimeSpan, TimeSpan)>();
-            try
-            {
-                using (var connection = new SqlConnection(this.connectionString))
-                {
-                    connection.Open();
-                    string sql = @"
-                SELECT TOP 1 BreakTime1Start, BreakTime1End, BreakTime2Start, BreakTime2End 
-                FROM AdditionalBreakTimes 
-                WHERE CAST(Date AS DATE) = @Date
-                ORDER BY CreatedAt DESC";
-                    using (var command = new SqlCommand(sql, connection))
-                    {
-                        command.Parameters.AddWithValue("@Date", date.Date);
-                        using (var reader = command.ExecuteReader())
-                        {
-                            if (reader.Read())
-                            {
-                                if (!reader.IsDBNull(0) && !reader.IsDBNull(1))
-                                    additionalBreaks.Add((reader.GetTimeSpan(0), reader.GetTimeSpan(1)));
-                                if (!reader.IsDBNull(2) && !reader.IsDBNull(3))
-                                    additionalBreaks.Add((reader.GetTimeSpan(2), reader.GetTimeSpan(3)));
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex) { Console.WriteLine($"Error getting additional breaks: {ex.Message}"); }
-            return additionalBreaks;
         }
 
         public int GetTotalRestTime(List<RestTime> listRestTime, TimeSpan StartTime, TimeSpan EndTime, TimeSpan CurrentTime) { int TotalRestTime = 0; bool isToday = (SelectedYear == DateTime.Now.Year && SelectedMonth == DateTime.Now.Month); TotalRestTime = listRestTime.Sum(rest => { if (isToday && rest.StartTime > CurrentTime) { return 0; } TimeSpan effectiveRestStart = rest.StartTime < StartTime ? StartTime : rest.StartTime; TimeSpan effectiveRestEnd = rest.EndTime > EndTime ? EndTime : rest.EndTime; if (isToday && effectiveRestEnd > CurrentTime) { effectiveRestEnd = CurrentTime; } return effectiveRestStart < effectiveRestEnd ? (int)(effectiveRestEnd - effectiveRestStart).TotalMinutes : 0; }); return TotalRestTime; }

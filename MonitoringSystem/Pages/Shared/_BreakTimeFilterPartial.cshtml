@@ -1,22 +1,176 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model MonitoringSystem.Pages.Shared.ApplyBreakFilterModel
 
-<form method="post" asp-page="/Shared/ApplyBreakFilter" asp-page-handler="SaveBreakTime" class="align-items-center text-center mx-4">
-    <div class="form-group mb-4">
-        <label for="BreakTime1Start" class="fw-bold mb-2">Break Time Weekly</label>
-        <div class="d-flex gap-2">
-            <input type="time" asp-for="BreakTime1Start" class="form-control" id="BreakTime1Start" name="BreakTime1Start" value="@(Model?.BreakTime1Start?.ToString(@"hh\:mm"))" />
-            <span class="align-self-center">-</span>
-            <input type="time" asp-for="BreakTime1End" class="form-control" id="BreakTime1End" name="BreakTime1End" value="@(Model?.BreakTime1End?.ToString(@"hh\:mm"))" />
+<form id="breakTimeForm" method="post" asp-page="/Shared/ApplyBreakFilter" asp-page-handler="SaveBreakTime">
+    <div class="modal-header border-bottom border-secondary d-flex align-items-center">
+        <h5 class="modal-title text-white fw-bold mb-0">
+            <i class="fa-solid fa-clock me-2"></i>Break Time Settings
+        </h5>
+        <div class="ms-auto me-3">
+            <input type="date" asp-for="SelectedDate" class="form-control form-control-sm text-center" style="width: auto; background-color: #3b4252; color: #d8dee9; border-color: #4c566a;" id="BreakTimeSelectedDate" name="SelectedDate" value="@(Model?.SelectedDate != default ? Model.SelectedDate.ToString("yyyy-MM-dd") : DateTime.Today.ToString("yyyy-MM-dd"))" />
         </div>
+        <button type="button" class="btn-close btn-close-white m-0" data-bs-dismiss="modal"></button>
     </div>
-    <div class="form-group mb-3">
-        <label for="BreakTime2Start" class="fw-bold mb-2">Break Time On Friday</label>
-        <div class="d-flex gap-2">
-            <input type="time" asp-for="BreakTime2Start" class="form-control" id="BreakTime2Start" name="BreakTime2Start" value="@(Model?.BreakTime2Start?.ToString(@"hh\:mm"))" />
-            <span class="align-self-center">-</span>
-            <input type="time" asp-for="BreakTime2End" class="form-control" id="BreakTime2End" name="BreakTime2End" value="@(Model?.BreakTime2End?.ToString(@"hh\:mm"))" />
+
+    <div class="modal-body align-items-center text-center mx-4 mt-3">
+        <div class="form-group mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="fw-bold mb-0">Break Times</label>
+                <button type="button" class="btn btn-sm btn-success rounded-pill px-3" onclick="addBreakTimeRow()">
+                    <i class="fa-solid fa-plus me-1"></i> Add
+                </button>
+            </div>
+            
+            <div id="breakTimeList" class="d-flex flex-column gap-2">
+                @if (Model != null && Model.BreakTimes != null && Model.BreakTimes.Any())
+                {
+                    for (int i = 0; i < Model.BreakTimes.Count; i++)
+                    {
+                        <div class="d-flex gap-2 justify-content-center break-time-row">
+                            <input type="time" name="BreakTimes[@i].StartTime" class="form-control text-center" value="@(Model.BreakTimes[i].StartTime.ToString(@"HH\:mm"))" required />
+                            <span class="align-self-center">-</span>
+                            <input type="time" name="BreakTimes[@i].EndTime" class="form-control text-center" value="@(Model.BreakTimes[i].EndTime.ToString(@"HH\:mm"))" required />
+                            <input type="text" name="BreakTimes[@i].Reason" class="form-control" placeholder="Reason (e.g. 5S, Rest)" value="@Model.BreakTimes[i].Reason" required />
+                            <button type="button" class="btn btn-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    }
+                }
+            </div>
         </div>
+        
+        <button type="submit" class="btn btn-primary mb-3 px-4 rounded-pill">Save Break Time</button>
     </div>
-    <button type="submit" class="btn btn-primary mb-3">Save Break Time</button>
 </form>
+
+<script>
+    function addBreakTimeRow() {
+        const container = document.getElementById('breakTimeList');
+        const index = container.querySelectorAll('.break-time-row').length;
+        
+        const row = document.createElement('div');
+        row.className = 'd-flex gap-2 justify-content-center break-time-row';
+        row.innerHTML = `
+            <input type="time" name="BreakTimes[${index}].StartTime" class="form-control text-center" required />
+            <span class="align-self-center">-</span>
+            <input type="time" name="BreakTimes[${index}].EndTime" class="form-control text-center" required />
+            <input type="text" name="BreakTimes[${index}].Reason" class="form-control" placeholder="Reason (e.g. 5S, Rest)" required />
+            <button type="button" class="btn btn-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
+        `;
+        container.appendChild(row);
+    }
+
+    function removeBreakTimeRow(btn) {
+        btn.closest('.break-time-row').remove();
+        reindexBreakTimes();
+    }
+
+    function reindexBreakTimes() {
+        const rows = document.querySelectorAll('.break-time-row');
+        rows.forEach((row, index) => {
+            row.querySelector('input[name$=".StartTime"]').name = `BreakTimes[${index}].StartTime`;
+            row.querySelector('input[name$=".EndTime"]').name = `BreakTimes[${index}].EndTime`;
+            row.querySelector('input[name$=".Reason"]').name = `BreakTimes[${index}].Reason`;
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const dateInput = document.getElementById('BreakTimeSelectedDate');
+
+        if (dateInput) {
+            if (typeof flatpickr !== 'undefined') {
+                flatpickr(dateInput, {
+                    dateFormat: "Y-m-d",
+                    onChange: window.fetchBreakTime
+                });
+            } else {
+                dateInput.addEventListener('change', window.fetchBreakTime);
+            }
+        }
+
+        window.fetchBreakTime = function() {
+            if (!dateInput) return;
+            const selectedDate = dateInput.value;
+            if (!selectedDate) return;
+
+            fetch(`/Shared/ApplyBreakFilter?handler=BreakTimeForDate&date=${selectedDate}`)
+                .then(response => {
+                    if (response.ok) return response.json();
+                    throw new Error('Network response was not ok');
+                })
+                .then(data => {
+                    const container = document.getElementById('breakTimeList');
+                    container.innerHTML = ''; // Clear existing rows
+                    
+                    if (data && data.hasData && data.data && data.data.length > 0) {
+                        data.data.forEach((bt, index) => {
+                            const row = document.createElement('div');
+                            row.className = 'd-flex gap-2 justify-content-center break-time-row';
+                            row.innerHTML = `
+                                <input type="time" name="BreakTimes[${index}].StartTime" class="form-control text-center" value="${bt.start}" required />
+                                <span class="align-self-center">-</span>
+                                <input type="time" name="BreakTimes[${index}].EndTime" class="form-control text-center" value="${bt.end}" required />
+                                <input type="text" name="BreakTimes[${index}].Reason" class="form-control" value="${bt.reason}" placeholder="Reason" required />
+                                <button type="button" class="btn btn-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
+                            `;
+                            container.appendChild(row);
+                        });
+                    }
+                })
+                .catch(error => console.error('Error fetching break time:', error));
+        };
+        const form = document.getElementById('breakTimeForm');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(form);
+                
+                fetch(form.action, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) return response.json();
+                    throw new Error('Network response was not ok');
+                })
+                .then(data => {
+                    if (data && data.success) {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Saved!',
+                                showConfirmButton: false,
+                                timer: 1000,
+                                target: document.getElementById('breakTimeFilterModal'),
+                                toast: true,
+                                position: 'center'
+                            });
+                        } else {
+                            alert('Break times have been updated successfully.');
+                        }
+                        
+                        // Refresh the list so it is sorted and formatted correctly
+                        if (typeof window.fetchBreakTime === 'function') {
+                            window.fetchBreakTime();
+                        }
+                    } else {
+                        throw new Error('Server returned unsuccessful response');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error saving break times:', error);
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Failed to Save',
+                            text: 'An error occurred while saving break times.'
+                        });
+                    } else {
+                        alert('Failed to save break times.');
+                    }
+                });
+            });
+        }
+    });
+</script>
+
