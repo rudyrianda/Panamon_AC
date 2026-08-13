@@ -137,10 +137,12 @@
                         if (typeof Swal !== 'undefined') {
                             Swal.fire({
                                 icon: 'success',
-                                title: 'Saved Successfully',
-                                text: 'Break times have been updated.',
+                                title: 'Saved!',
                                 showConfirmButton: false,
-                                timer: 1500
+                                timer: 1000,
+                                target: document.getElementById('breakTimeFilterModal'),
+                                toast: true,
+                                position: 'top'
                             });
                         } else {
                             alert('Break times have been updated successfully.');
