@@ -50,13 +50,19 @@ namespace MonitoringSystem.Pages.LossTimeReport
             (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
         };
 
-        private bool IsInBreakTime(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
+        private int CalculateBreakOverlapSec(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
         {
+            int totalOverlapSec = 0;
             foreach (var (breakStart, breakEnd) in breakTimes)
             {
-                if (startTime < breakEnd && endTime > breakStart) return true;
+                if (startTime < breakEnd && endTime > breakStart)
+                {
+                    var overlapStart = startTime > breakStart ? startTime : breakStart;
+                    var overlapEnd = endTime < breakEnd ? endTime : breakEnd;
+                    totalOverlapSec += (int)(overlapEnd - overlapStart).TotalSeconds;
+                }
             }
-            return false;
+            return totalOverlapSec;
         }
 
         private List<(TimeSpan Start, TimeSpan End)> GetAllBreakTimes()
@@ -341,8 +347,11 @@ namespace MonitoringSystem.Pages.LossTimeReport
                                     
                                     if (endTime < startTime) endTime = endTime.Add(TimeSpan.FromDays(1));
                                     
-                                    // LOGIC SAMAKAN DENGAN DETAIL LOSS (Skip Break Time)
-                                    if (IsInBreakTime(startTime, endTime, breakTimes)) continue;
+                                    // LOGIC SAMAKAN DENGAN DETAIL LOSS (Overlap Break Time)
+                                    int overlapSec = CalculateBreakOverlapSec(startTime, endTime, breakTimes);
+                                    durationSec -= overlapSec;
+
+                                    if (durationSec <= 0) continue;
 
                                     rawList.Add(new MonthlyCategoryData
                                     {

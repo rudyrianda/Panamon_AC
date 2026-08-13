@@ -946,20 +946,22 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                                     breakTimes.Add(ab);
                                 }
 
-                                bool isInBreakTime = false;
+                                int actualDurationSec = duration;
                                 foreach (var (breakStart, breakEnd) in breakTimes)
                                 {
                                     if (startTime < breakEnd && endTime > breakStart)
                                     {
-                                        isInBreakTime = true;
-                                        break;
+                                        var overlapStart = startTime > breakStart ? startTime : breakStart;
+                                        var overlapEnd = endTime < breakEnd ? endTime : breakEnd;
+                                        int overlapSec = (int)(overlapEnd - overlapStart).TotalSeconds;
+                                        actualDurationSec -= overlapSec;
                                     }
                                 }
 
-                                if (!isInBreakTime)
+                                if (actualDurationSec > 0)
                                 {
                                     if (!dailyTotals.ContainsKey(day)) dailyTotals[day] = 0;
-                                    dailyTotals[day] += duration;
+                                    dailyTotals[day] += actualDurationSec;
                                 }
                             }
                         }

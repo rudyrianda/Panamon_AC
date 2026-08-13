@@ -42,10 +42,10 @@ namespace MonitoringSystem.Pages.Performance
         public int TotalPlanForSummaryCU { get; set; }
         public int TotalPlanForSummaryCS { get; set; }
 
-        [BindProperty]
+        [BindProperty(SupportsGet = true)]
         public DateTime SelectedDate { get; set; } = DateTime.Now.Date;
 
-        [BindProperty]
+        [BindProperty(SupportsGet = true)]
         public string MachineCode { get; set; } = "MCH1-01";
 
         // ✅ COMMENTED: Tabel AdditionalBreakTime belum ada di database
@@ -94,8 +94,12 @@ namespace MonitoringSystem.Pages.Performance
 
         public void OnGet()
         {
-            SelectedDate = DateTime.Today;
-            MachineCode = MachineCode;
+            if (string.IsNullOrEmpty(MachineCode))
+                MachineCode = "MCH1-01";
+
+            if (SelectedDate == default)
+                SelectedDate = DateTime.Today;
+
             LoadAllData();
         }
 
@@ -1080,8 +1084,11 @@ namespace MonitoringSystem.Pages.Performance
                                 
                                 if (endTime < startTime) endTime = endTime.Add(TimeSpan.FromDays(1));
                                 
-                                // LOGIKA SAMA DENGAN DETAIL LOSS (skip jika bertabrakan dengan break)
-                                if (IsInBreakTime(startTime, endTime, breakTimes)) continue;
+                                // LOGIKA SAMA DENGAN DETAIL LOSS (hitung overlap)
+                                int overlapSec = CalculateBreakOverlapSec(startTime, endTime, breakTimes);
+                                durationSec -= overlapSec;
+
+                                if (durationSec <= 0) continue;
 
                                 totalLossMinutes += durationSec / 60.0;
                             }
@@ -1105,13 +1112,19 @@ namespace MonitoringSystem.Pages.Performance
             (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
         };
 
-        private bool IsInBreakTime(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
+        private int CalculateBreakOverlapSec(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
         {
+            int totalOverlapSec = 0;
             foreach (var (breakStart, breakEnd) in breakTimes)
             {
-                if (startTime < breakEnd && endTime > breakStart) return true;
+                if (startTime < breakEnd && endTime > breakStart)
+                {
+                    var overlapStart = startTime > breakStart ? startTime : breakStart;
+                    var overlapEnd = endTime < breakEnd ? endTime : breakEnd;
+                    totalOverlapSec += (int)(overlapEnd - overlapStart).TotalSeconds;
+                }
             }
-            return false;
+            return totalOverlapSec;
         }
 
         private List<(TimeSpan Start, TimeSpan End)> GetAllBreakTimes(DateTime date)

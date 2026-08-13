@@ -300,13 +300,19 @@ namespace MonitoringSystem.Pages.LossTime
             result = TimeSpan.Zero; return false;
         }
 
-        private bool IsInBreakTime(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
+        private int CalculateBreakOverlapSec(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
         {
+            int totalOverlapSec = 0;
             foreach (var (breakStart, breakEnd) in breakTimes)
             {
-                if (startTime < breakEnd && endTime > breakStart) return true;
+                if (startTime < breakEnd && endTime > breakStart)
+                {
+                    var overlapStart = startTime > breakStart ? startTime : breakStart;
+                    var overlapEnd = endTime < breakEnd ? endTime : breakEnd;
+                    totalOverlapSec += (int)(overlapEnd - overlapStart).TotalSeconds;
+                }
             }
-            return false;
+            return totalOverlapSec;
         }
 
         private void LoadData()
@@ -555,20 +561,21 @@ namespace MonitoringSystem.Pages.LossTime
                             if (breakTimes != null)
                                 breaksForThisDay.AddRange(breakTimes);
 
-                            if (IsInBreakTime(startTime, endTime, breaksForThisDay)) continue;
+                            int originalDuration = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : reader.GetInt32(reader.GetOrdinal("LossTime"));
+                            int overlapSec = CalculateBreakOverlapSec(startTime, endTime, breakTimes);
+                            int actualDuration = originalDuration - overlapSec;
+
+                            if (actualDuration <= 0) continue;
 
                             string reason = reader.IsDBNull(reader.GetOrdinal("Reason")) ? string.Empty : reader.GetString(reader.GetOrdinal("Reason"));
-
-                            if (recordDate < lastStart || recordDate > currEnd) continue;
-
                             records.Add(new LossTimeRecord
                             {
-                                RecordId = reader.IsDBNull(reader.GetOrdinal("Id")) ? 0 : reader.GetInt32(reader.GetOrdinal("Id")),
-                                Date = recordDate,
+                                Nomor = reader.IsDBNull(reader.GetOrdinal("Id")) ? 0 : reader.GetInt32(reader.GetOrdinal("Id")),
+                                Date = reader.IsDBNull(reader.GetOrdinal("Date")) ? DateTime.MinValue : reader.GetDateTime(reader.GetOrdinal("Date")),
                                 LossTime = reason,
                                 Start = startTime,
                                 End = endTime,
-                                Duration = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : reader.GetInt32(reader.GetOrdinal("LossTime")),
+                                Duration = actualDuration,
                                 Location = reader.IsDBNull(reader.GetOrdinal("MachineCode")) ? string.Empty : reader.GetString(reader.GetOrdinal("MachineCode")),
                                 Shift = reader.IsDBNull(reader.GetOrdinal("Shift")) ? string.Empty : reader.GetString(reader.GetOrdinal("Shift")),
                                 Category = CategorizeReason(reason),
@@ -586,7 +593,7 @@ namespace MonitoringSystem.Pages.LossTime
             string query = @"
 SELECT Id, Date, Reason, DetailedReason, MachineCode,
        CAST(Time AS TIME) AS StartTime, CAST(EndDateTime AS TIME) AS EndTime, LossTime, 
-       CASE WHEN MONTH(Date) = 7 AND YEAR(Date) = 2026 THEN
+       CASE WHEN MONTH(Date) IN (7, 8) AND YEAR(Date) = 2026 THEN
                  CASE WHEN CAST(Time AS TIME) >= '07:00:00' AND CAST(Time AS TIME) <= '19:45:00' THEN '1'
                       WHEN CAST(Time AS TIME) > '19:45:00' OR CAST(Time AS TIME) < '07:00:00' THEN '3'
                       ELSE '2' END
@@ -827,7 +834,13 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                         {
                             TimeSpan startTime = reader.GetTimeSpan(reader.GetOrdinal("StartTime"));
                             TimeSpan endTime = reader.GetTimeSpan(reader.GetOrdinal("EndTime"));
-                            if (IsInBreakTime(startTime, endTime, breakTimes)) continue;
+
+                            int originalDuration = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : reader.GetInt32(reader.GetOrdinal("LossTime"));
+                            int overlapSec = CalculateBreakOverlapSec(startTime, endTime, breakTimes);
+                            int actualDuration = originalDuration - overlapSec;
+
+                            if (actualDuration <= 0) continue;
+
                             string reason = reader.IsDBNull(reader.GetOrdinal("Reason")) ? string.Empty : reader.GetString(reader.GetOrdinal("Reason"));
                             LossTimeData.Add(new LossTimeRecord
                             {
@@ -836,7 +849,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                                 LossTime = reason,
                                 Start = startTime,
                                 End = endTime,
-                                Duration = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : reader.GetInt32(reader.GetOrdinal("LossTime")),
+                                Duration = actualDuration,
                                 Location = reader.IsDBNull(reader.GetOrdinal("MachineCode")) ? string.Empty : reader.GetString(reader.GetOrdinal("MachineCode")),
                                 Shift = reader.IsDBNull(reader.GetOrdinal("Shift")) ? string.Empty : reader.GetString(reader.GetOrdinal("Shift")),
                                 Category = CategorizeReason(reason),
@@ -867,7 +880,13 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                         {
                             TimeSpan startTime = reader.GetTimeSpan(reader.GetOrdinal("StartTime"));
                             TimeSpan endTime = reader.GetTimeSpan(reader.GetOrdinal("EndTime"));
-                            if (IsInBreakTime(startTime, endTime, breakTimes)) continue;
+                            
+                            int originalDuration = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : reader.GetInt32(reader.GetOrdinal("LossTime"));
+                            int overlapSec = CalculateBreakOverlapSec(startTime, endTime, breakTimes);
+                            int actualDuration = originalDuration - overlapSec;
+
+                            if (actualDuration <= 0) continue;
+
                             string reason = reader.IsDBNull(reader.GetOrdinal("Reason")) ? string.Empty : reader.GetString(reader.GetOrdinal("Reason"));
                             records.Add(new LossTimeRecord
                             {
@@ -875,7 +894,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                                 LossTime = reason,
                                 Start = startTime,
                                 End = endTime,
-                                Duration = reader.IsDBNull(reader.GetOrdinal("LossTime")) ? 0 : reader.GetInt32(reader.GetOrdinal("LossTime")),
+                                Duration = actualDuration,
                                 Shift = reader.IsDBNull(reader.GetOrdinal("Shift")) ? string.Empty : reader.GetString(reader.GetOrdinal("Shift")),
                                 Category = CategorizeReason(reason)
                             });

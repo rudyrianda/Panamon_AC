@@ -1,22 +1,61 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model MonitoringSystem.Pages.Shared.ApplyBreakFilterModel
 
 <form method="post" asp-page="/Shared/ApplyBreakFilter" asp-page-handler="SaveBreakTime" class="align-items-center text-center mx-4">
     <div class="form-group mb-4">
-        <label for="BreakTime1Start" class="fw-bold mb-2">Break Time Weekly</label>
+        <label for="SelectedDate" class="fw-bold mb-2">Select Date</label>
+        <input type="date" asp-for="SelectedDate" class="form-control text-center" id="BreakTimeSelectedDate" name="SelectedDate" value="@(Model?.SelectedDate != default ? Model.SelectedDate.ToString("yyyy-MM-dd") : DateTime.Today.ToString("yyyy-MM-dd"))" />
+    </div>
+
+    <div class="form-group mb-4">
+        <label class="fw-bold mb-2">Break Time</label>
         <div class="d-flex gap-2">
-            <input type="time" asp-for="BreakTime1Start" class="form-control" id="BreakTime1Start" name="BreakTime1Start" value="@(Model?.BreakTime1Start?.ToString(@"hh\:mm"))" />
+            <input type="time" asp-for="BreakTime1Start" class="form-control text-center" id="BreakTime1Start" name="BreakTime1Start" value="@(Model?.BreakTime1Start?.ToString(@"hh\:mm"))" />
             <span class="align-self-center">-</span>
-            <input type="time" asp-for="BreakTime1End" class="form-control" id="BreakTime1End" name="BreakTime1End" value="@(Model?.BreakTime1End?.ToString(@"hh\:mm"))" />
+            <input type="time" asp-for="BreakTime1End" class="form-control text-center" id="BreakTime1End" name="BreakTime1End" value="@(Model?.BreakTime1End?.ToString(@"hh\:mm"))" />
         </div>
     </div>
-    <div class="form-group mb-3">
-        <label for="BreakTime2Start" class="fw-bold mb-2">Break Time On Friday</label>
-        <div class="d-flex gap-2">
-            <input type="time" asp-for="BreakTime2Start" class="form-control" id="BreakTime2Start" name="BreakTime2Start" value="@(Model?.BreakTime2Start?.ToString(@"hh\:mm"))" />
-            <span class="align-self-center">-</span>
-            <input type="time" asp-for="BreakTime2End" class="form-control" id="BreakTime2End" name="BreakTime2End" value="@(Model?.BreakTime2End?.ToString(@"hh\:mm"))" />
-        </div>
-    </div>
-    <button type="submit" class="btn btn-primary mb-3">Save Break Time</button>
+    
+    <button type="submit" class="btn btn-primary mb-3 px-4 rounded-pill">Save Break Time</button>
 </form>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const dateInput = document.getElementById('BreakTimeSelectedDate');
+        const startInput = document.getElementById('BreakTime1Start');
+        const endInput = document.getElementById('BreakTime1End');
+
+        if (dateInput) {
+            // Apply flatpickr if available, otherwise fallback to native date
+            if (typeof flatpickr !== 'undefined') {
+                flatpickr(dateInput, {
+                    dateFormat: "Y-m-d",
+                    onChange: fetchBreakTime
+                });
+            } else {
+                dateInput.addEventListener('change', fetchBreakTime);
+            }
+
+            function fetchBreakTime() {
+                const selectedDate = dateInput.value;
+                if (!selectedDate) return;
+
+                fetch(`/Shared/ApplyBreakFilter?handler=BreakTimeForDate&date=${selectedDate}`)
+                    .then(response => {
+                        if (response.ok) return response.json();
+                        throw new Error('Network response was not ok');
+                    })
+                    .then(data => {
+                        if (data && data.hasData) {
+                            startInput.value = data.start;
+                            endInput.value = data.end;
+                        } else {
+                            startInput.value = '';
+                            endInput.value = '';
+                        }
+                    })
+                    .catch(error => console.error('Error fetching break time:', error));
+            }
+        }
+    });
+</script>
