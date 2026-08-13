@@ -166,7 +166,7 @@ namespace MonitoringSystem.Pages.Shared
                 }
             }
             await _context.SaveChangesAsync();
-            return Redirect(Request.Headers["Referer"].ToString());
+            return new JsonResult(new { success = true });
         }
     }
 }
