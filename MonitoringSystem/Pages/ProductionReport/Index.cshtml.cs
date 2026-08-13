@@ -464,9 +464,10 @@ INNER JOIN (
     SELECT PlanId, MachineCode FROM ProductionRecords
 ) machines ON pp.Id = machines.PlanId
 LEFT JOIN (
-    SELECT PlanId, MachineCode, SapPlanNormal, SapPlanOvertime
+    SELECT PlanId, MachineCode, SUM(ISNULL(SapPlanNormal, 0)) as SapPlanNormal, SUM(ISNULL(SapPlanOvertime, 0)) as SapPlanOvertime
     FROM SapPlan sp
     WHERE 1=1 {sapShiftFilter}
+    GROUP BY PlanId, MachineCode
 ) sp ON machines.PlanId = sp.PlanId AND machines.MachineCode = sp.MachineCode
 LEFT JOIN (
     SELECT PlanId, MachineCode, {selectQuantityColumn} as TotalPlanQuantity, {selectOvertimeColumn} as TotalPlanOvertime
