@@ -67,9 +67,9 @@
     function reindexBreakTimes() {
         const rows = document.querySelectorAll('.break-time-row');
         rows.forEach((row, index) => {
-            row.querySelector('input[name$=".StartTime"]').name = \`BreakTimes[\${index}].StartTime\`;
-            row.querySelector('input[name$=".EndTime"]').name = \`BreakTimes[\${index}].EndTime\`;
-            row.querySelector('input[name$=".Reason"]').name = \`BreakTimes[\${index}].Reason\`;
+            row.querySelector('input[name$=".StartTime"]').name = `BreakTimes[${index}].StartTime`;
+            row.querySelector('input[name$=".EndTime"]').name = `BreakTimes[${index}].EndTime`;
+            row.querySelector('input[name$=".Reason"]').name = `BreakTimes[${index}].Reason`;
         });
     }
 
@@ -90,7 +90,7 @@
                 const selectedDate = dateInput.value;
                 if (!selectedDate) return;
 
-                fetch(\`/Shared/ApplyBreakFilter?handler=BreakTimeForDate&date=\${selectedDate}\`)
+                fetch(`/Shared/ApplyBreakFilter?handler=BreakTimeForDate&date=${selectedDate}`)
                     .then(response => {
                         if (response.ok) return response.json();
                         throw new Error('Network response was not ok');
@@ -103,13 +103,13 @@
                             data.data.forEach((bt, index) => {
                                 const row = document.createElement('div');
                                 row.className = 'd-flex gap-2 justify-content-center break-time-row';
-                                row.innerHTML = \`
-                                    <input type="time" name="BreakTimes[\${index}].StartTime" class="form-control text-center" value="\${bt.start}" required />
+                                row.innerHTML = `
+                                    <input type="time" name="BreakTimes[${index}].StartTime" class="form-control text-center" value="${bt.start}" required />
                                     <span class="align-self-center">-</span>
-                                    <input type="time" name="BreakTimes[\${index}].EndTime" class="form-control text-center" value="\${bt.end}" required />
-                                    <input type="text" name="BreakTimes[\${index}].Reason" class="form-control" value="\${bt.reason}" placeholder="Reason" required />
+                                    <input type="time" name="BreakTimes[${index}].EndTime" class="form-control text-center" value="${bt.end}" required />
+                                    <input type="text" name="BreakTimes[${index}].Reason" class="form-control" value="${bt.reason}" placeholder="Reason" required />
                                     <button type="button" class="btn btn-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
-                                \`;
+                                `;
                                 container.appendChild(row);
                             });
                         }
