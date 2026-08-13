@@ -64,6 +64,10 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        
+        // Auto-apply pending migrations
+        await db.Database.MigrateAsync();
+        
         await db.Database.ExecuteSqlRawAsync("SELECT 1");
 
         // Auto-migrate database columns for shift quantities in ProductionRecords table
