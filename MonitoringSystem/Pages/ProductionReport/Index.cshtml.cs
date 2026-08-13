@@ -449,6 +449,37 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                 {
                     conn.Open();
 
+                    bool isAugust2026 = (SelectedYear == 2026 && SelectedMonth == 8);
+                    if (isAugust2026)
+                    {
+                        planSql = $@"
+SELECT 
+    DAY(pp.CurrentDate) as Day,
+    SUM(ISNULL(pr.TotalPlanQuantity, ISNULL(sp.SapPlanNormal, 0))) as TotalPlanQuantity,
+    SUM(ISNULL(pr.TotalPlanOvertime, ISNULL(sp.SapPlanOvertime, 0))) as TotalPlanOvertime
+FROM ProductionPlan pp
+INNER JOIN (
+    SELECT PlanId, MachineCode FROM SapPlan
+    UNION
+    SELECT PlanId, MachineCode FROM ProductionRecords
+) machines ON pp.Id = machines.PlanId
+LEFT JOIN (
+    SELECT PlanId, MachineCode, SapPlanNormal, SapPlanOvertime
+    FROM SapPlan sp
+    WHERE 1=1 {sapShiftFilter}
+) sp ON machines.PlanId = sp.PlanId AND machines.MachineCode = sp.MachineCode
+LEFT JOIN (
+    SELECT PlanId, MachineCode, {selectQuantityColumn} as TotalPlanQuantity, {selectOvertimeColumn} as TotalPlanOvertime
+    FROM ProductionRecords pr
+    WHERE 1=1 {planShiftFilter}
+    GROUP BY PlanId, MachineCode
+) pr ON machines.PlanId = pr.PlanId AND machines.MachineCode = pr.MachineCode
+WHERE YEAR(pp.CurrentDate) = @SelectedYear 
+  AND MONTH(pp.CurrentDate) = @SelectedMonth
+  {(MachineLine != "All" ? "AND machines.MachineCode = @MachineLine" : "AND machines.MachineCode IN ('MCH1-01', 'MCH1-02')")}
+GROUP BY DAY(pp.CurrentDate)";
+                    }
+
                     using (var planCmd = new SqlCommand(planSql, conn))
                     {
                         planCmd.Parameters.AddWithValue("@SelectedYear", SelectedYear);
