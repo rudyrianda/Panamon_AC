@@ -266,14 +266,7 @@ namespace MonitoringSystem.Pages.ProductionReport
       {planShiftFilter}
     GROUP BY DAY(pp.CurrentDate)";
 
-            string anyPlanSql = $@"
-    SELECT DISTINCT DAY(pp.CurrentDate) as Day
-    FROM ProductionPlan pp
-    INNER JOIN ProductionRecords pr ON pp.Id = pr.PlanId
-    WHERE YEAR(pp.CurrentDate) = @SelectedYear 
-      AND MONTH(pp.CurrentDate) = @SelectedMonth
-      AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')
-      {planShiftFilter}";
+
 
             string actualSql = $@"
 WITH ShiftData AS (
@@ -463,24 +456,6 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                                 {
                                     d.Plan = reader["TotalPlanQuantity"] != DBNull.Value ? Convert.ToInt32(reader["TotalPlanQuantity"]) : (int?)null;
                                     d.PlanOvertime = reader["TotalPlanOvertime"] != DBNull.Value ? Convert.ToInt32(reader["TotalPlanOvertime"]) : (int?)null;
-                                }
-                            }
-                        }
-                    }
-
-                    using (var anyPlanCmd = new SqlCommand(anyPlanSql, conn))
-                    {
-                        anyPlanCmd.Parameters.AddWithValue("@SelectedYear", SelectedYear);
-                        anyPlanCmd.Parameters.AddWithValue("@SelectedMonth", SelectedMonth);
-
-                        using (var reader = anyPlanCmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                var d = combinedData.FirstOrDefault(x => x.Day == (int)reader["Day"]);
-                                if (d != null)
-                                {
-                                    d.HasAnyPlan = true;
                                 }
                             }
                         }
@@ -742,22 +717,12 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
             for (int i = 0; i < PlanData.Count; i++)
             {
                 var data = combinedData[i];
-                if (!data.HasAnyPlan)
-                {
-                    int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : OriginalPlanData[i];
-                    EffectivePlanData.Add(effectiveNormal);
+                
+                int effectiveNormal = (PlanData[i].HasValue && PlanData[i].Value > 0) ? PlanData[i].Value : OriginalPlanData[i];
+                EffectivePlanData.Add(effectiveNormal);
 
-                    int effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
-                    EffectivePlanOvertimeData.Add(effectiveOt);
-                }
-                else
-                {
-                    int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : 0;
-                    EffectivePlanData.Add(effectiveNormal);
-
-                    int effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : 0;
-                    EffectivePlanOvertimeData.Add(effectiveOt);
-                }
+                int effectiveOt = (PlanOvertimeData[i].HasValue && PlanOvertimeData[i].Value > 0) ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
+                EffectivePlanOvertimeData.Add(effectiveOt);
             }
         }
 
