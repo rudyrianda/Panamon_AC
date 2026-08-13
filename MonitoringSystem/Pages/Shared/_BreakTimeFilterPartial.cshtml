@@ -80,43 +80,44 @@
             if (typeof flatpickr !== 'undefined') {
                 flatpickr(dateInput, {
                     dateFormat: "Y-m-d",
-                    onChange: fetchBreakTime
+                    onChange: window.fetchBreakTime
                 });
             } else {
-                dateInput.addEventListener('change', fetchBreakTime);
-            }
-
-            function fetchBreakTime() {
-                const selectedDate = dateInput.value;
-                if (!selectedDate) return;
-
-                fetch(`/Shared/ApplyBreakFilter?handler=BreakTimeForDate&date=${selectedDate}`)
-                    .then(response => {
-                        if (response.ok) return response.json();
-                        throw new Error('Network response was not ok');
-                    })
-                    .then(data => {
-                        const container = document.getElementById('breakTimeList');
-                        container.innerHTML = ''; // Clear existing rows
-                        
-                        if (data && data.hasData && data.data && data.data.length > 0) {
-                            data.data.forEach((bt, index) => {
-                                const row = document.createElement('div');
-                                row.className = 'd-flex gap-2 justify-content-center break-time-row';
-                                row.innerHTML = `
-                                    <input type="time" name="BreakTimes[${index}].StartTime" class="form-control text-center" value="${bt.start}" required />
-                                    <span class="align-self-center">-</span>
-                                    <input type="time" name="BreakTimes[${index}].EndTime" class="form-control text-center" value="${bt.end}" required />
-                                    <input type="text" name="BreakTimes[${index}].Reason" class="form-control" value="${bt.reason}" placeholder="Reason" required />
-                                    <button type="button" class="btn btn-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
-                                `;
-                                container.appendChild(row);
-                            });
-                        }
-                    })
-                    .catch(error => console.error('Error fetching break time:', error));
+                dateInput.addEventListener('change', window.fetchBreakTime);
             }
         }
+
+        window.fetchBreakTime = function() {
+            if (!dateInput) return;
+            const selectedDate = dateInput.value;
+            if (!selectedDate) return;
+
+            fetch(`/Shared/ApplyBreakFilter?handler=BreakTimeForDate&date=${selectedDate}`)
+                .then(response => {
+                    if (response.ok) return response.json();
+                    throw new Error('Network response was not ok');
+                })
+                .then(data => {
+                    const container = document.getElementById('breakTimeList');
+                    container.innerHTML = ''; // Clear existing rows
+                    
+                    if (data && data.hasData && data.data && data.data.length > 0) {
+                        data.data.forEach((bt, index) => {
+                            const row = document.createElement('div');
+                            row.className = 'd-flex gap-2 justify-content-center break-time-row';
+                            row.innerHTML = `
+                                <input type="time" name="BreakTimes[${index}].StartTime" class="form-control text-center" value="${bt.start}" required />
+                                <span class="align-self-center">-</span>
+                                <input type="time" name="BreakTimes[${index}].EndTime" class="form-control text-center" value="${bt.end}" required />
+                                <input type="text" name="BreakTimes[${index}].Reason" class="form-control" value="${bt.reason}" placeholder="Reason" required />
+                                <button type="button" class="btn btn-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
+                            `;
+                            container.appendChild(row);
+                        });
+                    }
+                })
+                .catch(error => console.error('Error fetching break time:', error));
+        };
         const form = document.getElementById('breakTimeForm');
         if (form) {
             form.addEventListener('submit', function(e) {
@@ -142,10 +143,15 @@
                                 timer: 1000,
                                 target: document.getElementById('breakTimeFilterModal'),
                                 toast: true,
-                                position: 'top'
+                                position: 'center'
                             });
                         } else {
                             alert('Break times have been updated successfully.');
+                        }
+                        
+                        // Refresh the list so it is sorted and formatted correctly
+                        if (typeof window.fetchBreakTime === 'function') {
+                            window.fetchBreakTime();
                         }
                     } else {
                         throw new Error('Server returned unsuccessful response');
