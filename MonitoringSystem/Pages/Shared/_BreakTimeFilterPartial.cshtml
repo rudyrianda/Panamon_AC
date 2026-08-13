@@ -14,11 +14,27 @@
 
     <div class="modal-body align-items-center text-center mx-4 mt-3">
         <div class="form-group mb-4">
-            <label class="fw-bold mb-2">Break Time</label>
-            <div class="d-flex gap-2 justify-content-center">
-                <input type="time" asp-for="BreakTime1Start" class="form-control text-center" id="BreakTime1Start" name="BreakTime1Start" value="@(Model?.BreakTime1Start?.ToString(@"hh\:mm"))" />
-                <span class="align-self-center">-</span>
-                <input type="time" asp-for="BreakTime1End" class="form-control text-center" id="BreakTime1End" name="BreakTime1End" value="@(Model?.BreakTime1End?.ToString(@"hh\:mm"))" />
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="fw-bold mb-0">Break Times</label>
+                <button type="button" class="btn btn-sm btn-success rounded-pill px-3" onclick="addBreakTimeRow()">
+                    <i class="fa-solid fa-plus me-1"></i> Add
+                </button>
+            </div>
+            
+            <div id="breakTimeList" class="d-flex flex-column gap-2">
+                @if (Model != null && Model.BreakTimes != null && Model.BreakTimes.Any())
+                {
+                    for (int i = 0; i < Model.BreakTimes.Count; i++)
+                    {
+                        <div class="d-flex gap-2 justify-content-center break-time-row">
+                            <input type="time" name="BreakTimes[@i].StartTime" class="form-control text-center" value="@(Model.BreakTimes[i].StartTime.ToString(@"HH\:mm"))" required />
+                            <span class="align-self-center">-</span>
+                            <input type="time" name="BreakTimes[@i].EndTime" class="form-control text-center" value="@(Model.BreakTimes[i].EndTime.ToString(@"HH\:mm"))" required />
+                            <input type="text" name="BreakTimes[@i].Reason" class="form-control" placeholder="Reason (e.g. 5S, Rest)" value="@Model.BreakTimes[i].Reason" required />
+                            <button type="button" class="btn btn-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    }
+                }
             </div>
         </div>
         
@@ -27,13 +43,40 @@
 </form>
 
 <script>
+    function addBreakTimeRow() {
+        const container = document.getElementById('breakTimeList');
+        const index = container.querySelectorAll('.break-time-row').length;
+        
+        const row = document.createElement('div');
+        row.className = 'd-flex gap-2 justify-content-center break-time-row';
+        row.innerHTML = `
+            <input type="time" name="BreakTimes[${index}].StartTime" class="form-control text-center" required />
+            <span class="align-self-center">-</span>
+            <input type="time" name="BreakTimes[${index}].EndTime" class="form-control text-center" required />
+            <input type="text" name="BreakTimes[${index}].Reason" class="form-control" placeholder="Reason (e.g. 5S, Rest)" required />
+            <button type="button" class="btn btn-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
+        `;
+        container.appendChild(row);
+    }
+
+    function removeBreakTimeRow(btn) {
+        btn.closest('.break-time-row').remove();
+        reindexBreakTimes();
+    }
+
+    function reindexBreakTimes() {
+        const rows = document.querySelectorAll('.break-time-row');
+        rows.forEach((row, index) => {
+            row.querySelector('input[name$=".StartTime"]').name = \`BreakTimes[\${index}].StartTime\`;
+            row.querySelector('input[name$=".EndTime"]').name = \`BreakTimes[\${index}].EndTime\`;
+            row.querySelector('input[name$=".Reason"]').name = \`BreakTimes[\${index}].Reason\`;
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         const dateInput = document.getElementById('BreakTimeSelectedDate');
-        const startInput = document.getElementById('BreakTime1Start');
-        const endInput = document.getElementById('BreakTime1End');
 
         if (dateInput) {
-            // Apply flatpickr if available, otherwise fallback to native date
             if (typeof flatpickr !== 'undefined') {
                 flatpickr(dateInput, {
                     dateFormat: "Y-m-d",
@@ -47,18 +90,28 @@
                 const selectedDate = dateInput.value;
                 if (!selectedDate) return;
 
-                fetch(`/Shared/ApplyBreakFilter?handler=BreakTimeForDate&date=${selectedDate}`)
+                fetch(\`/Shared/ApplyBreakFilter?handler=BreakTimeForDate&date=\${selectedDate}\`)
                     .then(response => {
                         if (response.ok) return response.json();
                         throw new Error('Network response was not ok');
                     })
                     .then(data => {
-                        if (data && data.hasData) {
-                            startInput.value = data.start;
-                            endInput.value = data.end;
-                        } else {
-                            startInput.value = '';
-                            endInput.value = '';
+                        const container = document.getElementById('breakTimeList');
+                        container.innerHTML = ''; // Clear existing rows
+                        
+                        if (data && data.hasData && data.data && data.data.length > 0) {
+                            data.data.forEach((bt, index) => {
+                                const row = document.createElement('div');
+                                row.className = 'd-flex gap-2 justify-content-center break-time-row';
+                                row.innerHTML = \`
+                                    <input type="time" name="BreakTimes[\${index}].StartTime" class="form-control text-center" value="\${bt.start}" required />
+                                    <span class="align-self-center">-</span>
+                                    <input type="time" name="BreakTimes[\${index}].EndTime" class="form-control text-center" value="\${bt.end}" required />
+                                    <input type="text" name="BreakTimes[\${index}].Reason" class="form-control" value="\${bt.reason}" placeholder="Reason" required />
+                                    <button type="button" class="btn btn-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
+                                \`;
+                                container.appendChild(row);
+                            });
                         }
                     })
                     .catch(error => console.error('Error fetching break time:', error));
@@ -66,3 +119,4 @@
         }
     });
 </script>
+

@@ -17,6 +17,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
 builder.Services.AddControllers();
+builder.Services.AddScoped<MonitoringSystem.Services.BreakTimeService>();
 builder.Services.AddRazorPages()
     .AddMvcOptions(options =>
     {

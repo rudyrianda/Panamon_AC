@@ -33,10 +33,13 @@ namespace MonitoringSystem.Pages.Performance
         // ✅ FLAG: Pastikan LoadBreakTimes hanya dipanggil sekali per request
         private bool _breakTimesLoaded = false;
 
-        public PerformanceModel(ApplicationDbContext context, IServiceProvider serviceProvider)
+        private readonly MonitoringSystem.Services.BreakTimeService _breakTimeService;
+
+        public PerformanceModel(ApplicationDbContext context, IServiceProvider serviceProvider, MonitoringSystem.Services.BreakTimeService breakTimeService)
         {
             _context = context;
             _serviceProvider = serviceProvider;
+            _breakTimeService = breakTimeService;
         }
 
         public int TotalPlanForSummaryCU { get; set; }
@@ -48,13 +51,6 @@ namespace MonitoringSystem.Pages.Performance
         [BindProperty(SupportsGet = true)]
         public string MachineCode { get; set; } = "MCH1-01";
 
-        // ✅ COMMENTED: Tabel AdditionalBreakTime belum ada di database
-        // Uncomment jika tabel sudah dibuat dengan script:
-        // CREATE TABLE AdditionalBreakTime (Id INT IDENTITY PRIMARY KEY, Date DATE, BreakTime1Start TIME, BreakTime1End TIME, BreakTime2Start TIME, BreakTime2End TIME, CreatedAt DATETIME DEFAULT GETDATE())
-        public TimeSpan? BreakTime1Start { get; set; }
-        public TimeSpan? BreakTime1End { get; set; }
-        public TimeSpan? BreakTime2Start { get; set; }
-        public TimeSpan? BreakTime2End { get; set; }
 
         // ✅ CACHE PROPERTIES: Hasil query disimpan sekali, dipakai berkali-kali di view
         public int CachedPlan { get; set; }
@@ -271,11 +267,7 @@ namespace MonitoringSystem.Pages.Performance
             if (_breakTimesLoaded) return;
             _breakTimesLoaded = true;
 
-            // Set semua null — fitur AdditionalBreakTime belum aktif
-            BreakTime1Start = null;
-            BreakTime1End = null;
-            BreakTime2Start = null;
-            BreakTime2End = null;
+
 
             // ============================================================
             // UNCOMMENT BLOK INI JIKA TABEL AdditionalBreakTime SUDAH ADA
@@ -1104,14 +1096,6 @@ namespace MonitoringSystem.Pages.Performance
             return totalLossMinutes;
         }
 
-        private readonly List<(TimeSpan Start, TimeSpan End)> FixedBreakTimes = new List<(TimeSpan, TimeSpan)>
-        {
-            (new TimeSpan(7, 0, 0), new TimeSpan(7, 5, 0)),
-            (new TimeSpan(9, 30, 0), new TimeSpan(9, 35, 0)),
-            (new TimeSpan(15, 30, 0), new TimeSpan(15, 35, 0)),
-            (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
-        };
-
         private int CalculateBreakOverlapSec(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
         {
             int totalOverlapSec = 0;
@@ -1129,21 +1113,9 @@ namespace MonitoringSystem.Pages.Performance
 
         private List<(TimeSpan Start, TimeSpan End)> GetAllBreakTimes(DateTime date)
         {
-            var breakTimes = new List<(TimeSpan Start, TimeSpan End)>(FixedBreakTimes);
-            var targetDate = DateOnly.FromDateTime(date);
-            var latestBreakTime = _context.AdditionalBreakTimes
-                .Where(bt => bt.Date == targetDate)
-                .OrderByDescending(bt => bt.CreatedAt)
-                .FirstOrDefault();
-
-            if (latestBreakTime != null)
-            {
-                if (latestBreakTime.BreakTime1Start.HasValue && latestBreakTime.BreakTime1End.HasValue)
-                    breakTimes.Add((latestBreakTime.BreakTime1Start.Value.ToTimeSpan(), latestBreakTime.BreakTime1End.Value.ToTimeSpan()));
-                if (latestBreakTime.BreakTime2Start.HasValue && latestBreakTime.BreakTime2End.HasValue)
-                    breakTimes.Add((latestBreakTime.BreakTime2Start.Value.ToTimeSpan(), latestBreakTime.BreakTime2End.Value.ToTimeSpan()));
-            }
-            return breakTimes;
+            return _breakTimeService.GetBreakTimesForDateAsync(date).Result
+                .Select(b => (b.StartTime, b.EndTime))
+                .ToList();
         }
 
         public int GetCurrentSUT()

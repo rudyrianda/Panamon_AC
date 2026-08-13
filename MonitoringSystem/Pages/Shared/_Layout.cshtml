@@ -238,7 +238,8 @@
             <div class="modal-content">
                 @{
                     var models = new MonitoringSystem.Pages.Shared.ApplyBreakFilterModel(
-                    (ApplicationDbContext)Context.RequestServices.GetService(typeof(ApplicationDbContext)));
+                    (ApplicationDbContext)Context.RequestServices.GetService(typeof(ApplicationDbContext)),
+                    (IConfiguration)Context.RequestServices.GetService(typeof(IConfiguration)));
                     await models.LoadBreakTimesAsync();
                     await Html.RenderPartialAsync("_BreakTimeFilterPartial", models);
                 }

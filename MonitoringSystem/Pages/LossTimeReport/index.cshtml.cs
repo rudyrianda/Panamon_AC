@@ -25,12 +25,15 @@ namespace MonitoringSystem.Pages.LossTimeReport
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _webHostEnvironment;
 
-        public indexModel(ApplicationDbContext context, IConfiguration configuration, IWebHostEnvironment webHostEnvironment)
+        private readonly MonitoringSystem.Services.BreakTimeService _breakTimeService;
+
+        public indexModel(ApplicationDbContext context, IConfiguration configuration, IWebHostEnvironment webHostEnvironment, MonitoringSystem.Services.BreakTimeService breakTimeService)
         {
             _context = context;
             _configuration = configuration;
             _connectionString = configuration.GetConnectionString("DefaultConnection");
             _webHostEnvironment = webHostEnvironment;
+            _breakTimeService = breakTimeService;
         }
         //public indexModel(ApplicationDbContext context, IConfiguration configuration)
         //{
@@ -41,14 +44,6 @@ namespace MonitoringSystem.Pages.LossTimeReport
         //{
         //    _context = context;
         //}
-
-        private readonly List<(TimeSpan Start, TimeSpan End)> FixedBreakTimes = new List<(TimeSpan, TimeSpan)>
-        {
-            (new TimeSpan(7, 0, 0), new TimeSpan(7, 5, 0)),
-            (new TimeSpan(9, 30, 0), new TimeSpan(9, 35, 0)),
-            (new TimeSpan(15, 30, 0), new TimeSpan(15, 35, 0)),
-            (new TimeSpan(18, 15, 0), new TimeSpan(18, 45, 0))
-        };
 
         private int CalculateBreakOverlapSec(TimeSpan startTime, TimeSpan endTime, List<(TimeSpan Start, TimeSpan End)> breakTimes)
         {
@@ -67,21 +62,9 @@ namespace MonitoringSystem.Pages.LossTimeReport
 
         private List<(TimeSpan Start, TimeSpan End)> GetAllBreakTimes()
         {
-            var breakTimes = new List<(TimeSpan Start, TimeSpan End)>(FixedBreakTimes);
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            var latestBreakTime = _context.AdditionalBreakTimes
-                .Where(bt => bt.Date == today)
-                .OrderByDescending(bt => bt.CreatedAt)
-                .FirstOrDefault();
-
-            if (latestBreakTime != null)
-            {
-                if (latestBreakTime.BreakTime1Start.HasValue && latestBreakTime.BreakTime1End.HasValue)
-                    breakTimes.Add((latestBreakTime.BreakTime1Start.Value.ToTimeSpan(), latestBreakTime.BreakTime1End.Value.ToTimeSpan()));
-                if (latestBreakTime.BreakTime2Start.HasValue && latestBreakTime.BreakTime2End.HasValue)
-                    breakTimes.Add((latestBreakTime.BreakTime2Start.Value.ToTimeSpan(), latestBreakTime.BreakTime2End.Value.ToTimeSpan()));
-            }
-            return breakTimes;
+            return _breakTimeService.GetBreakTimesForDateAsync(DateTime.Today).Result
+                .Select(b => (b.StartTime, b.EndTime))
+                .ToList();
         }
 
         [BindProperty(SupportsGet = true)]
@@ -388,7 +371,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
             {
                 for (int m = 1; m <= 12; m++)
                 {
-                    var pr = new MonitoringSystem.Pages.ProductionReport.IndexModel(_webHostEnvironment, _configuration);
+                    var pr = new MonitoringSystem.Pages.ProductionReport.IndexModel(_webHostEnvironment, _configuration, _breakTimeService);
                     pr.SelectedYear = m >= 4 ? fiscalYear : fiscalYear + 1;
                     pr.SelectedMonth = m;
                     pr.MachineLine = line;
