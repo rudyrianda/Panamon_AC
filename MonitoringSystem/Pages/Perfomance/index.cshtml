@@ -700,104 +700,59 @@
 
             window.myChart = realtimeChart;
 
-            async function fetchUpdatedChartData() {
+            async function autoRefreshPageViaHTML() {
                 try {
                     const machineCode  = document.getElementById('MachineCode').value;
                     const selectedDate = document.querySelector('input[name="SelectedDate"]').value;
-                    const response     = await fetch(`?handler=UpdatedData&machineCode=${machineCode}&selectedDate=${selectedDate}`);
-
+                    // Build the URL to fetch the full page
+                    const currentUrl = window.location.pathname;
+                    const url = `${currentUrl}?MachineCode=${machineCode}&SelectedDate=${selectedDate}`;
+                    
+                    const response = await fetch(url);
                     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-                    const data = await response.json();
                     
-                    const labels = data.Labels || data.labels;
-                    const efficiency = data.Efficiency || data.efficiency;
-
-                    if (!data || !labels || !efficiency) throw new Error("Incomplete data received.");
-
-                    window.myChart.data.labels            = labels;
-                    window.myChart.data.datasets[0].data  = efficiency;
-                    window.myChart.update();
-
-                    // Update UI table
-                    const updateElem = (id, val, suffix = "") => {
-                        const el = document.getElementById(id);
-                        if(el) el.textContent = val + suffix;
-                    };
+                    const htmlText = await response.text();
                     
-                    updateElem("val-planProd", data.planProd);
-                    updateElem("val-targetProd", data.targetProd);
-                    updateElem("val-actualProd", data.actualProd);
-                    
-                    const diffEl = document.getElementById("val-differenceProd");
-                    if(diffEl) {
-                        diffEl.textContent = data.differenceProd;
-                        if(data.differenceProd <= 0) diffEl.classList.add("text-danger");
-                        else diffEl.classList.remove("text-danger");
+                    // Parse the HTML
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(htmlText, 'text/html');
+
+                    // 1. Update Metrics Table
+                    const oldMetrics = document.querySelector('.perf-card');
+                    const newMetrics = doc.querySelector('.perf-card');
+                    if(oldMetrics && newMetrics) {
+                        oldMetrics.innerHTML = newMetrics.innerHTML;
                     }
 
-                    updateElem("val-efficiencyValue", data.efficiencyValue, " %");
-                    updateElem("val-planTaktTime", data.planTaktTime, " s");
-                    updateElem("val-actTaktTime", data.actTaktTime, " s");
-                    updateElem("val-defectRatio", data.defectRatio, " %");
-                    updateElem("val-workingTime", data.workingTime, " min");
-                    updateElem("val-lossTime", data.lossTime, " min");
-
-                    // Rebuild Hourly Table
-                    const hourlyList = data.hourlyList || data.hourlylist;
-                    if(hourlyList && Array.isArray(hourlyList)) {
-                        const tbody = document.getElementById("hourlyTableBody");
-                        if(tbody) {
-                            tbody.innerHTML = "";
-                            
-                            // Group by time to determine rowspan
-                            const timeCounts = {};
-                            hourlyList.forEach(item => {
-                                timeCounts[item.time] = (timeCounts[item.time] || 0) + 1;
-                            });
-
-                            let previousTime = "";
-                            hourlyList.forEach(item => {
-                                const tr = document.createElement("tr");
-                                
-                                if (previousTime !== item.time) {
-                                    const tdTime = document.createElement("td");
-                                    tdTime.rowSpan = timeCounts[item.time];
-                                    tdTime.className = "fw-bold";
-                                    tdTime.textContent = item.time;
-                                    tr.appendChild(tdTime);
-                                    previousTime = item.time;
-                                }
-
-                                const tdModel = document.createElement("td");
-                                tdModel.className = "fw-bold";
-                                tdModel.textContent = item.model;
-                                tr.appendChild(tdModel);
-
-                                const tdPlan = document.createElement("td");
-                                tdPlan.className = "fw-bold";
-                                tdPlan.textContent = item.plan;
-                                tr.appendChild(tdPlan);
-
-                                const tdActual = document.createElement("td");
-                                tdActual.className = "fw-bold";
-                                tdActual.textContent = item.actual;
-                                tr.appendChild(tdActual);
-
-                                tbody.appendChild(tr);
-                            });
-                        }
+                    // 2. Update Hourly Table
+                    const oldHourly = document.querySelector('.perf-hourly-table');
+                    const newHourly = doc.querySelector('.perf-hourly-table');
+                    if(oldHourly && newHourly) {
+                        oldHourly.innerHTML = newHourly.innerHTML;
                     }
 
+                    // 3. Update Chart Data by extracting it from the fetched HTML text
+                    const labelsMatch = htmlText.match(/let labelData\s*=\s*(\[.*?\]);/);
+                    const effMatch = htmlText.match(/let efficiencyDataPoints\s*=\s*(\[.*?\]);/);
+                    
+                    if (labelsMatch && labelsMatch[1] && effMatch && effMatch[1]) {
+                        const parsedLabels = JSON.parse(labelsMatch[1]);
+                        const parsedEff = JSON.parse(effMatch[1]);
+                        
+                        window.myChart.data.labels = parsedLabels;
+                        window.myChart.data.datasets[0].data = parsedEff;
+                        window.myChart.update('none'); // Update without flickering animation
+                    }
                 } catch (error) {
-                    console.error("Failed to fetch updated data:", error.message);
+                    console.error("Auto-refresh via HTML failed:", error.message);
                 }
             }
 
             // Panggil otomatis jika user ubah filter
-            document.getElementById('MachineCode').addEventListener('change', fetchUpdatedChartData);
-            document.querySelector('input[name="SelectedDate"]').addEventListener('change', fetchUpdatedChartData);
+            document.getElementById('MachineCode').addEventListener('change', autoRefreshPageViaHTML);
+            document.querySelector('input[name="SelectedDate"]').addEventListener('change', autoRefreshPageViaHTML);
 
-            // ✅ OPTIMASI: interval 5 detik
-            setInterval(fetchUpdatedChartData, 5000);
+            // Jalankan proses load setiap 5 detik
+            setInterval(autoRefreshPageViaHTML, 5000);
         </script>
 }
