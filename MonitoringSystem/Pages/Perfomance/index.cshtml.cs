@@ -941,6 +941,25 @@ namespace MonitoringSystem.Pages.Performance
                         totalQuantityPlan = (result != null && result != DBNull.Value)
                             ? Convert.ToInt32(result) : 0;
                     }
+                    bool isAugust2026 = (SelectedDate.Year == 2026 && SelectedDate.Month == 8);
+                    if (isAugust2026 && totalQuantityPlan == 0)
+                    {
+                        string fallbackQuery = @"
+                        SELECT SUM(ISNULL(sp.SapPlanNormal, 0) + ISNULL(sp.SapPlanOvertime, 0))
+                        FROM SapPlan sp
+                        JOIN ProductionPlan pp ON sp.PlanId = pp.Id
+                        WHERE CAST(pp.CurrentDate AS DATE) = @SelectedDate
+                          AND sp.MachineCode = @MachineCode;";
+
+                        using (SqlCommand cmdFallback = new SqlCommand(fallbackQuery, connection))
+                        {
+                            cmdFallback.Parameters.AddWithValue("@SelectedDate", SelectedDate.Date);
+                            cmdFallback.Parameters.AddWithValue("@MachineCode", MachineCode);
+                            var resultFallback = cmdFallback.ExecuteScalar();
+                            totalQuantityPlan = (resultFallback != null && resultFallback != DBNull.Value)
+                                ? Convert.ToInt32(resultFallback) : 0;
+                        }
+                    }
                 }
             }
             catch (Exception ex)

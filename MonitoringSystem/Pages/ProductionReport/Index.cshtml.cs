@@ -265,7 +265,10 @@ namespace MonitoringSystem.Pages.ProductionReport
                     : "AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')")}
       {planShiftFilter}
     GROUP BY DAY(pp.CurrentDate)";
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
             string anyPlanSql = $@"
     SELECT DISTINCT DAY(pp.CurrentDate) as Day
     FROM ProductionPlan pp
@@ -274,6 +277,10 @@ namespace MonitoringSystem.Pages.ProductionReport
       AND MONTH(pp.CurrentDate) = @SelectedMonth
       AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')
       {planShiftFilter}";
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 
             string actualSql = $@"
 WITH ShiftData AS (
@@ -739,24 +746,37 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                 DailyNetManHours.Add(netManMinutes / 60.0);
             }
 
+            bool isAugust2026 = (SelectedYear == 2026 && SelectedMonth == 8);
             for (int i = 0; i < PlanData.Count; i++)
             {
                 var data = combinedData[i];
-                if (!data.HasAnyPlan)
+                
+                if (isAugust2026)
                 {
-                    int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : OriginalPlanData[i];
+                    int effectiveNormal = (PlanData[i].HasValue && PlanData[i].Value > 0) ? PlanData[i].Value : OriginalPlanData[i];
                     EffectivePlanData.Add(effectiveNormal);
 
-                    int effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
+                    int effectiveOt = (PlanOvertimeData[i].HasValue && PlanOvertimeData[i].Value > 0) ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
                     EffectivePlanOvertimeData.Add(effectiveOt);
                 }
                 else
                 {
-                    int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : 0;
-                    EffectivePlanData.Add(effectiveNormal);
+                    if (!data.HasAnyPlan)
+                    {
+                        int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : OriginalPlanData[i];
+                        EffectivePlanData.Add(effectiveNormal);
 
-                    int effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : 0;
-                    EffectivePlanOvertimeData.Add(effectiveOt);
+                        int effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
+                        EffectivePlanOvertimeData.Add(effectiveOt);
+                    }
+                    else
+                    {
+                        int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : 0;
+                        EffectivePlanData.Add(effectiveNormal);
+
+                        int effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : 0;
+                        EffectivePlanOvertimeData.Add(effectiveOt);
+                    }
                 }
             }
         }
