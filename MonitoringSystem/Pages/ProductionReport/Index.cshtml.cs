@@ -455,8 +455,20 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                         planSql = $@"
 SELECT 
     DAY(pp.CurrentDate) as Day,
-    SUM(ISNULL(pr.TotalPlanQuantity, ISNULL(sp.SapPlanNormal, 0))) as TotalPlanQuantity,
-    SUM(ISNULL(pr.TotalPlanOvertime, ISNULL(sp.SapPlanOvertime, 0))) as TotalPlanOvertime
+    SUM(
+        CASE 
+            WHEN CAST(pp.CurrentDate AS DATE) <= CAST(DATEADD(day, 1, GETDATE()) AS DATE) 
+            THEN ISNULL(pr.TotalPlanQuantity, ISNULL(sp.SapPlanNormal, 0))
+            ELSE ISNULL(pr.TotalPlanQuantity, 0)
+        END
+    ) as TotalPlanQuantity,
+    SUM(
+        CASE 
+            WHEN CAST(pp.CurrentDate AS DATE) <= CAST(DATEADD(day, 1, GETDATE()) AS DATE) 
+            THEN ISNULL(pr.TotalPlanOvertime, ISNULL(sp.SapPlanOvertime, 0))
+            ELSE ISNULL(pr.TotalPlanOvertime, 0)
+        END
+    ) as TotalPlanOvertime
 FROM ProductionPlan pp
 INNER JOIN (
     SELECT PlanId, MachineCode FROM SapPlan
@@ -776,18 +788,30 @@ GROUP BY DAY(pp.CurrentDate)";
             for (int i = 0; i < PlanData.Count; i++)
             {
                 var data = combinedData[i];
+                bool isUpToTomorrow = new DateTime(SelectedYear, SelectedMonth, data.Day).Date <= DateTime.Now.Date.AddDays(1);
                 
                 if (isAugust2026)
                 {
-                    int effectiveNormal = (PlanData[i].HasValue && PlanData[i].Value > 0) ? PlanData[i].Value : OriginalPlanData[i];
+                    int effectiveNormal;
+                    int effectiveOt;
+                    
+                    if (isUpToTomorrow)
+                    {
+                        effectiveNormal = (PlanData[i].HasValue && PlanData[i].Value > 0) ? PlanData[i].Value : OriginalPlanData[i];
+                        effectiveOt = (PlanOvertimeData[i].HasValue && PlanOvertimeData[i].Value > 0) ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
+                    }
+                    else
+                    {
+                        effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : 0;
+                        effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : 0;
+                    }
+                    
                     EffectivePlanData.Add(effectiveNormal);
-
-                    int effectiveOt = (PlanOvertimeData[i].HasValue && PlanOvertimeData[i].Value > 0) ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
                     EffectivePlanOvertimeData.Add(effectiveOt);
                 }
                 else
                 {
-                    if (!data.HasAnyPlan)
+                    if (!data.HasAnyPlan && isUpToTomorrow)
                     {
                         int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : OriginalPlanData[i];
                         EffectivePlanData.Add(effectiveNormal);
