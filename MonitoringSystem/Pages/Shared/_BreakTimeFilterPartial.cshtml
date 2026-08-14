@@ -38,7 +38,7 @@
             </div>
         </div>
         
-        <button type="submit" class="btn btn-primary mb-3 px-4 rounded-pill">Save Break Time</button>
+        <button type="submit" id="saveBreakTimeBtn" class="btn btn-primary mb-3 px-4 rounded-pill">Save Break Time</button>
     </div>
 </form>
 
@@ -124,6 +124,8 @@
                 e.preventDefault();
                 
                 const formData = new FormData(form);
+                const saveBtn = document.getElementById('saveBreakTimeBtn');
+                const originalText = saveBtn.innerHTML;
                 
                 fetch(form.action, {
                     method: 'POST',
@@ -135,19 +137,15 @@
                 })
                 .then(data => {
                     if (data && data.success) {
-                        if (typeof Swal !== 'undefined') {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Saved!',
-                                showConfirmButton: false,
-                                timer: 1000,
-                                target: document.getElementById('breakTimeFilterModal'),
-                                toast: true,
-                                position: 'center'
-                            });
-                        } else {
-                            alert('Break times have been updated successfully.');
-                        }
+                        // Change button to success state
+                        saveBtn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Saved!';
+                        saveBtn.classList.replace('btn-primary', 'btn-success');
+                        
+                        // Revert button after 1 second
+                        setTimeout(() => {
+                            saveBtn.innerHTML = originalText;
+                            saveBtn.classList.replace('btn-success', 'btn-primary');
+                        }, 1000);
                         
                         // Refresh the list so it is sorted and formatted correctly
                         if (typeof window.fetchBreakTime === 'function') {
@@ -159,15 +157,7 @@
                 })
                 .catch(error => {
                     console.error('Error saving break times:', error);
-                    if (typeof Swal !== 'undefined') {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Failed to Save',
-                            text: 'An error occurred while saving break times.'
-                        });
-                    } else {
-                        alert('Failed to save break times.');
-                    }
+                    alert('Failed to save break times.');
                 });
             });
         }
