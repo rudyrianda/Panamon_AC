@@ -267,7 +267,6 @@ namespace MonitoringSystem.Pages.ProductionReport
     GROUP BY DAY(pp.CurrentDate)";
 
 
-<<<<<<< HEAD
             string anyPlanSql = $@"
     SELECT DISTINCT DAY(pp.CurrentDate) as Day
     FROM ProductionPlan pp
@@ -276,8 +275,6 @@ namespace MonitoringSystem.Pages.ProductionReport
       AND MONTH(pp.CurrentDate) = @SelectedMonth
       AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')
       {planShiftFilter}";
-=======
->>>>>>> origin/main
 
             string actualSql = $@"
 WITH ShiftData AS (
@@ -773,7 +770,6 @@ GROUP BY DAY(pp.CurrentDate)";
             for (int i = 0; i < PlanData.Count; i++)
             {
                 var data = combinedData[i];
-<<<<<<< HEAD
                 bool isUpToTomorrow = new DateTime(SelectedYear, SelectedMonth, data.Day).Date <= DateTime.Now.Date.AddDays(1);
                 
                 if (isAugust2026)
@@ -814,14 +810,6 @@ GROUP BY DAY(pp.CurrentDate)";
                         EffectivePlanOvertimeData.Add(effectiveOt);
                     }
                 }
-=======
-                
-                int effectiveNormal = (PlanData[i].HasValue && PlanData[i].Value > 0) ? PlanData[i].Value : OriginalPlanData[i];
-                EffectivePlanData.Add(effectiveNormal);
-
-                int effectiveOt = (PlanOvertimeData[i].HasValue && PlanOvertimeData[i].Value > 0) ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
-                EffectivePlanOvertimeData.Add(effectiveOt);
->>>>>>> origin/main
             }
         }
 
