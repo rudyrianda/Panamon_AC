@@ -941,7 +941,13 @@ namespace MonitoringSystem.Pages.Performance
                         totalQuantityPlan = (result != null && result != DBNull.Value)
                             ? Convert.ToInt32(result) : 0;
                     }
+<<<<<<< HEAD
+                    bool isAugust2026 = (SelectedDate.Year == 2026 && SelectedDate.Month == 8);
+                    if (isAugust2026 && totalQuantityPlan == 0)
+=======
+
                     if (totalQuantityPlan == 0)
+>>>>>>> origin/main
                     {
                         string fallbackQuery = @"
                         SELECT SUM(ISNULL(sp.SapPlanNormal, 0) + ISNULL(sp.SapPlanOvertime, 0))
