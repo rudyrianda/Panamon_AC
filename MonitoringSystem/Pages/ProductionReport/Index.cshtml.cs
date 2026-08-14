@@ -774,19 +774,8 @@ GROUP BY DAY(pp.CurrentDate)";
                 
                 if (isAugust2026)
                 {
-                    int effectiveNormal;
-                    int effectiveOt;
-                    
-                    if (isUpToTomorrow)
-                    {
-                        effectiveNormal = (PlanData[i].HasValue && PlanData[i].Value > 0) ? PlanData[i].Value : OriginalPlanData[i];
-                        effectiveOt = (PlanOvertimeData[i].HasValue && PlanOvertimeData[i].Value > 0) ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
-                    }
-                    else
-                    {
-                        effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : 0;
-                        effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : 0;
-                    }
+                    int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : 0;
+                    int effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : 0;
                     
                     EffectivePlanData.Add(effectiveNormal);
                     EffectivePlanOvertimeData.Add(effectiveOt);
