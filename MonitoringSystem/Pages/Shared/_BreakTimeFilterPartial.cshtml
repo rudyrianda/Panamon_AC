@@ -136,6 +136,7 @@
                 .then(data => {
                     if (data && data.success) {
                         if (typeof Swal !== 'undefined') {
+                            // Centered SweetAlert toast for success
                             Swal.fire({
                                 icon: 'success',
                                 title: 'Saved!',
