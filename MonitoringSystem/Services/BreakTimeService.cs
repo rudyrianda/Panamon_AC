@@ -57,7 +57,7 @@ namespace MonitoringSystem.Services
                 using (var connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
-                    var sql = "SELECT DISTINCT ShiftMode FROM [Panasonic_Smart_Factory].[dbo].[Oeesn] WHERE CAST(Date AS DATE) = @date AND ShiftMode IS NOT NULL";
+                    var sql = "SELECT DISTINCT ShiftMode FROM [OEESN] WHERE CAST(Date AS DATE) = @date AND ShiftMode IS NOT NULL";
                     using (var command = new SqlCommand(sql, connection))
                     {
                         command.Parameters.AddWithValue("@date", dateOnly.ToDateTime(TimeOnly.MinValue));
