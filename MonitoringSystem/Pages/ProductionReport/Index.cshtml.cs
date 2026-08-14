@@ -267,14 +267,6 @@ namespace MonitoringSystem.Pages.ProductionReport
     GROUP BY DAY(pp.CurrentDate)";
 
 
-            string anyPlanSql = $@"
-    SELECT DISTINCT DAY(pp.CurrentDate) as Day
-    FROM ProductionPlan pp
-    INNER JOIN ProductionRecords pr ON pp.Id = pr.PlanId
-    WHERE YEAR(pp.CurrentDate) = @SelectedYear 
-      AND MONTH(pp.CurrentDate) = @SelectedMonth
-      AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')
-      {planShiftFilter}";
 
             string actualSql = $@"
 WITH ShiftData AS (
@@ -449,9 +441,6 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                 {
                     conn.Open();
 
-                    bool useAugustLogic = (SelectedYear == 2026 && SelectedMonth == 8);
-                    if (useAugustLogic)
-                    {
                         planSql = $@"
 SELECT 
     DAY(pp.CurrentDate) as Day,
@@ -491,7 +480,6 @@ WHERE YEAR(pp.CurrentDate) = @SelectedYear
   AND MONTH(pp.CurrentDate) = @SelectedMonth
   {(MachineLine != "All" ? "AND machines.MachineCode = @MachineLine" : "AND machines.MachineCode IN ('MCH1-01', 'MCH1-02')")}
 GROUP BY DAY(pp.CurrentDate)";
-                    }
 
                     using (var planCmd = new SqlCommand(planSql, conn))
                     {
@@ -508,24 +496,6 @@ GROUP BY DAY(pp.CurrentDate)";
                                 {
                                     d.Plan = reader["TotalPlanQuantity"] != DBNull.Value ? Convert.ToInt32(reader["TotalPlanQuantity"]) : (int?)null;
                                     d.PlanOvertime = reader["TotalPlanOvertime"] != DBNull.Value ? Convert.ToInt32(reader["TotalPlanOvertime"]) : (int?)null;
-                                }
-                            }
-                        }
-                    }
-
-                    using (var anyPlanCmd = new SqlCommand(anyPlanSql, conn))
-                    {
-                        anyPlanCmd.Parameters.AddWithValue("@SelectedYear", SelectedYear);
-                        anyPlanCmd.Parameters.AddWithValue("@SelectedMonth", SelectedMonth);
-
-                        using (var reader = anyPlanCmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                var d = combinedData.FirstOrDefault(x => x.Day == (int)reader["Day"]);
-                                if (d != null)
-                                {
-                                    d.HasAnyPlan = true;
                                 }
                             }
                         }
@@ -784,50 +754,27 @@ GROUP BY DAY(pp.CurrentDate)";
                 DailyNetManHours.Add(netManMinutes / 60.0);
             }
 
-            bool isAugust2026 = (SelectedYear == 2026 && SelectedMonth == 8);
             for (int i = 0; i < PlanData.Count; i++)
             {
                 var data = combinedData[i];
                 bool isUpToTomorrow = new DateTime(SelectedYear, SelectedMonth, data.Day).Date <= DateTime.Now.Date.AddDays(1);
                 
-                if (isAugust2026)
+                int effectiveNormal;
+                int effectiveOt;
+                
+                if (isUpToTomorrow)
                 {
-                    int effectiveNormal;
-                    int effectiveOt;
-                    
-                    if (isUpToTomorrow)
-                    {
-                        effectiveNormal = (PlanData[i].HasValue && PlanData[i].Value > 0) ? PlanData[i].Value : OriginalPlanData[i];
-                        effectiveOt = (PlanOvertimeData[i].HasValue && PlanOvertimeData[i].Value > 0) ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
-                    }
-                    else
-                    {
-                        effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : 0;
-                        effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : 0;
-                    }
-                    
-                    EffectivePlanData.Add(effectiveNormal);
-                    EffectivePlanOvertimeData.Add(effectiveOt);
+                    effectiveNormal = (PlanData[i].HasValue && PlanData[i].Value > 0) ? PlanData[i].Value : OriginalPlanData[i];
+                    effectiveOt = (PlanOvertimeData[i].HasValue && PlanOvertimeData[i].Value > 0) ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
                 }
                 else
                 {
-                    if (!data.HasAnyPlan && isUpToTomorrow)
-                    {
-                        int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : OriginalPlanData[i];
-                        EffectivePlanData.Add(effectiveNormal);
-
-                        int effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i];
-                        EffectivePlanOvertimeData.Add(effectiveOt);
-                    }
-                    else
-                    {
-                        int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : 0;
-                        EffectivePlanData.Add(effectiveNormal);
-
-                        int effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : 0;
-                        EffectivePlanOvertimeData.Add(effectiveOt);
-                    }
+                    effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : 0;
+                    effectiveOt = PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : 0;
                 }
+                
+                EffectivePlanData.Add(effectiveNormal);
+                EffectivePlanOvertimeData.Add(effectiveOt);
             }
         }
 
