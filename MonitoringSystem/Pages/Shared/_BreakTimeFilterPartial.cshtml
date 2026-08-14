@@ -31,7 +31,7 @@
                             <span class="align-self-center">-</span>
                             <input type="time" name="BreakTimes[@i].EndTime" class="form-control text-center" value="@(Model.BreakTimes[i].EndTime.ToString(@"HH\:mm"))" required />
                             <input type="text" name="BreakTimes[@i].Reason" class="form-control" placeholder="Reason (e.g. 5S, Rest)" value="@Model.BreakTimes[i].Reason" required />
-                            <button type="button" class="btn btn-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
+                            <button type="button" class="btn btn-outline-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
                         </div>
                     }
                 }
@@ -54,7 +54,7 @@
             <span class="align-self-center">-</span>
             <input type="time" name="BreakTimes[${index}].EndTime" class="form-control text-center" required />
             <input type="text" name="BreakTimes[${index}].Reason" class="form-control" placeholder="Reason (e.g. 5S, Rest)" required />
-            <button type="button" class="btn btn-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
+            <button type="button" class="btn btn-outline-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
         `;
         container.appendChild(row);
     }
@@ -110,7 +110,7 @@
                                 <span class="align-self-center">-</span>
                                 <input type="time" name="BreakTimes[${index}].EndTime" class="form-control text-center" value="${bt.end}" required />
                                 <input type="text" name="BreakTimes[${index}].Reason" class="form-control" value="${bt.reason}" placeholder="Reason" required />
-                                <button type="button" class="btn btn-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
+                                <button type="button" class="btn btn-outline-danger" onclick="removeBreakTimeRow(this)"><i class="fa-solid fa-trash"></i></button>
                             `;
                             container.appendChild(row);
                         });
