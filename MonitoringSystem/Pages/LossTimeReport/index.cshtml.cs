@@ -85,6 +85,25 @@ namespace MonitoringSystem.Pages.LossTimeReport
         public Dictionary<string, double[]> DetailActuals { get; set; } = new Dictionary<string, double[]>();
         public Dictionary<string, double[]> DetailPlans { get; set; } = new Dictionary<string, double[]>();
 
+        private static readonly HashSet<string> WorkingLossCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Quality Trouble",
+            "Model Change Loss",
+            "Material Shortage External",
+            "Machine & Tools Trouble",
+            "Man Power Adjustment",
+            "Material Shortage Inhouse",
+            "Material Shortage Internal",
+            "Set Repairing Loss",
+            "Gawse - External Bodies",
+            "Rework",
+            "Mold Change Loss"
+        };
+
+        // Pilihan "All" di UI berarti gabungan dua line yang tersedia: CU dan CS.
+        // Gunakan cakupan yang sama untuk actual, BP, dan working time.
+        private static readonly string[] TrendMachineLines = { "MCH1-01", "MCH1-02" };
+
         // Menampung total Working Loss saja (untuk ringkasan & grafik)
         public double[] TotalActualPerMonth { get; set; } = new double[12];
         public double[] TotalPlanPerMonth { get; set; } = new double[12];
@@ -96,22 +115,25 @@ namespace MonitoringSystem.Pages.LossTimeReport
 
             var actualsRaw = GetDetailedActualData(SelectedYear, MachineLine);
 
-            var planQuery = _context.LossTimePlans.AsQueryable();
+            var planQuery = _context.LossTimePlans.AsNoTracking().AsQueryable();
             planQuery = planQuery.Where(x =>
                 (x.Year == SelectedYear && x.Month >= 4) ||
                 (x.Year == SelectedYear + 1 && x.Month <= 3)
             );
 
-            if (MachineLine != "All") planQuery = planQuery.Where(x => x.MachineLine == MachineLine);
+            planQuery = MachineLine == "All"
+                ? planQuery.Where(x => TrendMachineLines.Contains(x.MachineLine))
+                : planQuery.Where(x => x.MachineLine == MachineLine);
 
             var plansRaw = planQuery.ToList()
-                .GroupBy(x => new { Category = NormalizeCategoryName(x.Category, true), Month = x.Month })
-                .Select(g => new { Category = g.Key.Category, Month = g.Key.Month, Total = g.Sum(x => x.TargetMinutes) })
-                .ToList();
-
-            var plansRatioRaw = planQuery.ToList()
-                .GroupBy(x => x.Month)
-                .Select(g => new { Month = g.Key, RatioVal = g.Max(x => x.Ratio) })
+                .Select(x => new
+                {
+                    Plan = x,
+                    Category = NormalizeCategoryName(x.Category, true)
+                })
+                .Where(x => WorkingLossCategories.Contains(x.Category))
+                .GroupBy(x => new { x.Category, x.Plan.Month })
+                .Select(g => new { Category = g.Key.Category, Month = g.Key.Month, Total = g.Sum(x => x.Plan.TargetMinutes) })
                 .ToList();
 
             var workingTimeRaw = GetMonthlyWorkingTime(SelectedYear, MachineLine);
@@ -241,6 +263,18 @@ namespace MonitoringSystem.Pages.LossTimeReport
             return new CultureInfo("en-US", false).TextInfo.ToTitleCase(name);
         }
 
+        private bool TryNormalizeWorkingLossCategory(string? input, out string category)
+        {
+            category = string.Empty;
+            if (string.IsNullOrWhiteSpace(input)) return false;
+
+            var normalizedCategory = NormalizeCategoryName(input, true);
+            if (!WorkingLossCategories.Contains(normalizedCategory)) return false;
+
+            category = normalizedCategory;
+            return true;
+        }
+
         private class MonthlyCategoryData
         {
             public int Month { get; set; }
@@ -254,23 +288,47 @@ namespace MonitoringSystem.Pages.LossTimeReport
             DateTime startDate = new DateTime(fiscalYear, 4, 1);
             DateTime endDate = new DateTime(fiscalYear + 1, 3, 31);
 
-            var actualsQuery = _context.LossTimeActuals.Where(x =>
+            var actualsQuery = _context.LossTimeActuals.AsNoTracking().Where(x =>
                 (x.Year == fiscalYear && x.Month >= 4) ||
                 (x.Year == fiscalYear + 1 && x.Month <= 3)
             );
-            if (line != "All") actualsQuery = actualsQuery.Where(x => x.MachineLine == line);
-
-            // Cek bulan mana yang sudah ada di LossTimeActuals
-            var monthsWithActuals = actualsQuery.Select(x => x.Month).Distinct().ToList();
+            actualsQuery = line == "All"
+                ? actualsQuery.Where(x => TrendMachineLines.Contains(x.MachineLine))
+                : actualsQuery.Where(x => x.MachineLine == line);
 
             // Semua bulan fiscal year
             var allFiscalMonths = new List<int> { 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3 };
 
-            // Bulan yang BELUM ada di LossTimeActuals → fallback
-            var monthsMissing = allFiscalMonths.Where(m => !monthsWithActuals.Contains(m)).ToList();
+            // Sumber actual ditentukan per bulan dan per line. Dengan begitu, pada
+            // filter All, actual CU tidak menutup fallback data CS (atau sebaliknya).
+            var selectedLines = line == "All" ? TrendMachineLines : new[] { line };
+            var actualPeriods = actualsQuery
+                .Select(x => new { x.Year, x.Month, x.MachineLine })
+                .Distinct()
+                .ToList();
+
+            var missingPeriods = allFiscalMonths
+                .SelectMany(month => selectedLines.Select(machineLine => new
+                {
+                    Year = month >= 4 ? fiscalYear : fiscalYear + 1,
+                    Month = month,
+                    MachineLine = machineLine
+                }))
+                .Where(period => !actualPeriods.Any(actual =>
+                    actual.Year == period.Year &&
+                    actual.Month == period.Month &&
+                    actual.MachineLine == period.MachineLine))
+                .Select((period, index) => new
+                {
+                    period.Year,
+                    period.Month,
+                    period.MachineLine,
+                    ParameterName = $"@MachineCode{index}"
+                })
+                .ToList();
 
             // ✅ Ambil dari LossTimeActuals untuk bulan yang sudah ada
-            if (monthsWithActuals.Any())
+            if (actualPeriods.Any())
             {
                 var grouped = actualsQuery
                     .GroupBy(x => new { x.Month, x.Category })
@@ -292,21 +350,16 @@ namespace MonitoringSystem.Pages.LossTimeReport
                 }
             }
 
-            // ✅ Fallback ke AssemblyLossTime untuk bulan yang BELUM ada
-            if (monthsMissing.Any())
+            // ✅ Fallback ke AssemblyLossTime hanya untuk kombinasi bulan-line yang belum ada
+            if (missingPeriods.Any())
             {
-                var dateConditions = string.Join(" OR ", monthsMissing.Select(m =>
-                {
-                    int year = m >= 4 ? fiscalYear : fiscalYear + 1;
-                    return $"(YEAR(Date) = {year} AND MONTH(Date) = {m})";
-                }));
+                var dateConditions = string.Join(" OR ", missingPeriods.Select(period =>
+                    $"(YEAR(Date) = {period.Year} AND MONTH(Date) = {period.Month} AND MachineCode = {period.ParameterName})"));
 
                 string query = $@"SELECT MONTH(Date) AS MonthVal, Reason, LossTime,
                                          CAST(Time AS TIME) AS StartTime, CAST(EndDateTime AS TIME) AS EndTime
                                   FROM AssemblyLossTime 
                                   WHERE ({dateConditions})";
-
-                if (line != "All") query += " AND MachineCode = @MachineCode";
 
                 try
                 {
@@ -316,7 +369,11 @@ namespace MonitoringSystem.Pages.LossTimeReport
                         conn.Open();
                         using (var cmd = new SqlCommand(query, conn))
                         {
-                            if (line != "All") cmd.Parameters.AddWithValue("@MachineCode", line);
+                            foreach (var period in missingPeriods)
+                            {
+                                cmd.Parameters.AddWithValue(period.ParameterName, period.MachineLine);
+                            }
+
                             using (var reader = cmd.ExecuteReader())
                             {
                                 while (reader.Read())
@@ -377,8 +434,9 @@ namespace MonitoringSystem.Pages.LossTimeReport
                     pr.MachineLine = line;
                     pr.SelectedShifts = new List<string> { "All" };
                     
-                    // Panggil LoadChartData yang akan memproses DailyWorkTime
-                    pr.LoadChartData();
+                    // Untuk rasio Trend hanya DailyWorkTime yang dibutuhkan.
+                    // Filter tahun dan line tetap diterapkan oleh model ini.
+                    pr.LoadChartData(loadSupportingData: false);
                     
                     double totalWorkMinutes = pr.DailyWorkTime.Sum();
                     result.Add(m, totalWorkMinutes);
@@ -393,7 +451,12 @@ namespace MonitoringSystem.Pages.LossTimeReport
 
         public async Task<IActionResult> OnPostImportExcelAsync()
         {
-            if (UploadedExcel == null || UploadedExcel.Length == 0) return RedirectToPage();
+            if (UploadedExcel == null || UploadedExcel.Length == 0)
+            {
+                TempData["Error"] = "File Excel BP belum dipilih.";
+                return RedirectToPage(new { SelectedYear, MachineLine });
+            }
+
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             try
             {
@@ -403,11 +466,21 @@ namespace MonitoringSystem.Pages.LossTimeReport
                     using (var package = new ExcelPackage(stream))
                     {
                         var sheet = package.Workbook.Worksheets[0];
+                        if (sheet.Dimension == null)
+                        {
+                            TempData["Error"] = "Sheet Excel BP kosong.";
+                            return RedirectToPage(new { SelectedYear, MachineLine });
+                        }
+
                         var newPlans = new List<LossTimePlan>();
                         for (int row = 4; row <= sheet.Dimension.Rows; row++)
                         {
-                            var catName = NormalizeCategoryName(sheet.Cells[row, 2].Text);
-                            if (string.IsNullOrEmpty(catName) || catName.Contains("Total")) continue;
+                            var rawCategory = sheet.Cells[row, 2].Text?.Trim();
+
+                            // Hanya 11 kategori Working Loss pada template yang boleh disimpan.
+                            // Header, baris kosong, Fixed Loss, dan kategori lain dilewati.
+                            if (!TryNormalizeWorkingLossCategory(rawCategory, out var catName)) continue;
+
                             int[] months = { 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3 };
                             int col = 3;
                             foreach (var m in months)
@@ -431,10 +504,15 @@ namespace MonitoringSystem.Pages.LossTimeReport
                         _context.LossTimePlans.RemoveRange(old);
                         _context.LossTimePlans.AddRange(newPlans);
                         await _context.SaveChangesAsync();
+
+                        TempData["Success"] = $"BP berhasil di-import: {newPlans.Count} data dari 11 kategori Working Loss. Fixed Loss tidak disimpan.";
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Import BP gagal: {ex.Message}";
+            }
             return RedirectToPage(new { SelectedYear, MachineLine });
         }
 

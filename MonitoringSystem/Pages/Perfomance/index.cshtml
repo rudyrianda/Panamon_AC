@@ -55,13 +55,11 @@
         ? Math.Round(100.0 - ((double)totalDefect / actualProd * 100.0))
         : 100.0;
 
-    var actualData = Model.GetActualPerHour();
     var timeCounts = Model.listProdAchieve.GroupBy(item => item.Time).ToDictionary(group => group.Key, group => group.Count());
-
-    var efficiencyData = CalculateCumulativeEfficiency(actualData, hourlyPlans, workingTime, totalLossTime, planTaktTime);
 
     // ✅ OPTIMASI: Sort sekali di sini, reuse di bawah
     var sortedProdAchieve = Model.listProdAchieve.OrderByDescending(item => item.Time).ToList();
+    var currentModelPlanTotal = 0;
 }
 
 @functions {
@@ -78,12 +76,6 @@
         public double WorkEff { get; set; }
         public double EffProd { get; set; }
         public double ActTaktTime { get; set; }
-    }
-
-    private class EfficiencyData
-    {
-        public List<string> Labels { get; set; } = new List<string>();
-        public List<double> CumulativeEfficiency { get; set; } = new List<double>();
     }
 
     private WorkingTimeData CalculateWorkingTime(DateTime selectedDate, TimeSpan currentTime, TimeSpan startWorkingTime, TimeSpan endWorkingTime, List<Performance.PerformanceModel.RestTime> listRestTime)
@@ -195,37 +187,6 @@
         return result;
     }
 
-    private EfficiencyData CalculateCumulativeEfficiency(
-        List<Performance.PerformanceModel.ActualData> actualData,
-        List<int> hourlyPlans,
-        int workingTime,
-        double totalLossTime,
-        int planTaktTime)
-    {
-        var result = new EfficiencyData();
-        int cumulativeActual = 0;
-
-        result.Labels.Add("07:00");
-        result.CumulativeEfficiency.Add(0);
-
-        for (int i = 1; i < actualData.Count; i++)
-        {
-            cumulativeActual += actualData[i].Actual;
-
-            double efficiency =
-                (cumulativeActual > 0 && workingTime > totalLossTime && planTaktTime > 0)
-                ? Math.Round(Math.Min(
-                    (cumulativeActual * planTaktTime) / ((workingTime - totalLossTime) * 60) * 100,
-                    120), 2)
-                : 0;
-
-            result.Labels.Add(actualData[i].EndTime);
-            result.CumulativeEfficiency.Add(efficiency);
-        }
-
-        return result;
-    }
-
     private int CalculatePlanPerHour(string currentModel, string previousModel, TimeSpan startTime, TimeSpan endTime,
                                      TimeSpan currentTime, DateTime currentDate, int sut,
                                      List<Performance.PerformanceModel.RestTime> listRestTime)
@@ -267,6 +228,11 @@
 <style>
     .perf-label {
         color: rgba(255, 255, 255, 0.88);
+    }
+
+    .perf-page-shell {
+        margin-top: -16px;
+        --perf-dashboard-height: max(735px, calc(100vh - 175px));
     }
     body.light-mode .perf-label {
         color: #1a1a2e !important;
@@ -332,10 +298,12 @@
     }
 
     .perf-card {
+        height: var(--perf-dashboard-height);
         background: rgba(255, 255, 255, 0.08) !important;
         border: 1.5px solid rgba(255, 255, 255, 0.20) !important;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28) !important;
         border-radius: 10px !important;
+        overflow: hidden;
     }
     body.light-mode .perf-card {
         background: rgba(255, 255, 255, 0.60) !important;
@@ -414,7 +382,10 @@
         --bs-table-color: #1a1a2e !important;
     }
 
-    .perf-card .table { border-collapse: collapse !important; }
+    .perf-card .table {
+        height: 100%;
+        border-collapse: collapse !important;
+    }
     .perf-card .table tbody tr { border-bottom: 2px solid rgba(255, 255, 255, 0.22) !important; }
     body.light-mode .perf-card .table tbody tr { border-bottom: 2px solid rgba(61, 121, 176, 0.45) !important; }
     .perf-card .table tbody tr td.perf-td { border-left: 2px solid rgba(255, 255, 255, 0.22) !important; }
@@ -439,6 +410,156 @@
     }
     body.light-mode .perf-panel-title {
         color: #1a1a2e !important;
+    }
+
+    .perf-cycle-panel {
+        position: relative;
+        flex: 0 0 48%;
+        min-height: 300px;
+        overflow: hidden;
+    }
+
+    .perf-dashboard-right {
+        display: flex;
+        height: var(--perf-dashboard-height);
+        min-height: 735px;
+        flex-direction: column;
+    }
+
+    .perf-cycle-heading {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 42px;
+        border-bottom: 1px solid rgba(255, 255, 255, .14);
+        background: rgba(61, 121, 176, .82);
+        text-align: center;
+    }
+
+    .perf-cycle-heading h2 {
+        margin: 0;
+        color: rgba(255, 255, 255, .94);
+        font-size: 1.4rem;
+        font-weight: 800;
+        letter-spacing: .05em;
+    }
+
+    .perf-cycle-legend {
+        position: absolute;
+        right: 12px;
+        display: flex;
+        align-items: center;
+        gap: .8rem;
+        color: rgba(235, 240, 250, .92);
+        font-size: .82rem;
+        font-weight: 700;
+        pointer-events: none;
+    }
+
+    .perf-cycle-legend > span {
+        display: inline-flex;
+        align-items: center;
+        gap: .28rem;
+        white-space: nowrap;
+    }
+
+    .perf-cycle-legend-line {
+        display: inline-block;
+        width: 30px;
+        border-top: 2.5px solid #54c7ec;
+    }
+
+    .perf-cycle-legend-line.plan {
+        border-top-color: #f6bd60;
+        border-top-style: dashed;
+    }
+
+    .perf-cycle-chart-wrap {
+        height: calc(100% - 42px);
+        padding: .25rem .65rem .35rem;
+    }
+
+    .perf-cycle-window-nav {
+        position: absolute;
+        top: 5px;
+        right: auto;
+        bottom: auto;
+        left: 10px;
+        z-index: 12;
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .18rem .35rem;
+        border: 1px solid rgba(84, 199, 236, .35);
+        border-radius: 7px;
+        background: rgba(16, 31, 64, .88);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, .28);
+        backdrop-filter: blur(3px);
+    }
+
+    .perf-cycle-window-nav button {
+        display: inline-flex;
+        width: 30px;
+        height: 27px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(84, 199, 236, .5);
+        border-radius: 5px;
+        background: rgba(61, 121, 176, .72);
+        color: #ffffff;
+        font-size: 1.2rem;
+        font-weight: 800;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .perf-cycle-window-nav button:hover:not(:disabled) {
+        background: rgba(61, 121, 176, 1);
+    }
+
+    .perf-cycle-window-nav button:disabled {
+        opacity: .35;
+        cursor: default;
+    }
+
+    .perf-cycle-window-label {
+        min-width: 94px;
+        color: #ffffff;
+        font-size: .72rem;
+        font-weight: 700;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    body.light-mode .perf-cycle-window-nav {
+        border-color: rgba(61, 121, 176, .45);
+        background: rgba(239, 246, 252, .92);
+    }
+
+    body.light-mode .perf-cycle-window-label {
+        color: #1a1a2e;
+    }
+
+    body.light-mode .perf-cycle-heading {
+        border-bottom-color: rgba(61, 121, 176, .24);
+        background: rgba(61, 121, 176, .92);
+    }
+
+    body.light-mode .perf-cycle-heading h2,
+    body.light-mode .perf-cycle-legend {
+        color: #1a1a2e;
+    }
+
+    @@media (max-width: 1200px) {
+        .perf-cycle-heading {
+            justify-content: flex-start;
+            padding-left: 14px;
+        }
+
+        .perf-cycle-heading h2 {
+            font-size: .92rem;
+        }
     }
 
     .perf-hourly-table thead,
@@ -468,6 +589,10 @@
     }
 
     .perf-hourly-table tbody td {
+        height: 50px;
+        padding-top: .55rem !important;
+        padding-bottom: .55rem !important;
+        vertical-align: middle;
         background-color: transparent !important;
         color: #e0e2ea !important;
         border-color: rgba(255, 255, 255, 0.12) !important;
@@ -503,9 +628,127 @@
     body.light-mode .perf-hourly-table tbody tr:hover td {
         background-color: rgba(61, 121, 176, 0.10) !important;
     }
+
+    .perf-hourly-panel {
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow: hidden;
+    }
+
+    .perf-hourly-scroll {
+        min-height: 0;
+        align-content: flex-start;
+        align-items: flex-start;
+        overflow-y: auto;
+    }
+
+    .perf-hourly-table {
+        height: auto !important;
+        align-self: flex-start;
+    }
+
+    .perf-hourly-total-row {
+        display: grid;
+        grid-template-columns: 32% 32% 18% 18%;
+        flex: 0 0 52px;
+        align-items: stretch;
+        border-top: 2px solid rgba(84, 199, 236, 0.55);
+        background: linear-gradient(90deg, rgba(61, 121, 176, 0.92), rgba(43, 85, 137, 0.88));
+        color: #ffffff;
+    }
+
+    .perf-hourly-total-row > span {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+        padding: .45rem .65rem;
+        border-right: 1px solid rgba(255, 255, 255, 0.14);
+        font-weight: 700;
+        line-height: 1.5;
+    }
+
+    .perf-hourly-total-row > span:last-child {
+        border-right: 0;
+    }
+
+    .perf-hourly-total-label {
+        position: relative;
+        cursor: help;
+    }
+
+    .perf-hourly-total-label::before,
+    .perf-hourly-total-label::after {
+        position: absolute;
+        z-index: 20;
+        left: 68%;
+        pointer-events: none;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity .15s ease, transform .15s ease;
+    }
+
+    .perf-hourly-total-label::before {
+        content: "";
+        bottom: calc(100% + 2px);
+        border: 7px solid transparent;
+        border-top-color: #101f40;
+        transform: translate(-50%, -3px);
+    }
+
+    .perf-hourly-total-label::after {
+        content: attr(data-tooltip);
+        bottom: calc(100% + 16px);
+        width: max-content;
+        max-width: 380px;
+        padding: .65rem .85rem;
+        border: 1px solid rgba(84, 199, 236, .48);
+        border-radius: 7px;
+        background: #101f40;
+        box-shadow: 0 8px 22px rgba(0, 0, 0, .38);
+        color: #ffffff;
+        font-size: 1rem;
+        font-weight: 600;
+        line-height: 1.35;
+        white-space: nowrap;
+        transform: translate(-12%, 4px);
+    }
+
+    .perf-hourly-total-label:hover::before,
+    .perf-hourly-total-label:hover::after,
+    .perf-hourly-total-label:focus-visible::before,
+    .perf-hourly-total-label:focus-visible::after {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .perf-hourly-total-label:hover::before,
+    .perf-hourly-total-label:focus-visible::before {
+        transform: translate(-50%, 0);
+    }
+
+    .perf-hourly-total-label:hover::after,
+    .perf-hourly-total-label:focus-visible::after {
+        transform: translate(-12%, 0);
+    }
+
+    .perf-hourly-total-model {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .perf-hourly-total-value {
+        color: #8ff0d0;
+    }
+
+    body.light-mode .perf-hourly-total-row {
+        border-top-color: rgba(24, 112, 158, 0.65);
+        background: linear-gradient(90deg, rgba(61, 121, 176, 0.94), rgba(48, 96, 150, 0.92));
+    }
 </style>
 
-<div class="row mx-3">
+<div class="row mx-3 perf-page-shell">
     <form method="post" asp-page-handler="OnPost" class="w-100 mb-3">
         <div class="row">
             <div class="col-5 d-flex gap-2 align-items-center">
@@ -578,22 +821,37 @@
         </div>
     </div>
 
-    <div class="col-7">
-        <div class="perf-panel rounded-3 mb-3" style="height: 300px; contain: layout style;">
-            <div class="row">
-                <label class="fs-2 text-center fw-bolder perf-panel-title">REALTIME EFFICIENCY</label>
+    <div class="col-7 perf-dashboard-right">
+        <div class="perf-panel perf-cycle-panel rounded-3 mb-3" style="contain: layout style;">
+            <div class="perf-cycle-heading">
+                <h2>CYCLE TIME</h2>
+                <div class="perf-cycle-legend" aria-hidden="true">
+                    <span><i class="perf-cycle-legend-line plan"></i>Plan SUT (s)</span>
+                    <span><i class="perf-cycle-legend-line"></i>Actual Cycle (s)</span>
+                </div>
             </div>
-            <div class="row d-flex justify-content-center mx-2" style="height: 240px;">
-                <canvas id="RealtimeChart"></canvas>
+            <div class="perf-cycle-chart-wrap">
+                <canvas id="PerformanceCycleTimeChart"></canvas>
+            </div>
+            <div class="perf-cycle-window-nav" aria-label="Navigasi periode cycle time">
+                <button type="button" id="CycleWindowPrevious" title="Lihat 2 jam sebelumnya" aria-label="Lihat 2 jam sebelumnya">&#8249;</button>
+                <span class="perf-cycle-window-label" id="CycleWindowLabel">--:--–--:--</span>
+                <button type="button" id="CycleWindowNext" title="Lihat 2 jam berikutnya" aria-label="Lihat 2 jam berikutnya">&#8250;</button>
             </div>
         </div>
 
-        <div class="overflow-y-auto text-center table-responsive perf-panel p-0 m-0 @(Model.SelectedDate != DateTime.Now.Date ? "" : "refreshHourlyAchievement")" style="height:378px; contain: layout style;">
+        <div class="text-center perf-panel perf-hourly-panel d-flex flex-column p-0 m-0 @(Model.SelectedDate != DateTime.Now.Date ? "" : "refreshHourlyAchievement")" style="contain: layout style;">
             <div class="row p-0 m-0">
                 <label class="fs-2 text-center fw-bolder p-0 m-0 perf-panel-title">HOURLY ACHIEVEMENT</label>
             </div>
-            <div class="overflow-y-auto row p-0 m-0">
+            <div class="perf-hourly-scroll row p-0 m-0 flex-grow-1">
                 <table class="table border-2 p-0 m-0 fs-4 overflow-y-auto perf-hourly-table">
+                    <colgroup>
+                        <col style="width:32%" />
+                        <col style="width:32%" />
+                        <col style="width:18%" />
+                        <col style="width:18%" />
+                    </colgroup>
                     <thead>
                         <tr>
                             <th scope="col" style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important;">TIME</th>
@@ -632,6 +890,14 @@
                                                 listRestTime
                                             );
                                             previousModel = sortedProdAchieve[i].Model;
+
+                                            if (string.Equals(
+                                                sortedProdAchieve[i].Model,
+                                                Model.CurrentModelName,
+                                                StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                currentModelPlanTotal += planPerHour;
+                                            }
                                         }
                                         @planPerHour
                                             </td>
@@ -648,57 +914,294 @@
                     </tbody>
                 </table>
             </div>
+            <div class="perf-hourly-total-row fs-4">
+                <span class="perf-hourly-total-label"
+                      tabindex="0"
+                      data-tooltip="Total dari model yang sedang berjalan saat ini">TOTAL</span>
+                <span class="perf-hourly-total-model">@Model.CurrentModelName</span>
+                <span>@currentModelPlanTotal</span>
+                <span class="perf-hourly-total-value">@Model.CurrentModelTotal</span>
+            </div>
         </div>
     </div>
 </div>
 
 @section Scripts {
         <script>
-            let labelData          = @(Html.Raw(System.Text.Json.JsonSerializer.Serialize(efficiencyData.Labels)));
-            let efficiencyDataPoints = @(Html.Raw(System.Text.Json.JsonSerializer.Serialize(efficiencyData.CumulativeEfficiency)));
+            let cycleTimeData = @(Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CycleTimeChartPoints)));
 
             const isLightMode = document.body.classList.contains('light-mode');
             const gridColor   = isLightMode ? 'rgba(0,0,0,0.08)'      : 'rgba(255,255,255,0.10)';
             const tickColor   = isLightMode ? '#1a1a2e'                : 'rgba(220,228,240,0.75)';
-            const legendColor = isLightMode ? '#1a1a2e'                : 'rgba(220,228,240,0.85)';
 
-            const ctx = document.getElementById('RealtimeChart').getContext('2d');
-            const realtimeChart = new Chart(ctx, {
+            const CYCLE_WINDOW_MINUTES = 120;
+            let cycleWindowEndMinute = null;
+            let cycleWindowPinnedToLatest = true;
+
+            function cycleLabelToShiftMinute(label) {
+                const parts = String(label || '').split(':').map(Number);
+                if (parts.length < 2 || parts.some(Number.isNaN)) return null;
+
+                let clockMinute = (parts[0] * 60) + parts[1] + ((parts[2] || 0) / 60);
+                if (clockMinute < 7 * 60) clockMinute += 24 * 60;
+                return clockMinute - (7 * 60);
+            }
+
+            function cycleShiftMinuteToTime(value) {
+                const totalMinute = (7 * 60) + Math.max(0, Number(value) || 0);
+                const hour = Math.floor(totalMinute / 60) % 24;
+                const minute = Math.floor(totalMinute % 60);
+                return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+            }
+
+            function getCycleTimeBounds(rawData) {
+                const minutes = (rawData || [])
+                    .map(point => cycleLabelToShiftMinute(point.Label))
+                    .filter(value => value !== null);
+
+                if (!minutes.length) return { hasData: false, min: 0, max: CYCLE_WINDOW_MINUTES };
+                return {
+                    hasData: true,
+                    min: Math.min(...minutes),
+                    max: Math.max(...minutes)
+                };
+            }
+
+            function ensureCycleWindow(rawData, resetToLatest = false) {
+                const bounds = getCycleTimeBounds(rawData);
+                if (resetToLatest || cycleWindowEndMinute === null || cycleWindowPinnedToLatest) {
+                    cycleWindowEndMinute = bounds.max;
+                    cycleWindowPinnedToLatest = true;
+                } else {
+                    cycleWindowEndMinute = Math.max(0, Math.min(cycleWindowEndMinute, bounds.max));
+                }
+                return bounds;
+            }
+
+            function getCycleWindowData(rawData, bounds) {
+                const windowEnd = cycleWindowEndMinute ?? bounds.max;
+                const windowStart = Math.max(0, windowEnd - CYCLE_WINDOW_MINUTES);
+
+                return (rawData || []).filter(point => {
+                    const minute = cycleLabelToShiftMinute(point.Label);
+                    if (minute === null) return false;
+                    const afterStart = windowStart === 0 ? minute >= windowStart : minute > windowStart;
+                    return afterStart && minute <= windowEnd;
+                });
+            }
+
+            function formatCycleValue(value, maximumFractionDigits = 1) {
+                return Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits });
+            }
+
+            function buildCurrentCycleWindowView(resetToLatest = false) {
+                const bounds = ensureCycleWindow(cycleTimeData, resetToLatest);
+                const points = getCycleWindowData(cycleTimeData, bounds);
+                const windowEnd = cycleWindowEndMinute ?? bounds.max;
+
+                return {
+                    bounds,
+                    points,
+                    labels: points.map(point => point.Label),
+                    planData: points.map(point => point.PlanCycleTime),
+                    actualData: points.map(point => point.ActualCycleTime),
+                    windowEnd,
+                    windowStart: Math.max(0, windowEnd - CYCLE_WINDOW_MINUTES)
+                };
+            }
+
+            let cycleWindowView = buildCurrentCycleWindowView(true);
+
+            Chart.Tooltip.positioners.cycleOffset = function(elements) {
+                if (!elements.length) return false;
+
+                const position = elements[0].element.tooltipPosition();
+                const chartArea = this.chart.chartArea;
+                const showOnRight = position.x < chartArea.left + (chartArea.width * 0.72);
+
+                return {
+                    x: position.x + (showOnRight ? 30 : -30),
+                    y: position.y,
+                    xAlign: showOnRight ? 'left' : 'right',
+                    yAlign: 'center'
+                };
+            };
+
+            const cycleHoverGuidePlugin = {
+                id: 'cycleHoverGuide',
+                beforeDatasetsDraw(chart) {
+                    const activeElements = chart.getActiveElements();
+                    if (!activeElements.length) return;
+
+                    const x = activeElements[0].element.x;
+                    const { ctx, chartArea } = chart;
+
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.setLineDash([4, 4]);
+                    ctx.moveTo(x, chartArea.top);
+                    ctx.lineTo(x, chartArea.bottom);
+                    ctx.lineWidth = 1.4;
+                    ctx.strokeStyle = 'rgba(126, 226, 255, .72)';
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            };
+
+            const ctx = document.getElementById('PerformanceCycleTimeChart').getContext('2d');
+            const performanceCycleChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: labelData,
-                    datasets: [{
-                        label: 'Efficiency (%)',
-                        data: efficiencyDataPoints,
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        fill: false,
-                        tension: 0.1,
-                    }],
+                    labels: cycleWindowView.labels,
+                    datasets: [
+                        {
+                            label: 'Plan SUT (s)',
+                            data: cycleWindowView.planData,
+                            borderColor: '#f6bd60',
+                            backgroundColor: 'rgba(246, 189, 96, 0.12)',
+                            borderWidth: 2,
+                            borderDash: [7, 5],
+                            pointRadius: 0,
+                            pointHitRadius: 12,
+                            pointHoverRadius: 5,
+                            pointHoverBackgroundColor: '#f6bd60',
+                            pointHoverBorderColor: '#ffffff',
+                            pointHoverBorderWidth: 2,
+                            stepped: true,
+                            tension: 0
+                        },
+                        {
+                            label: 'Actual Cycle (s)',
+                            data: cycleWindowView.actualData,
+                            borderColor: '#54c7ec',
+                            backgroundColor: 'rgba(84, 199, 236, 0.12)',
+                            borderWidth: 1.6,
+                            pointRadius: 0,
+                            pointHitRadius: 12,
+                            pointHoverRadius: 6,
+                            pointHoverBackgroundColor: '#54c7ec',
+                            pointHoverBorderColor: '#ffffff',
+                            pointHoverBorderWidth: 2,
+                            tension: 0.12
+                        }
+                    ]
                 },
+                plugins: [cycleHoverGuidePlugin],
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    animation: { duration: 400 },
+                    animation: { duration: 350 },
+                    interaction: { mode: 'index', intersect: false },
+                    layout: { padding: { bottom: 4 } },
                     plugins: {
                         legend: {
-                            display: true,
-                            labels: { color: legendColor, font: { weight: '600' } }
+                            display: false
                         },
+                        tooltip: {
+                            position: 'cycleOffset',
+                            padding: 12,
+                            caretSize: 7,
+                            caretPadding: 10,
+                            boxWidth: 14,
+                            boxHeight: 14,
+                            titleFont: {
+                                size: 15,
+                                weight: 'bold'
+                            },
+                            bodyFont: {
+                                size: 14,
+                                weight: '600'
+                            },
+                            titleSpacing: 4,
+                            bodySpacing: 5,
+                            callbacks: {
+                                title(items) {
+                                    const index = items[0]?.dataIndex ?? 0;
+                                    const point = cycleWindowView.points[index];
+                                    return point ? `${point.Label} · ${point.ModelProduk}` : '';
+                                },
+                                label(context) {
+                                    const point = cycleWindowView.points[context.dataIndex];
+                                    if (!point) return '';
+                                    const value = context.datasetIndex === 0
+                                        ? point.PlanCycleTime
+                                        : point.ActualCycleTime;
+                                    return `${context.dataset.label}: ${formatCycleValue(value)}`;
+                                }
+                            }
+                        }
                     },
                     scales: {
-                        x: { ticks: { color: tickColor }, grid: { color: gridColor } },
+                        x: {
+                            ticks: {
+                                color: tickColor,
+                                autoSkip: true,
+                                autoSkipPadding: 20,
+                                maxTicksLimit: 8,
+                                maxRotation: 0,
+                                minRotation: 0,
+                                callback(value) {
+                                    return this.getLabelForValue(value).substring(0, 5);
+                                }
+                            },
+                            grid: { color: gridColor }
+                        },
                         y: {
                             beginAtZero: true,
-                            max: 120,
-                            ticks: { color: tickColor, callback: function(value) { return value + '%'; } },
+                            ticks: {
+                                color: tickColor,
+                                callback(value) { return `${formatCycleValue(value, 0)} s`; }
+                            },
                             grid: { color: gridColor }
                         }
                     }
                 },
             });
 
-            window.myChart = realtimeChart;
+            window.performanceCycleChart = performanceCycleChart;
+
+            function updateCycleWindowControls() {
+                const previousButton = document.getElementById('CycleWindowPrevious');
+                const nextButton = document.getElementById('CycleWindowNext');
+                const label = document.getElementById('CycleWindowLabel');
+                const bounds = cycleWindowView.bounds;
+
+                label.textContent = `${cycleShiftMinuteToTime(cycleWindowView.windowStart)}–${cycleShiftMinuteToTime(cycleWindowView.windowEnd)}`;
+                previousButton.disabled = !bounds.hasData || cycleWindowView.windowStart <= bounds.min;
+                nextButton.disabled = !bounds.hasData || cycleWindowPinnedToLatest || cycleWindowView.windowEnd >= bounds.max;
+            }
+
+            function updateCycleWindowChart(resetToLatest = false) {
+                cycleWindowView = buildCurrentCycleWindowView(resetToLatest);
+
+                performanceCycleChart.data.labels = cycleWindowView.labels;
+                performanceCycleChart.data.datasets[0].data = cycleWindowView.planData;
+                performanceCycleChart.data.datasets[1].data = cycleWindowView.actualData;
+                updateCycleWindowControls();
+                performanceCycleChart.update('none');
+            }
+
+            document.getElementById('CycleWindowPrevious').addEventListener('click', () => {
+                const bounds = getCycleTimeBounds(cycleTimeData);
+                if (!bounds.hasData) return;
+
+                const currentEnd = cycleWindowEndMinute ?? bounds.max;
+                cycleWindowEndMinute = Math.max(0, currentEnd - CYCLE_WINDOW_MINUTES);
+                cycleWindowPinnedToLatest = false;
+                updateCycleWindowChart();
+            });
+
+            document.getElementById('CycleWindowNext').addEventListener('click', () => {
+                const bounds = getCycleTimeBounds(cycleTimeData);
+                if (!bounds.hasData) return;
+
+                const currentEnd = cycleWindowEndMinute ?? bounds.max;
+                cycleWindowEndMinute = Math.min(bounds.max, currentEnd + CYCLE_WINDOW_MINUTES);
+                cycleWindowPinnedToLatest = cycleWindowEndMinute >= bounds.max;
+                updateCycleWindowChart();
+            });
+
+            updateCycleWindowControls();
 
             async function autoRefreshPageViaHTML() {
                 try {
@@ -731,26 +1234,34 @@
                         oldHourly.innerHTML = newHourly.innerHTML;
                     }
 
-                    // 3. Update Chart Data by extracting it from the fetched HTML text
-                    const labelsMatch = htmlText.match(/let labelData\s*=\s*(\[.*?\]);/);
-                    const effMatch = htmlText.match(/let efficiencyDataPoints\s*=\s*(\[.*?\]);/);
-                    
-                    if (labelsMatch && labelsMatch[1] && effMatch && effMatch[1]) {
-                        const parsedLabels = JSON.parse(labelsMatch[1]);
-                        const parsedEff = JSON.parse(effMatch[1]);
-                        
-                        window.myChart.data.labels = parsedLabels;
-                        window.myChart.data.datasets[0].data = parsedEff;
-                        window.myChart.update('none'); // Update without flickering animation
+                    const oldHourlyTotal = document.querySelector('.perf-hourly-total-row');
+                    const newHourlyTotal = doc.querySelector('.perf-hourly-total-row');
+                    if(oldHourlyTotal && newHourlyTotal) {
+                        oldHourlyTotal.innerHTML = newHourlyTotal.innerHTML;
+                        oldHourlyTotal.title = newHourlyTotal.title;
                     }
+
+                    // 3. Update Cycle Time Chart dari HTML terbaru.
+                    const cycleMatch = htmlText.match(/let cycleTimeData\s*=\s*(\[.*?\]);/);
+                    if (cycleMatch && cycleMatch[1]) {
+                        cycleTimeData = JSON.parse(cycleMatch[1]);
+                        updateCycleWindowChart();
+                    }
+
                 } catch (error) {
                     console.error("Auto-refresh via HTML failed:", error.message);
                 }
             }
 
             // Panggil otomatis jika user ubah filter
-            document.getElementById('MachineCode').addEventListener('change', autoRefreshPageViaHTML);
-            document.querySelector('input[name="SelectedDate"]').addEventListener('change', autoRefreshPageViaHTML);
+            async function refreshWithLatestCycleWindow() {
+                cycleWindowEndMinute = null;
+                cycleWindowPinnedToLatest = true;
+                await autoRefreshPageViaHTML();
+            }
+
+            document.getElementById('MachineCode').addEventListener('change', refreshWithLatestCycleWindow);
+            document.querySelector('input[name="SelectedDate"]').addEventListener('change', refreshWithLatestCycleWindow);
 
             // Jalankan proses load setiap 5 detik
             setInterval(autoRefreshPageViaHTML, 5000);

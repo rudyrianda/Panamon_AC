@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Data.SqlClient;
 using MonitoringSystem.Data;
 using MonitoringSystem.Models;
+using MonitoringSystem.Services;
 using static MonitoringSystem.Pages.Summary.SummaryModel;
 
 namespace MonitoringSystem.Pages.Performance
@@ -34,6 +35,7 @@ namespace MonitoringSystem.Pages.Performance
         private bool _breakTimesLoaded = false;
 
         private readonly MonitoringSystem.Services.BreakTimeService _breakTimeService;
+        private List<BreakTimeInfo> _cycleBreakTimes = new();
 
         public PerformanceModel(ApplicationDbContext context, IServiceProvider serviceProvider, MonitoringSystem.Services.BreakTimeService breakTimeService)
         {
@@ -61,6 +63,9 @@ namespace MonitoringSystem.Pages.Performance
         public int CachedWorkingTime { get; set; }
         public double CachedLossTime { get; set; }
         public int CachedDefect { get; set; }
+        public string CurrentModelName { get; private set; } = "-";
+        public int CurrentModelTotal { get; private set; }
+        public List<CycleTimeChartPoint> CycleTimeChartPoints { get; private set; } = new();
 
         public List<ProductionAchievement> listProdAchieve = new List<ProductionAchievement>();
         public List<AssemblyTime> assemblyTimes = new List<AssemblyTime>();
@@ -73,6 +78,8 @@ namespace MonitoringSystem.Pages.Performance
         {
             LoadBreakTimesFromDb(); // Aman: sudah di-comment isinya, return langsung
             GetHourlyAchievement();
+            GetCurrentModelTotal();
+            LoadCycleTimeMonitoring();
             GetAssemblyTime();
 
             CachedPlan = GetProductionPlan();
@@ -776,6 +783,242 @@ namespace MonitoringSystem.Pages.Performance
             }
         }
 
+        private void GetCurrentModelTotal()
+        {
+            CurrentModelName = "-";
+            CurrentModelTotal = 0;
+
+            var shiftStart = SelectedDate.Date.AddHours(7);
+            var shiftEnd = shiftStart.AddDays(1);
+
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    const string query = @"
+                    WITH ShiftData AS
+                    (
+                        SELECT Product_Id, SDate
+                        FROM OEESN
+                        WHERE MachineCode = @MachineCode
+                          AND SDate >= @ShiftStart
+                          AND SDate < @ShiftEnd
+                    ),
+                    LastScan AS
+                    (
+                        SELECT TOP (1) Product_Id
+                        FROM ShiftData
+                        ORDER BY SDate DESC
+                    )
+                    SELECT
+                        COALESCE(model.ProductName, lastScan.Product_Id) AS CurrentModel,
+                        COUNT(*) AS ModelTotal
+                    FROM LastScan lastScan
+                    INNER JOIN ShiftData shiftData
+                        ON shiftData.Product_Id = lastScan.Product_Id
+                    OUTER APPLY
+                    (
+                        SELECT TOP (1) masterData.ProductName
+                        FROM MasterData masterData
+                        WHERE masterData.Product_Id = lastScan.Product_Id
+                          AND masterData.MachineCode = @MachineCode
+                    ) model
+                    GROUP BY COALESCE(model.ProductName, lastScan.Product_Id);";
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.Add("@MachineCode", System.Data.SqlDbType.VarChar, 30).Value = MachineCode;
+                        command.Parameters.Add("@ShiftStart", System.Data.SqlDbType.DateTime2).Value = shiftStart;
+                        command.Parameters.Add("@ShiftEnd", System.Data.SqlDbType.DateTime2).Value = shiftEnd;
+
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                CurrentModelName = reader.IsDBNull(0) ? "-" : reader.GetString(0);
+                                CurrentModelTotal = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error in GetCurrentModelTotal: " + ex.Message);
+            }
+        }
+
+        private void LoadCycleTimeMonitoring()
+        {
+            CycleTimeChartPoints.Clear();
+            var scans = new List<CycleTimeScan>();
+            var shiftStart = SelectedDate.Date.AddHours(7);
+            var shiftEnd = shiftStart.AddDays(1);
+
+            try
+            {
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    connection.Open();
+                    const string query = @"
+                    ;WITH ScanData AS
+                    (
+                        SELECT
+                            OEESN.Product_Id,
+                            ISNULL(MasterData.ProductName, OEESN.Product_Id) AS ModelProduk,
+                            ISNULL(MasterData.SUT, 0) AS PlanCycleTime,
+                            OEESN.SDate AS WaktuScan,
+                            LAG(OEESN.SDate) OVER (
+                                PARTITION BY OEESN.MachineCode
+                                ORDER BY OEESN.SDate
+                            ) AS WaktuScanSebelumnya,
+                            LAG(OEESN.Product_Id) OVER (
+                                PARTITION BY OEESN.MachineCode
+                                ORDER BY OEESN.SDate
+                            ) AS ModelSebelumnya
+                        FROM OEESN
+                        LEFT JOIN MasterData
+                            ON OEESN.Product_Id = MasterData.Product_Id
+                           AND MasterData.MachineCode = @MachineCode
+                        WHERE OEESN.MachineCode = @MachineCode
+                          AND OEESN.SN_GOOD IS NOT NULL
+                          AND LTRIM(RTRIM(OEESN.SN_GOOD)) <> ''
+                          AND OEESN.SDate >= @ShiftStart
+                          AND OEESN.SDate < @ShiftEnd
+                    )
+                    SELECT
+                        Product_Id,
+                        ModelProduk,
+                        PlanCycleTime,
+                        WaktuScan,
+                        WaktuScanSebelumnya,
+                        CASE
+                            WHEN Product_Id = ModelSebelumnya
+                            THEN DATEDIFF(SECOND, WaktuScanSebelumnya, WaktuScan)
+                            ELSE NULL
+                        END AS CycleTime
+                    FROM ScanData
+                    ORDER BY WaktuScan;";
+
+                    using (SqlCommand command = new SqlCommand(query, connection))
+                    {
+                        command.Parameters.Add("@MachineCode", System.Data.SqlDbType.VarChar, 30).Value = MachineCode;
+                        command.Parameters.Add("@ShiftStart", System.Data.SqlDbType.DateTime2).Value = shiftStart;
+                        command.Parameters.Add("@ShiftEnd", System.Data.SqlDbType.DateTime2).Value = shiftEnd;
+
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                scans.Add(new CycleTimeScan
+                                {
+                                    ProductId = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
+                                    ModelProduk = reader.IsDBNull(1) ? "-" : reader.GetString(1),
+                                    PlanCycleTime = reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
+                                    WaktuScan = reader.GetDateTime(3),
+                                    WaktuScanSebelumnya = reader.IsDBNull(4) ? null : reader.GetDateTime(4),
+                                    CycleTime = reader.IsDBNull(5) ? null : reader.GetInt32(5)
+                                });
+                            }
+                        }
+                    }
+                }
+
+                LoadCycleBreakTimes();
+
+                CycleTimeChartPoints = scans
+                    .Select(scan => new
+                    {
+                        Scan = scan,
+                        ActualCycleTime = GetCycleTimeWithoutBreak(scan)
+                    })
+                    .Where(item => item.ActualCycleTime.HasValue && item.Scan.PlanCycleTime > 0)
+                    .Select(item => new CycleTimeChartPoint
+                    {
+                        Label = item.Scan.WaktuScan.ToString("HH:mm:ss"),
+                        ModelProduk = item.Scan.ModelProduk,
+                        PlanCycleTime = item.Scan.PlanCycleTime,
+                        ActualCycleTime = item.ActualCycleTime!.Value
+                    })
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error in LoadCycleTimeMonitoring: " + ex.Message);
+            }
+        }
+
+        private void LoadCycleBreakTimes()
+        {
+            var breakTimes = new List<BreakTimeInfo>();
+
+            try
+            {
+                breakTimes.AddRange(
+                    _breakTimeService.GetBreakTimesForDateAsync(SelectedDate).GetAwaiter().GetResult());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error loading cycle additional break time: " + ex.Message);
+            }
+
+            breakTimes.AddRange(GetRestTime(DetermineTypeOfDay(SelectedDate.DayOfWeek))
+                .Select(rest => new BreakTimeInfo
+                {
+                    StartTime = rest.StartTime,
+                    EndTime = rest.EndTime,
+                    Reason = "Rest Time"
+                }));
+
+            _cycleBreakTimes = breakTimes
+                .GroupBy(item => new { item.StartTime, item.EndTime })
+                .Select(group => group.First())
+                .OrderBy(item => item.StartTime)
+                .ToList();
+        }
+
+        private int? GetCycleTimeWithoutBreak(CycleTimeScan scan)
+        {
+            if (!scan.CycleTime.HasValue || !scan.WaktuScanSebelumnya.HasValue)
+                return null;
+
+            var intervalStart = scan.WaktuScanSebelumnya.Value;
+            var intervalEnd = scan.WaktuScan;
+            var breakOverlapSeconds = 0;
+
+            foreach (var breakTime in _cycleBreakTimes)
+            {
+                var breakStart = SelectedDate.Date.Add(breakTime.StartTime);
+                var breakEnd = SelectedDate.Date.Add(breakTime.EndTime);
+
+                if (breakTime.StartTime < TimeSpan.FromHours(7))
+                    breakStart = breakStart.AddDays(1);
+                if (breakTime.EndTime < TimeSpan.FromHours(7))
+                    breakEnd = breakEnd.AddDays(1);
+                if (breakEnd <= breakStart)
+                    breakEnd = breakEnd.AddDays(1);
+
+                // Bila produksi tetap berjalan sepenuhnya di dalam jadwal break,
+                // pertahankan jarak scan aktual.
+                if (intervalStart >= breakStart && intervalEnd <= breakEnd)
+                    continue;
+
+                if (intervalStart < breakEnd && intervalEnd > breakStart)
+                {
+                    var overlapStart = intervalStart > breakStart ? intervalStart : breakStart;
+                    var overlapEnd = intervalEnd < breakEnd ? intervalEnd : breakEnd;
+                    breakOverlapSeconds += (int)(overlapEnd - overlapStart).TotalSeconds;
+                }
+            }
+
+            var actualCycleTime = scan.CycleTime.Value - breakOverlapSeconds;
+            if (actualCycleTime <= 0)
+                return null;
+
+            return Math.Max(14, actualCycleTime);
+        }
+
         // ✅ CACHE: GetFirstTimeModel — cek cache dulu sebelum query DB
         public TimeSpan GetFirstTimeModel(TimeSpan StartTime, TimeSpan EndTime, string model)
         {
@@ -1351,52 +1594,87 @@ namespace MonitoringSystem.Pages.Performance
             if (_cachedActualPerHour != null) return _cachedActualPerHour;
 
             List<ActualData> actualData = new List<ActualData>();
-            actualData.Add(new ActualData { StartTime = "07:00", EndTime = "07:00", Actual = 0 });
 
             try
             {
-                var dbActuals = new Dictionary<string, int>();
+                var shiftStart = SelectedDate.Date.AddHours(7);
+                var shiftEnd = shiftStart.AddDays(1);
+                var defaultChartEnd = SelectedDate.Date.AddHours(16);
+                var nightChartStart = SelectedDate.Date.AddHours(23);
+                var dbActuals = new Dictionary<DateTime, int>();
+
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
                     connection.Open();
                     string query = @"
-                SELECT 
-                    CAST(DATEADD(HOUR, DATEDIFF(HOUR, 0, OEESN.SDate) + 1, 0) AS TIME) As EndTime,
-                    COUNT(*) AS Actual
-                FROM OEESN
-                WHERE CAST(SDate As DATE) = @Date AND OEESN.MachineCode = @MachineCode
-                GROUP BY DATEDIFF(HOUR, 0, SDate), DATEADD(HOUR, DATEDIFF(HOUR, 0, SDate) + 1, 0)";
+                    SELECT
+                        DATEADD(HOUR, DATEDIFF(HOUR, 0, OEESN.SDate), 0) AS HourStart,
+                        COUNT(*) AS Actual
+                    FROM OEESN
+                    WHERE OEESN.MachineCode = @MachineCode
+                      AND OEESN.SDate >= @ShiftStart
+                      AND OEESN.SDate < @ShiftEnd
+                    GROUP BY DATEADD(HOUR, DATEDIFF(HOUR, 0, OEESN.SDate), 0)
+                    ORDER BY HourStart;";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
-                        command.Parameters.AddWithValue("@Date", SelectedDate);
-                        command.Parameters.AddWithValue("@MachineCode", MachineCode);
+                        command.Parameters.Add("@MachineCode", System.Data.SqlDbType.VarChar, 30).Value = MachineCode;
+                        command.Parameters.Add("@ShiftStart", System.Data.SqlDbType.DateTime2).Value = shiftStart;
+                        command.Parameters.Add("@ShiftEnd", System.Data.SqlDbType.DateTime2).Value = shiftEnd;
+
                         using (SqlDataReader reader = command.ExecuteReader())
                         {
                             while (reader.Read())
                             {
-                                string timeKey = reader.GetTimeSpan(0).ToString(@"hh\:mm");
-                                dbActuals[timeKey] = reader.GetInt32(1);
+                                dbActuals[reader.GetDateTime(0)] = reader.GetInt32(1);
                             }
                         }
                     }
                 }
 
-                DateTime now = DateTime.Now;
-                int startHour = 7;
-                int endHour = SelectedDate.Date == now.Date ? now.Hour + 1 : 24;
+                var latestScanHour = dbActuals.Count > 0
+                    ? dbActuals.Keys.Max()
+                    : (DateTime?)null;
 
-                for (int h = startHour + 1; h <= endHour; h++)
+                DateTime chartStart;
+                DateTime chartEnd;
+
+                if (latestScanHour.HasValue && latestScanHour.Value >= nightChartStart)
                 {
-                    if (h > 23 && SelectedDate.Date != now.Date) break;
-                    int displayHour = h % 24;
-                    string label = $"{displayHour:D2}:00";
+                    // Setelah memasuki jam 23:00, tampilkan penuh window shift malam 23:00–07:00.
+                    chartStart = nightChartStart;
+                    chartEnd = shiftEnd;
+                }
+                else
+                {
+                    // Default 07:00–16:00. Scan setelah 16:00 menambah ujung skala satu jam.
+                    chartStart = shiftStart;
+                    chartEnd = defaultChartEnd;
 
+                    if (latestScanHour.HasValue && latestScanHour.Value >= defaultChartEnd)
+                    {
+                        chartEnd = latestScanHour.Value.AddHours(1);
+                        if (chartEnd > nightChartStart)
+                            chartEnd = nightChartStart;
+                    }
+                }
+
+                actualData.Add(new ActualData
+                {
+                    StartTime = chartStart.ToString("HH:mm"),
+                    EndTime = chartStart.ToString("HH:mm"),
+                    Actual = 0
+                });
+
+                for (var hourStart = chartStart; hourStart < chartEnd; hourStart = hourStart.AddHours(1))
+                {
+                    var hourEnd = hourStart.AddHours(1);
                     actualData.Add(new ActualData
                     {
-                        StartTime = $"{(h - 1) % 24:D2}:00",
-                        EndTime = label,
-                        Actual = dbActuals.ContainsKey(label) ? dbActuals[label] : 0
+                        StartTime = hourStart.ToString("HH:mm"),
+                        EndTime = hourEnd.ToString("HH:mm"),
+                        Actual = dbActuals.TryGetValue(hourStart, out var actual) ? actual : 0
                     });
                 }
             }
@@ -1405,8 +1683,29 @@ namespace MonitoringSystem.Pages.Performance
                 Console.WriteLine("Error in GetActualPerHour: " + ex.Message);
             }
 
+            if (actualData.Count == 0)
+                actualData.Add(new ActualData { StartTime = "07:00", EndTime = "07:00", Actual = 0 });
+
             _cachedActualPerHour = actualData;
             return actualData;
+        }
+
+        private sealed class CycleTimeScan
+        {
+            public string ProductId { get; init; } = string.Empty;
+            public string ModelProduk { get; init; } = string.Empty;
+            public int PlanCycleTime { get; init; }
+            public DateTime WaktuScan { get; init; }
+            public DateTime? WaktuScanSebelumnya { get; init; }
+            public int? CycleTime { get; init; }
+        }
+
+        public sealed class CycleTimeChartPoint
+        {
+            public string Label { get; init; } = string.Empty;
+            public string ModelProduk { get; init; } = string.Empty;
+            public int PlanCycleTime { get; init; }
+            public int ActualCycleTime { get; init; }
         }
 
         public class ProductionAchievement

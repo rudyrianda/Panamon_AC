@@ -1,0 +1,159 @@
+body.ac-oee-inventory-page:not(.light-theme) {
+    background: transparent !important;
+}
+
+body.ac-oee-inventory-page:not(.light-theme) .oee-shell {
+    border-color: rgba(255, 255, 255, .30);
+    background: transparent;
+}
+
+body.ac-oee-inventory-page:not(.light-theme) .inventory-main {
+    background: transparent;
+}
+
+body.ac-oee-inventory-page:not(.light-theme) .oee-header,
+body.ac-oee-inventory-page:not(.light-theme) .oee-footer {
+    background: transparent;
+}
+
+body.ac-oee-inventory-page:not(.light-theme) .oee-sidebar {
+    border-right: 2px solid rgba(255, 255, 255, .30);
+    background: rgba(255, 255, 255, .20);
+}
+
+body.ac-oee-inventory-page .oee-shell {
+    grid-template-rows: 72px minmax(0, calc(100vh - 123px)) 51px;
+    height: 100vh;
+    min-height: 720px;
+}
+
+body.ac-oee-inventory-page .oee-body {
+    min-height: 0;
+    overflow: hidden;
+}
+
+body.ac-oee-inventory-page .inventory-main {
+    min-height: 0;
+    overflow: hidden;
+    padding: 18px 30px 15px;
+}
+
+.inventory-page-title {
+    margin: 0 0 14px;
+    color: var(--oee-text);
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+body.ac-oee-inventory-page .filter-area-with-lines {
+    width: 100%;
+    min-height: 48px;
+    margin: 0 0 14px !important;
+    padding: 7px 0;
+}
+
+body.ac-oee-inventory-page .panamon-bottom-line,
+body.ac-oee-inventory-page .panamon-bottomm-line {
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 0 !important;
+}
+
+body.ac-oee-inventory-page .filter-content {
+    margin: 0;
+    padding: 3px 10px;
+}
+
+body.ac-oee-inventory-page .inv-card {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, .30) !important;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, .20) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .20);
+}
+
+body.ac-oee-inventory-page #inventory-report,
+body.ac-oee-inventory-page .inv-table-container {
+    height: 100%;
+}
+
+body.ac-oee-inventory-page .inv-table-container {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+}
+
+body.ac-oee-inventory-page .inv-header-wrap,
+body.ac-oee-inventory-page .inv-footer-wrap {
+    flex: 0 0 auto;
+}
+
+body.ac-oee-inventory-page .inv-body-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+}
+
+body.ac-oee-inventory-page.light-theme .inventory-page-title,
+body.ac-oee-inventory-page.light-theme .filter-content label {
+    color: #102b4a !important;
+}
+
+body.ac-oee-inventory-page.light-theme .filter-content .form-select,
+body.ac-oee-inventory-page.light-theme .filter-content .form-control[type="number"] {
+    color: #102b4a !important;
+    border-color: rgba(16, 43, 74, .35) !important;
+    background-color: rgba(255, 255, 255, .65) !important;
+}
+
+body.ac-oee-inventory-page.light-theme .filter-content .form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23102b4a' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+}
+
+body.ac-oee-inventory-page.light-theme .filter-content .form-select option {
+    color: #102b4a;
+    background: #fff;
+}
+
+body.ac-oee-inventory-page.light-theme .inv-card {
+    background: rgba(240, 248, 253, .82) !important;
+}
+
+body.ac-oee-inventory-page.light-theme .inv-header-wrap,
+body.ac-oee-inventory-page.light-theme .inv-footer-wrap {
+    background: #dbe9f5 !important;
+}
+
+body.ac-oee-inventory-page.light-theme .inv-tbl thead th,
+body.ac-oee-inventory-page.light-theme .inv-tbl tbody td,
+body.ac-oee-inventory-page.light-theme .inv-tbl tfoot td {
+    color: #102b4a !important;
+    border-color: rgba(16, 43, 74, .22) !important;
+}
+
+body.ac-oee-inventory-page.light-theme .inv-tbl thead th,
+body.ac-oee-inventory-page.light-theme .inv-tbl tfoot td {
+    background: rgba(205, 224, 239, .95) !important;
+}
+
+body.ac-oee-inventory-page.light-theme .inv-tbl tbody td {
+    background: rgba(244, 249, 253, .9) !important;
+}
+
+@media (max-width: 1450px) {
+    body.ac-oee-inventory-page .inventory-main {
+        padding-right: 22px;
+        padding-left: 24px;
+    }
+
+    body.ac-oee-inventory-page .filter-content form {
+        gap: .65rem !important;
+    }
+}
+.inventory-filter-group + .inventory-filter-group {
+    margin-left: 12px;
+}

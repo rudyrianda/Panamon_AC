@@ -191,7 +191,7 @@
 .chart-canvas {
     width: 100% !important;
     max-width: 100%;
-    height: 500px !important;
+    height: 550px !important;
     margin-bottom: 6px;
 }
 
@@ -739,6 +739,12 @@ main.pb-5 {
         let datasets = [];
         let colorIdx = 0;
         let bpDatasetIndices = [];
+        // Batang dibuat cukup lebar agar tetap proporsional saat browser di-zoom 80%.
+        const pairedBarSizing = {
+            categoryPercentage: 0.64,
+            barPercentage: 0.91,
+            maxBarThickness: 58
+        };
 
         const activeCategories = Object.keys(chartData.Actuals);
 
@@ -749,15 +755,21 @@ main.pb-5 {
             datasets.push({
                 type: 'bar', label: cat + ' (Plan)',
                 data: chartData.Plans[cat],
-                backgroundColor: color, borderColor: color,
-                barThickness: 40, stack: 'Plan', order: 2, yAxisID: 'y', hidden: false
+                backgroundColor: color,
+                borderColor: color,
+                borderWidth: 0,
+                ...pairedBarSizing,
+                stack: 'Plan', order: 2, yAxisID: 'y', hidden: false
             });
 
             datasets.push({
                 type: 'bar', label: cat + ' (Act)',
                 data: chartData.Actuals[cat],
-                backgroundColor: color, borderColor: color,
-                barThickness: 40, stack: 'Actual', order: 2, yAxisID: 'y'
+                backgroundColor: color,
+                borderColor: color,
+                borderWidth: 0,
+                ...pairedBarSizing,
+                stack: 'Actual', order: 2, yAxisID: 'y'
             });
 
             colorIdx++;
@@ -779,15 +791,61 @@ main.pb-5 {
         // ============================================================
         const c0 = getChartColors();
 
+        // Buat sumbu X dua tingkat: penanda BP/Act dekat batang dan bulan di bawahnya.
+        const barRoleLabelsPlugin = {
+            id: 'barRoleLabels',
+            afterDraw(chart) {
+                const xScale = chart.scales.x;
+                const firstBpIndex = bpDatasetIndices[0];
+                if (!xScale || firstBpIndex === undefined) return;
+
+                const bpMeta = chart.getDatasetMeta(firstBpIndex);
+                const actMeta = chart.getDatasetMeta(firstBpIndex + 1);
+                const showBp = chart.isDatasetVisible(firstBpIndex);
+                const roleLabelY = chart.chartArea.bottom + 12;
+                const monthLabelY = chart.chartArea.bottom + 34;
+                const colors = getChartColors();
+
+                chart.ctx.save();
+                chart.ctx.textAlign = 'center';
+                chart.ctx.textBaseline = 'middle';
+                chart.ctx.font = '600 13px "Segoe UI", Arial, sans-serif';
+
+                chart.data.labels.forEach((_, dataIndex) => {
+                    const bpX = bpMeta.data[dataIndex]?.x;
+                    const actX = actMeta.data[dataIndex]?.x;
+
+                    if (showBp && Number.isFinite(bpX)) {
+                        chart.ctx.fillStyle = colors.textColor;
+                        chart.ctx.fillText('BP', bpX, roleLabelY);
+                    }
+
+                    if (Number.isFinite(actX)) {
+                        chart.ctx.fillStyle = colors.textColor;
+                        chart.ctx.fillText('Act', actX, roleLabelY);
+                    }
+                });
+
+                chart.ctx.font = '600 14px "Segoe UI", Arial, sans-serif';
+                chart.data.labels.forEach((month, dataIndex) => {
+                    chart.ctx.fillStyle = colors.textColor;
+                    chart.ctx.fillText(month, xScale.getPixelForTick(dataIndex), monthLabelY);
+                });
+
+                chart.ctx.restore();
+            }
+        };
+
         const monthlyChart = new Chart(ctx, {
             type: 'bar',
             data: { labels: chartData.Labels, datasets: datasets },
+            plugins: [barRoleLabelsPlugin],
             options: {
                 devicePixelRatio: 3,
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: { duration: 500 },
-                layout: { padding: { bottom: 0, top: 10, left: 5, right: 5 } },
+                layout: { padding: { bottom: 0, top: 0, left: 5, right: 5 } },
                 plugins: {
                     tooltip: {
                         mode: 'index', intersect: false,
@@ -862,9 +920,10 @@ main.pb-5 {
                 scales: {
                     x: {
                         stacked: true,
-                        title: { display: true, text: 'Fiscal Month', color: c0.textColor },
-                        ticks: { color: c0.textColor },
-                        grid:  { color: c0.gridColor }
+                        title: { display: false },
+                        ticks: { display: false },
+                        grid:  { color: c0.gridColor },
+                        afterFit: (scale) => { scale.height = 48; }
                     },
                     y: {
                         type: 'linear', display: true, position: 'left', stacked: true,

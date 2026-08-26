@@ -1,0 +1,237 @@
+@page "/ACOEE/ProductionData"
+@model MonitoringSystem.Pages.ACOEE.ProductionDataModel
+@{
+    ViewData["Title"] = "AC OEE Production Data";
+    Layout = null;
+
+    var machines = new[]
+    {
+        "Evaporator", "Condenser",
+        "400 Ton New", "300 Ton New", "300 Ton Old", "200 Ton", "110 Ton Amada", "110 Ton Komatsu",
+        "Hairpin Bender 7row", "Hairpin Bender 14row", "Fix 80", "Fix 36", "Fix 12", "SF-250",
+        "Expander Kyoshin 7", "Expander Kyoshin 6.35", "Expander Li-chin"
+    };
+    var shiftTimes = new[]
+    {
+        new[]
+        {
+            "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "15:45"
+        },
+        new[]
+        {
+            "15:45", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "23:15"
+        },
+        new[]
+        {
+            "23:15", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00"
+        }
+    };
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AC OEE Production Data</title>
+    <link rel="stylesheet" href="~/lib/fontawesome/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/fonts.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/ac-oee-production.css" asp-append-version="true" />
+</head>
+<body class="production-data-page">
+    <div class="production-shell">
+        <header class="production-header">
+            <a class="production-brand" href="/" aria-label="Panasonic home">
+                <img src="~/assets/PanasonicIcon.png" alt="Panasonic" />
+            </a>
+
+            <div class="machine-tabs-shell">
+                <nav class="machine-tabs" id="productionMachineTabs" aria-label="AC machine selection">
+                    @foreach (var machine in machines)
+                    {
+                        var usesDatabaseModel = machine is "Evaporator" or "Condenser";
+                        var latestModel = usesDatabaseModel ? Model.LatestMachineModels[machine] : string.Empty;
+                        <button class="machine-tab @(machine == "400 Ton New" ? "active" : null)"
+                                type="button"
+                                data-machine="@machine"
+                                data-uses-database-model="@usesDatabaseModel.ToString().ToLowerInvariant()"
+                                data-model="@latestModel">@machine</button>
+                    }
+                </nav>
+                <div class="machine-tabs-controls" aria-label="Navigate machine list">
+                    <button class="machine-tabs-arrow machine-tabs-previous" type="button"
+                            aria-label="Show previous machines" aria-controls="productionMachineTabs">
+                        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                    </button>
+                    <button class="machine-tabs-arrow machine-tabs-next" type="button"
+                            aria-label="Show more machines" aria-controls="productionMachineTabs">
+                        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="production-clock">
+                <i class="fa-regular fa-calendar-days" id="productionCalendarIcon"></i>
+                <span class="clock-date" id="productionDate" role="button" tabindex="0" aria-label="Select production date">20 October,<br />Wednesday</span>
+                <input class="production-date-picker" id="productionDatePicker" type="date" aria-label="Select production date" />
+                <time id="productionTime">13 : 52 : 57</time>
+            </div>
+        </header>
+
+        <div class="production-body">
+            <aside class="production-sidebar" aria-label="AC OEE navigation">
+                <nav>
+                    <a class="production-side-link" href="/ACOEE">
+                        <i class="fa-solid fa-fan"></i><span>Dashboard</span>
+                    </a>
+                    <a class="production-side-link active" href="/ACOEE/ProductionData">
+                        <i class="fa-solid fa-chart-column"></i><span>Production<br />Data</span>
+                    </a>
+                    <a class="production-side-link" href="/LossTimeReport/index">
+                        <i class="fa-regular fa-clock"></i><span>Downtime<br />History</span>
+                    </a>
+                    <a class="production-side-link" href="/ACOEE/Inventory">
+                        <i class="fa-solid fa-cube"></i><span>Inventory<br />Data</span>
+                    </a>
+                </nav>
+                <div class="production-sidebar-divider"></div>
+                <a class="production-sidebar-collapse" href="/" aria-label="Return to Panamon">
+                    <i class="fa-solid fa-angles-left"></i>
+                </a>
+            </aside>
+
+            <main class="production-main">
+            <section class="production-overview">
+                <div class="machine-title-panel">
+                    <span></span>
+                    <h1 id="productionMachineTitle">400 TON NEW</h1>
+                    <i class="fa-solid fa-chart-column"></i>
+                </div>
+                <article class="glass-panel model-panel">
+                    <h2>MODEL NAME</h2>
+                    <strong id="productionModelName">BC-MetalPiece1/1</strong>
+                    <dl>
+                        <div><dt>PRODUCTION PLAN</dt><dd><span>:</span> <output id="productionPlanValue">0</output></dd></div>
+                        <div><dt>PLAN BY SUT</dt><dd><span>:</span> 1170</dd></div>
+                        <div><dt>ACTUAL</dt><dd><span>:</span> <output id="productionActualValue">2106</output></dd></div>
+                        <div><dt>DIFFERENCE</dt><dd id="productionDifference" class="negative"><span>:</span> <output id="productionDifferenceValue">-2106</output></dd></div>
+                        <div><dt>REMAINING</dt><dd class="negative"><span>:</span> -2106</dd></div>
+                        <div>
+                            <dt>TOTAL NG</dt>
+                            <dd class="under-development-value">
+                                <span>:</span>
+                                <small><i class="fa-solid fa-gear"></i><b>Under Development</b></small>
+                            </dd>
+                        </div>
+                    </dl>
+                </article>
+
+                <article class="glass-panel oee-panel">
+                    <svg class="production-gauge" viewBox="0 0 240 240" role="img" aria-label="OEE 128 percent">
+                        <g class="production-gauge-tracks">
+                            <circle cx="120" cy="120" r="93" pathLength="100" />
+                            <circle cx="120" cy="120" r="74" pathLength="100" />
+                            <circle cx="120" cy="120" r="59" pathLength="100" />
+                            <circle cx="120" cy="120" r="44" pathLength="100" />
+                        </g>
+                        <g class="production-gauge-values">
+                            <circle class="ring-oee" cx="120" cy="120" r="93" pathLength="100" />
+                            <circle class="ring-operating" cx="120" cy="120" r="74" pathLength="100" />
+                            <circle class="ring-ability" cx="120" cy="120" r="59" pathLength="100" />
+                            <circle class="ring-quality" cx="120" cy="120" r="44" pathLength="100" />
+                        </g>
+                        <text x="120" y="132">128%</text>
+                    </svg>
+                    <div class="gauge-legend">
+                        <span><i class="legend-dot oee"></i>OEE : 128%</span>
+                        <span><i class="legend-dot ability"></i>Ability : 180.1%</span>
+                        <span><i class="legend-dot operating"></i>Operating : 71.1%</span>
+                        <span><i class="legend-dot quality"></i>Quality : 100%</span>
+                    </div>
+                </article>
+
+                <article class="glass-panel chart-panel">
+                    <header>
+                        <h2>PLAN VS ACTUAL CHART</h2>
+                        <div class="chart-legend"><span><i class="legend-dot plan"></i>Plan</span><span><i class="legend-dot actual"></i>Actual</span></div>
+                    </header>
+                    <div class="chart-body">
+                        <span class="axis-title axis-y">Quantity</span>
+                        <svg class="plan-chart" viewBox="0 0 910 250" preserveAspectRatio="none" role="img" aria-label="Plan and actual production chart">
+                            <defs>
+                                <linearGradient id="planGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#287cf4" stop-opacity=".65" /><stop offset="1" stop-color="#287cf4" stop-opacity=".12" /></linearGradient>
+                                <linearGradient id="actualGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#11c2bd" stop-opacity=".45" /><stop offset="1" stop-color="#11c2bd" stop-opacity=".08" /></linearGradient>
+                            </defs>
+                            <g class="chart-grid">
+                                <path d="M56 14H894 M56 54H894 M56 94H894 M56 134H894 M56 174H894 M56 214H894" />
+                                <path d="M56 14V214 M194 14V214 M332 14V214 M470 14V214 M608 14V214 M746 14V214 M894 14V214" />
+                            </g>
+                            <g class="y-labels"><text x="46" y="19">2000</text><text x="46" y="59">1600</text><text x="46" y="99">1200</text><text x="46" y="139">800</text><text x="46" y="179">400</text><text x="46" y="219">0</text></g>
+                            <path class="plan-fill" d="M56 134 C108 117 155 96 194 84 S282 55 332 50 S423 42 470 41 S561 40 608 41 S699 42 746 41 S841 32 894 25 L894 214 L56 214 Z" />
+                            <path class="actual-fill" d="M56 186 C110 180 151 174 194 170 S286 155 332 152 S423 145 470 144 S562 143 608 143 S699 144 746 143 S841 140 894 137 L894 214 L56 214 Z" />
+                            <path class="plan-line" d="M56 134 C108 117 155 96 194 84 S282 55 332 50 S423 42 470 41 S561 40 608 41 S699 42 746 41 S841 32 894 25" />
+                            <path class="actual-line" d="M56 186 C110 180 151 174 194 170 S286 155 332 152 S423 145 470 144 S562 143 608 143 S699 144 746 143 S841 140 894 137" />
+                            <g class="plan-points"><circle cx="56" cy="134" r="4"/><circle cx="194" cy="84" r="4"/><circle cx="332" cy="50" r="4"/><circle cx="470" cy="41" r="4"/><circle cx="608" cy="41" r="4"/><circle cx="746" cy="41" r="4"/><circle cx="894" cy="25" r="4"/></g>
+                            <g class="actual-points"><circle cx="56" cy="186" r="4"/><circle cx="194" cy="170" r="4"/><circle cx="332" cy="152" r="4"/><circle cx="470" cy="144" r="4"/><circle cx="608" cy="143" r="4"/><circle cx="746" cy="143" r="4"/><circle cx="894" cy="137" r="4"/></g>
+                            <g class="x-labels"><text x="56" y="234">07:00</text><text x="194" y="234">08:30</text><text x="332" y="234">10:00</text><text x="470" y="234">11:30</text><text x="608" y="234">13:00</text><text x="746" y="234">14:30</text><text x="894" y="234">16:00</text></g>
+                        </svg>
+                        <span class="axis-title axis-x">Hour</span>
+                    </div>
+                </article>
+            </section>
+
+            <section class="detail-grid">
+                <article class="glass-panel shift-summary">
+                    <div class="shift-block shift-one">
+                        <strong><i></i>SHIFT #1</strong>
+                        <dl><div><dt>WORKING TIME</dt><dd>: <b>343</b></dd></div><div><dt>STOP TIME</dt><dd>: <b>139</b></dd></div><div><dt>LOAD TIME</dt><dd>: <b>204</b></dd></div></dl>
+                    </div>
+                    <div class="shift-block shift-two">
+                        <strong><i></i>SHIFT #2</strong>
+                        <dl><div><dt>WORKING TIME</dt><dd>: 0</dd></div><div><dt>STOP TIME</dt><dd>: 0</dd></div><div><dt>LOAD TIME</dt><dd>: 0</dd></div></dl>
+                    </div>
+                    <div class="shift-block shift-three">
+                        <strong><i></i>SHIFT #3</strong>
+                        <dl><div><dt>WORKING TIME</dt><dd>: 0</dd></div><div><dt>STOP TIME</dt><dd>: 0</dd></div><div><dt>LOAD TIME</dt><dd>: 0</dd></div></dl>
+                    </div>
+                </article>
+
+                <article class="glass-panel timeline-panel">
+                    <div class="timeline-legend" aria-label="Timeline status legend">
+                        <span><i class="run"></i>Run</span>
+                        <span><i class="stop"></i>Stop</span>
+                        <span><i class="break"></i>Break</span>
+                    </div>
+                    @for (var shift = 1; shift <= 3; shift++)
+                    {
+                        <div class="timeline-row shift-@shift">
+                            <h3>SHIFT @shift</h3>
+                            <div class="timeline-wrap">
+                                <div class="timeline-track">
+                                    @if (shift == 1)
+                                    {
+                                        <i class="segment stop-segment" style="--left:0%;--width:27%"></i><i class="segment run-segment" style="--left:27%;--width:41%"></i><i class="segment stop-segment" style="--left:68%;--width:10%"></i><i class="segment run-segment" style="--left:78%;--width:8%"></i><i class="segment idle-segment" style="--left:86%;--width:5%"></i><i class="segment stop-segment" style="--left:91%;--width:9%"></i>
+                                    }
+                                    else if (shift == 3)
+                                    {
+                                        <i class="segment run-segment" style="--left:0%;--width:16%"></i><i class="segment stop-segment" style="--left:16%;--width:11%"></i><i class="segment run-segment" style="--left:27%;--width:11%"></i><i class="segment idle-segment" style="--left:38%;--width:11%"></i><i class="segment stop-segment" style="--left:49%;--width:25%"></i><i class="segment run-segment" style="--left:74%;--width:8%"></i><i class="segment idle-segment" style="--left:82%;--width:5%"></i><i class="segment stop-segment" style="--left:87%;--width:6%"></i><i class="segment run-segment" style="--left:93%;--width:7%"></i>
+                                    }
+                                </div>
+                                <div class="time-labels">
+                                    @foreach (var time in shiftTimes[shift - 1])
+                                    {
+                                        <span>@time</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </article>
+            </section>
+            </main>
+        </div>
+
+        <footer class="production-footer">&copy;2026 - Panasonic Manufacturing Indonesia (PMI) - Air Conditioner</footer>
+    </div>
+    <script src="~/js/ac-oee-production.js" asp-append-version="true"></script>
+</body>
+</html>

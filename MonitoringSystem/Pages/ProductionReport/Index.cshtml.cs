@@ -166,14 +166,18 @@ namespace MonitoringSystem.Pages.ProductionReport
             return NotFound($"Template file not found.");
         }
 
-        public void LoadChartData()
+        // Trend Loss Time only needs DailyWorkTime. Avoid loading loss time and plan
+        // datasets when that is the sole required output.
+        public void LoadChartData(bool loadSupportingData = true)
         {
             this.connectionString = _configuration.GetConnectionString("DefaultConnection");
-            var dailyLosses = GetDailyLossTimeTotals();
+            var dailyLosses = loadSupportingData
+                ? GetDailyLossTimeTotals()
+                : new Dictionary<int, int>();
             bool isCurrentMonthView = (SelectedYear == DateTime.Now.Year && SelectedMonth == DateTime.Now.Month);
             this.IsCurrentMonthView = isCurrentMonthView;
 
-            string dateFilter = isCurrentMonthView ? "AND CAST(SDate AS DATE) <= @TodayDate" : "";
+            string dateFilter = isCurrentMonthView ? "AND SDate < DATEADD(DAY, 1, @TodayDate)" : "";
             this.DaysInMonth = DateTime.DaysInMonth(SelectedYear, SelectedMonth);
             var combinedData = Enumerable.Range(1, this.DaysInMonth).Select(day => new DailyData { Day = day }).ToList();
 
@@ -258,8 +262,8 @@ namespace MonitoringSystem.Pages.ProductionReport
            {selectOvertimeColumn} as TotalPlanOvertime
     FROM ProductionPlan pp
     INNER JOIN ProductionRecords pr ON pp.Id = pr.PlanId
-    WHERE YEAR(pp.CurrentDate) = @SelectedYear 
-      AND MONTH(pp.CurrentDate) = @SelectedMonth
+    WHERE pp.CurrentDate >= DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)
+      AND pp.CurrentDate < DATEADD(MONTH, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1))
       {(MachineLine != "All"
                     ? "AND pr.MachineCode = @MachineLine"
                     : "AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')")}
@@ -271,8 +275,8 @@ namespace MonitoringSystem.Pages.ProductionReport
     SELECT DISTINCT DAY(pp.CurrentDate) as Day
     FROM ProductionPlan pp
     INNER JOIN ProductionRecords pr ON pp.Id = pr.PlanId
-    WHERE YEAR(pp.CurrentDate) = @SelectedYear 
-      AND MONTH(pp.CurrentDate) = @SelectedMonth
+    WHERE pp.CurrentDate >= DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)
+      AND pp.CurrentDate < DATEADD(MONTH, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1))
       AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')
       {planShiftFilter}";
 
@@ -314,11 +318,12 @@ WITH ShiftData AS (
         END AS Status_Di_Web,
         MachineCode
     FROM oeesn
-    WHERE (
-        (YEAR(SDate) = @SelectedYear AND MONTH(SDate) = @SelectedMonth AND CAST(SDate AS TIME) >= '07:00:00')
-        OR
-        (SDate >= DATEADD(DAY, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)) AND SDate < DATEADD(MONTH, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)) AND CAST(SDate AS TIME) < '07:00:00')
-    )
+    WHERE SDate >= DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)
+      AND SDate < DATEADD(MONTH, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1))
+      AND (
+          CAST(SDate AS TIME) >= '07:00:00'
+          OR (SDate >= DATEADD(DAY, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)) AND CAST(SDate AS TIME) < '07:00:00')
+      )
     {dateFilter}
     {(MachineLine != "All" ? "AND MachineCode = @MachineLine" : "AND MachineCode IN ('MCH1-01', 'MCH1-02')")}
 ),
@@ -435,8 +440,8 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                                    SUM(ISNULL(sp.SapPlanOvertime, 0)) as TotalSapOvertime
                             FROM ProductionPlan pp
                             INNER JOIN SapPlan sp ON pp.Id = sp.PlanId
-                            WHERE YEAR(pp.CurrentDate) = @SelectedYear
-                              AND MONTH(pp.CurrentDate) = @SelectedMonth
+                            WHERE pp.CurrentDate >= DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)
+                              AND pp.CurrentDate < DATEADD(MONTH, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1))
                               {(MachineLine != "All"
                            ? "AND sp.MachineCode = @MachineLine"
                            : "AND sp.MachineCode IN ('MCH1-01', 'MCH1-02')")}
@@ -487,27 +492,30 @@ LEFT JOIN (
     WHERE 1=1 {planShiftFilter}
     GROUP BY PlanId, MachineCode
 ) pr ON machines.PlanId = pr.PlanId AND machines.MachineCode = pr.MachineCode
-WHERE YEAR(pp.CurrentDate) = @SelectedYear 
-  AND MONTH(pp.CurrentDate) = @SelectedMonth
+WHERE pp.CurrentDate >= DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)
+  AND pp.CurrentDate < DATEADD(MONTH, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1))
   {(MachineLine != "All" ? "AND machines.MachineCode = @MachineLine" : "AND machines.MachineCode IN ('MCH1-01', 'MCH1-02')")}
 GROUP BY DAY(pp.CurrentDate)";
                     }
 
-                    using (var planCmd = new SqlCommand(planSql, conn))
+                    if (loadSupportingData)
                     {
-                        planCmd.Parameters.AddWithValue("@SelectedYear", SelectedYear);
-                        planCmd.Parameters.AddWithValue("@SelectedMonth", SelectedMonth);
-                        if (MachineLine != "All") planCmd.Parameters.AddWithValue("@MachineLine", MachineLine);
-
-                        using (var reader = planCmd.ExecuteReader())
+                        using (var planCmd = new SqlCommand(planSql, conn))
                         {
-                            while (reader.Read())
+                            planCmd.Parameters.AddWithValue("@SelectedYear", SelectedYear);
+                            planCmd.Parameters.AddWithValue("@SelectedMonth", SelectedMonth);
+                            if (MachineLine != "All") planCmd.Parameters.AddWithValue("@MachineLine", MachineLine);
+
+                            using (var reader = planCmd.ExecuteReader())
                             {
-                                var d = combinedData.FirstOrDefault(x => x.Day == (int)reader["Day"]);
-                                if (d != null)
+                                while (reader.Read())
                                 {
-                                    d.Plan = reader["TotalPlanQuantity"] != DBNull.Value ? Convert.ToInt32(reader["TotalPlanQuantity"]) : (int?)null;
-                                    d.PlanOvertime = reader["TotalPlanOvertime"] != DBNull.Value ? Convert.ToInt32(reader["TotalPlanOvertime"]) : (int?)null;
+                                    var d = combinedData.FirstOrDefault(x => x.Day == (int)reader["Day"]);
+                                    if (d != null)
+                                    {
+                                        d.Plan = reader["TotalPlanQuantity"] != DBNull.Value ? Convert.ToInt32(reader["TotalPlanQuantity"]) : (int?)null;
+                                        d.PlanOvertime = reader["TotalPlanOvertime"] != DBNull.Value ? Convert.ToInt32(reader["TotalPlanOvertime"]) : (int?)null;
+                                    }
                                 }
                             }
                         }
@@ -557,21 +565,24 @@ GROUP BY DAY(pp.CurrentDate)";
                         }
                     }
 
-                    using (var sapCmd = new SqlCommand(sapPlanSql, conn))
+                    if (loadSupportingData)
                     {
-                        sapCmd.Parameters.AddWithValue("@SelectedYear", SelectedYear);
-                        sapCmd.Parameters.AddWithValue("@SelectedMonth", SelectedMonth);
-                        if (MachineLine != "All") sapCmd.Parameters.AddWithValue("@MachineLine", MachineLine);
-
-                        using (var reader = sapCmd.ExecuteReader())
+                        using (var sapCmd = new SqlCommand(sapPlanSql, conn))
                         {
-                            while (reader.Read())
+                            sapCmd.Parameters.AddWithValue("@SelectedYear", SelectedYear);
+                            sapCmd.Parameters.AddWithValue("@SelectedMonth", SelectedMonth);
+                            if (MachineLine != "All") sapCmd.Parameters.AddWithValue("@MachineLine", MachineLine);
+
+                            using (var reader = sapCmd.ExecuteReader())
                             {
-                                var d = combinedData.FirstOrDefault(x => x.Day == (int)reader["Day"]);
-                                if (d != null)
+                                while (reader.Read())
                                 {
-                                    d.OriginalPlan = Convert.ToInt32(reader["TotalSapNormal"]);
-                                    d.OtOriginalPlan = Convert.ToInt32(reader["TotalSapOvertime"]);
+                                    var d = combinedData.FirstOrDefault(x => x.Day == (int)reader["Day"]);
+                                    if (d != null)
+                                    {
+                                        d.OriginalPlan = Convert.ToInt32(reader["TotalSapNormal"]);
+                                        d.OtOriginalPlan = Convert.ToInt32(reader["TotalSapOvertime"]);
+                                    }
                                 }
                             }
                         }
@@ -830,12 +841,13 @@ GROUP BY DAY(pp.CurrentDate)";
         private Dictionary<int, int> GetDailyLossTimeTotals()
         {
             var dailyTotals = new Dictionary<int, int>();
+            var breakTimesByDate = new Dictionary<DateTime, List<(TimeSpan Start, TimeSpan End)>>();
 
             bool hasActuals = false;
             try
             {
                 string checkSql = $@"
-            SELECT COUNT(1) FROM LossTimeActuals 
+            SELECT TOP (1) 1 FROM LossTimeActuals
             WHERE Month = @Month AND Year = @Year
             {(MachineLine != "All" ? "AND MachineLine = @MachineLine" : "AND MachineLine IN ('MCH1-01', 'MCH1-02')")}";
 
@@ -847,7 +859,7 @@ GROUP BY DAY(pp.CurrentDate)";
                         cmd.Parameters.AddWithValue("@Month", SelectedMonth);
                         cmd.Parameters.AddWithValue("@Year", SelectedYear);
                         if (MachineLine != "All") cmd.Parameters.AddWithValue("@MachineLine", MachineLine);
-                        hasActuals = (int)cmd.ExecuteScalar() > 0;
+                        hasActuals = cmd.ExecuteScalar() != null;
                     }
                 }
             }
@@ -944,8 +956,8 @@ GROUP BY DAY(pp.CurrentDate)";
             CAST(EndDateTime AS TIME) as EndTime, 
             LossTime as Duration
         FROM AssemblyLossTime
-        WHERE YEAR(Date) = @Year 
-          AND MONTH(Date) = @Month 
+        WHERE Date >= DATEFROMPARTS(@Year, @Month, 1)
+          AND Date < DATEADD(MONTH, 1, DATEFROMPARTS(@Year, @Month, 1))
           {lossTimeMachineFilter}
           {shiftFilterSql}";
 
@@ -974,12 +986,17 @@ GROUP BY DAY(pp.CurrentDate)";
                                 var endTime = (TimeSpan)reader["EndTime"];
                                 var duration = Convert.ToInt32(reader["Duration"]);
 
-                                var dayType = DetermineTypeOfDay(fullDate.DayOfWeek);
-                                
-                                // Copy-paste Break Times dari Detail Loss Time
-                                var breakTimes = _breakTimeService.GetBreakTimesForDateAsync(fullDate).Result
-                                    .Select(b => (b.StartTime, b.EndTime))
-                                    .ToList();
+                                // Break time hanya berubah per tanggal. Cache lokal ini menjaga
+                                // perhitungan tetap sama sambil menghindari query berulang untuk
+                                // setiap record loss pada tanggal yang sama.
+                                var breakDate = fullDate.Date;
+                                if (!breakTimesByDate.TryGetValue(breakDate, out var breakTimes))
+                                {
+                                    breakTimes = _breakTimeService.GetBreakTimesForDateAsync(breakDate).Result
+                                        .Select(b => (b.StartTime, b.EndTime))
+                                        .ToList();
+                                    breakTimesByDate[breakDate] = breakTimes;
+                                }
 
                                 int actualDurationSec = duration;
                                 foreach (var (breakStart, breakEnd) in breakTimes)

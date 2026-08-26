@@ -163,6 +163,7 @@ namespace MonitoringSystem.Pages.LossTime
             { "Gas Charge",                 "#BA55D3" },
             { "Running Trip",               "#DDA0DD" },
             { "Vaccum",                     "#4BC0C0" },
+            { "Dummy NG",                   "#7C3AED" },
             { "Conveyor",                   "#20C997" },
             { "Lifter Prouduct",            "#198754" },
             { "Laser",                      "#C9CBCF" },
@@ -532,9 +533,11 @@ namespace MonitoringSystem.Pages.LossTime
                             if (actualDuration <= 0) continue;
 
                             string reason = reader.IsDBNull(reader.GetOrdinal("Reason")) ? string.Empty : reader.GetString(reader.GetOrdinal("Reason"));
+                            int recordId = reader.IsDBNull(reader.GetOrdinal("Id")) ? 0 : reader.GetInt32(reader.GetOrdinal("Id"));
                             records.Add(new LossTimeRecord
                             {
-                                Nomor = reader.IsDBNull(reader.GetOrdinal("Id")) ? 0 : reader.GetInt32(reader.GetOrdinal("Id")),
+                                Nomor = recordId,
+                                RecordId = recordId,
                                 Date = reader.IsDBNull(reader.GetOrdinal("Date")) ? DateTime.MinValue : reader.GetDateTime(reader.GetOrdinal("Date")),
                                 LossTime = reason,
                                 Start = startTime,
@@ -660,7 +663,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                     "Scanner Nameplate CS", "Scanner Label CS", "Scanner Final CS",
                     "Bending Condensor Reguler", "Straping Band", "Bending Condensor Bigcap",
                     "Driver", "Gas Charge", "Running Trip", "Vaccum",
-                    "Conveyor", "Lifter Prouduct", "Laser"
+                    "Dummy NG", "Conveyor", "Lifter Prouduct", "Laser"
                 };
 
                 // Group records MTT per hari per sub-category
@@ -756,6 +759,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
             if (dr.Contains("vaccum") || dr.Contains("vacuum")) return "Vaccum";
             if (dr.Contains("scanner")) return "Scanner FM CU"; // default scanner
             if (dr.Contains("laser")) return "Laser";
+            if (dr.Contains("dummy") || dr.Contains("dumy")) return "Dummy NG";
             if (dr.Contains("conveyor")) return "Conveyor";
             if (dr.Contains("driver")) return "Driver";
             if (dr.Contains("gas")) return "Gas Charge";
@@ -806,9 +810,11 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                             if (actualDuration <= 0) continue;
 
                             string reason = reader.IsDBNull(reader.GetOrdinal("Reason")) ? string.Empty : reader.GetString(reader.GetOrdinal("Reason"));
+                            int recordId = reader.IsDBNull(reader.GetOrdinal("Id")) ? 0 : reader.GetInt32(reader.GetOrdinal("Id"));
                             LossTimeData.Add(new LossTimeRecord
                             {
-                                Nomor = reader.IsDBNull(reader.GetOrdinal("Id")) ? 0 : reader.GetInt32(reader.GetOrdinal("Id")),
+                                Nomor = recordId,
+                                RecordId = recordId,
                                 Date = reader.IsDBNull(reader.GetOrdinal("Date")) ? DateTime.MinValue : reader.GetDateTime(reader.GetOrdinal("Date")),
                                 LossTime = reason,
                                 Start = startTime,

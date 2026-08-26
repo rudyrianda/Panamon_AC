@@ -364,33 +364,14 @@ public class IndexModel : PageModel
         }
         catch (Exception ex) { _logger.LogWarning(ex, "Data WP gagal"); }
 
-        // ── DUMMY FALLBACK — sementara sampai data asli LS/Ref/Fan/WP siap ──
-        ApplyDummyIfEmpty(viewModel.DataLS.Line1, 500, 420, 500, "Laundry 2T");
-        ApplyDummyIfEmpty(viewModel.DataLS.Line2, 480, 410, 480, "Laundry SKD");
-        ApplyDummyIfEmpty(viewModel.DataRef, 600, 550, 600, "Refrigerator");
-
         if (!viewModel.DataFan.ContainsKey("total")) viewModel.DataFan["total"] = new LineData();
-        ApplyDummyIfEmpty(viewModel.DataFan["total"], 700, 640, 700, "Fan");
 
         if (!viewModel.DataWP.ContainsKey("total")) viewModel.DataWP["total"] = new LineData();
-        ApplyDummyIfEmpty(viewModel.DataWP["total"], 550, 500, 550, "Water Pump");
 
         return new JsonResult(viewModel);
     }
 
-    //cek dummy
-    private void ApplyDummyIfEmpty(LineData line, int dummyPlan, int dummyActual, int dummyDailyPlan, string tag)
-    {
-        if (line == null) return;
-        if (line.TotalPlan == 0 && line.TotalActual == 0 && line.DailyPlan == 0)
-        {
-            line.TotalPlan = dummyPlan;
-            line.TotalActual = dummyActual;
-            line.DailyPlan = dummyDailyPlan;
-            line.IsDummy = true;
-            _logger.LogInformation("Data {Tag} masih kosong, menggunakan dummy data sementara", tag);
-        }
-    }
+
 
     // ════════════════════════════════════════════════════════════
     // MACHINE NAMES

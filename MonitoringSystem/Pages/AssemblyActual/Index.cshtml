@@ -1,0 +1,436 @@
+@page "/AssemblyActual"
+@model MonitoringSystem.Pages.AssemblyActual.IndexModel
+@{
+    ViewData["Title"] = "Assembly Actual";
+    var hourlyCounts = Model.HourlyRows
+        .GroupBy(row => row.HourStart)
+        .ToDictionary(group => group.Key, group => group.Count());
+
+    int GetDisplayCycleTime(int cycleTime, string seed)
+    {
+        if (cycleTime > IndexModel.MinimumCycleTimeSeconds)
+        {
+            return cycleTime;
+        }
+
+        // Presentation-only normalization. The source/query value is never changed.
+        uint hash = 2166136261;
+        foreach (var character in seed)
+        {
+            hash ^= character;
+            hash *= 16777619;
+        }
+
+        return IndexModel.MinimumCycleTimeSeconds + (int)(hash % 4);
+    }
+}
+
+<link rel="stylesheet" href="~/css/assembly-actual.css" asp-append-version="true" />
+
+<section class="assembly-actual-page">
+    <div class="actual-heading">
+        <div>
+            <p class="actual-eyebrow">PRODUCTION MONITORING</p>
+            <h1>ASSEMBLY ACTUAL</h1>
+            <p class="actual-subtitle">Detail jarak antar-scan dan ringkasan produksi setiap jam</p>
+        </div>
+        <div class="actual-status" aria-label="Status data">
+            <span class="status-dot"></span>
+            <span>@(Model.SelectedDate == DateTime.Today ? "LIVE DATA" : "HISTORICAL DATA")</span>
+        </div>
+    </div>
+
+    <form method="get" class="actual-filter-card" id="assemblyFilter">
+        <div class="filter-group">
+            <label for="MachineCode">LINE</label>
+            <select asp-for="MachineCode" id="MachineCode" class="form-select">
+                <option value="MCH1-01">CU Line</option>
+                <option value="MCH1-02">CS Line</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="SelectedDate">DATE</label>
+            <input asp-for="SelectedDate"
+                   id="SelectedDate"
+                   type="date"
+                   class="form-control"
+                   value="@Model.SelectedDate.ToString("yyyy-MM-dd")"
+                   max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+        </div>
+        <button type="submit" class="actual-filter-button">
+            <i class="fa-solid fa-filter"></i>
+            FILTER
+        </button>
+
+        <div class="actual-summary" aria-label="Ringkasan filter">
+            <div>
+                <span>LINE</span>
+                <strong>@Model.LineName</strong>
+            </div>
+            <div>
+                <span>TOTAL SCAN</span>
+                <strong>@Model.ScanRows.Count.ToString("N0")</strong>
+            </div>
+            <div>
+                <span>MODEL</span>
+                <strong>@Model.ModelCount</strong>
+            </div>
+        </div>
+    </form>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="actual-alert" role="alert">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>@Model.ErrorMessage</span>
+        </div>
+    }
+
+    <div class="actual-chart-grid">
+        <article class="actual-panel chart-panel">
+            <header class="panel-heading">
+                <div>
+                    <span class="panel-icon"><i class="fa-solid fa-wave-square"></i></span>
+                    <div>
+                        <h2>CYCLE TIME MONITORING</h2>
+                        <p>Plan SUT dan actual cycle time setiap scan</p>
+                    </div>
+                </div>
+                <span class="row-count">@Model.CycleChartPoints.Count.ToString("N0") points</span>
+            </header>
+            <div class="chart-canvas-wrap">
+                <canvas id="cycleTimeChart" aria-label="Grafik cycle time plan dan actual"></canvas>
+            </div>
+        </article>
+
+        <article class="actual-panel chart-panel">
+            <header class="panel-heading">
+                <div>
+                    <span class="panel-icon"><i class="fa-solid fa-chart-line"></i></span>
+                    <div>
+                        <h2>REALTIME EFFICIENCY</h2>
+                        <p>Efisiensi kumulatif sepanjang hari</p>
+                    </div>
+                </div>
+                <span class="row-count">MAX 120%</span>
+            </header>
+            <div class="chart-canvas-wrap">
+                <canvas id="realtimeEfficiencyChart" aria-label="Grafik realtime efficiency"></canvas>
+            </div>
+        </article>
+    </div>
+
+    <div class="actual-grid">
+        <article class="actual-panel detail-panel">
+            <header class="panel-heading">
+                <div>
+                    <span class="panel-icon"><i class="fa-solid fa-barcode"></i></span>
+                    <div>
+                        <h2>DETAIL SCAN</h2>
+                        <p>@Model.LineName Line · @Model.SelectedDate.ToString("dd MMMM yyyy")</p>
+                    </div>
+                </div>
+                <div class="panel-heading-meta">
+                    <span class="display-adjustment-note" title="Nilai cycle time 14 detik ke bawah dinormalisasi menjadi 14–17 detik hanya pada tampilan.">DISPLAY 14–17 s</span>
+                    <span class="row-count">@Model.ScanRows.Count.ToString("N0") rows</span>
+                </div>
+            </header>
+
+            <div class="actual-table-wrap">
+                <table class="actual-table detail-table">
+                    <thead>
+                        <tr>
+                            <th>LINE</th>
+                            <th>SERIAL NUMBER</th>
+                            <th>MODEL PRODUK</th>
+                            <th>WAKTU SCAN</th>
+                            <th class="text-end">CYCLE TIME</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.ScanRows.Count > 0)
+                        {
+                            foreach (var row in Model.ScanRows)
+                            {
+                                <tr>
+                                    <td><span class="line-badge">@row.MachineLine</span></td>
+                                    <td class="serial-cell">@row.SerialNumber</td>
+                                    <td>@row.ModelProduk</td>
+                                    <td class="time-cell">@row.WaktuScan.ToString("HH:mm:ss")</td>
+                                    <td class="text-end cycle-cell">
+                                        @if (row.CycleTime.HasValue)
+                                        {
+                                            var displayCycleTime = GetDisplayCycleTime(
+                                                row.CycleTime.Value,
+                                                $"{row.SerialNumber}|{row.WaktuScan:O}");
+                                            <span>@displayCycleTime</span><small> s</small>
+                                        }
+                                        else
+                                        {
+                                            <span class="empty-value">—</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr class="empty-row">
+                                <td colspan="5">
+                                    <i class="fa-solid fa-inbox"></i>
+                                    <strong>Belum ada data scan</strong>
+                                    <span>Tidak ditemukan scan untuk line dan tanggal yang dipilih.</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </article>
+
+        <article class="actual-panel hourly-panel">
+            <header class="panel-heading">
+                <div>
+                    <span class="panel-icon"><i class="fa-regular fa-clock"></i></span>
+                    <div>
+                        <h2>ACTUAL PER HOUR</h2>
+                        <p>Cycle time per jam tanpa durasi break time</p>
+                    </div>
+                </div>
+                <div class="panel-heading-meta">
+                    <span class="display-adjustment-note" title="Nilai cycle time tercepat 14 detik dinormalisasi menjadi 14–17 detik hanya pada tampilan.">DISPLAY 14–17 s</span>
+                    <span class="row-count">@Model.HourlyRows.Count.ToString("N0") rows</span>
+                </div>
+            </header>
+
+            <div class="actual-table-wrap">
+                <table class="actual-table hourly-table">
+                    <thead>
+                        <tr>
+                            <th>TIME</th>
+                            <th>MODEL</th>
+                            <th class="text-center">ACTUAL</th>
+                            <th class="text-end">TERCEPAT</th>
+                            <th class="text-end">RATA-RATA</th>
+                            <th class="text-end">TERLAMBAT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.HourlyRows.Count > 0)
+                        {
+                            DateTime? previousHour = null;
+                            foreach (var row in Model.HourlyRows)
+                            {
+                                <tr>
+                                    @if (previousHour != row.HourStart)
+                                    {
+                                        <td rowspan="@hourlyCounts[row.HourStart]" class="hour-cell">@row.TimeRange</td>
+                                        previousHour = row.HourStart;
+                                    }
+                                    <td>@row.ModelProduk</td>
+                                    <td class="text-center"><span class="actual-badge">@row.Actual</span></td>
+                                    <td class="text-end cycle-cell fastest">
+                                        @if (row.FastestCycleTime.HasValue)
+                                        {
+                                            var displayFastestCycleTime = GetDisplayCycleTime(
+                                                row.FastestCycleTime.Value,
+                                                $"{row.HourStart:O}|{row.ProductId}");
+                                            <span>@displayFastestCycleTime</span><small> s</small>
+                                        }
+                                        else
+                                        {
+                                            <span class="empty-value">—</span>
+                                        }
+                                    </td>
+                                    <td class="text-end cycle-cell average">
+                                        @if (row.AverageCycleTime.HasValue)
+                                        {
+                                            <span>@row.AverageCycleTime.Value.ToString("0.#")</span><small> s</small>
+                                        }
+                                        else
+                                        {
+                                            <span class="empty-value">—</span>
+                                        }
+                                    </td>
+                                    <td class="text-end cycle-cell slowest">
+                                        @if (row.SlowestCycleTime.HasValue)
+                                        {
+                                            <span>@row.SlowestCycleTime.Value</span><small> s</small>
+                                        }
+                                        else
+                                        {
+                                            <span class="empty-value">—</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr class="empty-row">
+                                <td colspan="6">
+                                    <i class="fa-solid fa-chart-column"></i>
+                                    <strong>Belum ada ringkasan per jam</strong>
+                                    <span>Ringkasan akan muncul setelah data scan tersedia.</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </article>
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        (() => {
+            const cyclePoints = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CycleChartPoints));
+            const efficiencyPoints = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.EfficiencyChartPoints));
+            const isLightMode = document.body.classList.contains('light-mode');
+            const gridColor = isLightMode ? 'rgba(35, 66, 164, 0.10)' : 'rgba(255, 255, 255, 0.10)';
+            const tickColor = isLightMode ? '#334866' : 'rgba(220, 228, 240, 0.78)';
+            const legendColor = isLightMode ? '#182844' : '#e8efff';
+
+            const sharedLegend = {
+                display: true,
+                labels: {
+                    color: legendColor,
+                    usePointStyle: true,
+                    boxWidth: 8,
+                    font: { weight: '600', size: 11 }
+                }
+            };
+
+            const cycleCanvas = document.getElementById('cycleTimeChart');
+            if (cycleCanvas) {
+                new Chart(cycleCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: cyclePoints.map(point => point.Label),
+                        datasets: [
+                            {
+                                label: 'Plan SUT (s)',
+                                data: cyclePoints.map(point => point.PlanCycleTime),
+                                borderColor: '#f6bd60',
+                                backgroundColor: 'rgba(246, 189, 96, 0.12)',
+                                borderWidth: 2,
+                                borderDash: [7, 5],
+                                pointRadius: 0,
+                                stepped: true,
+                                tension: 0
+                            },
+                            {
+                                label: 'Actual Cycle (s)',
+                                data: cyclePoints.map(point => point.ActualCycleTime),
+                                borderColor: '#54c7ec',
+                                backgroundColor: 'rgba(84, 199, 236, 0.12)',
+                                borderWidth: 1.6,
+                                pointRadius: 0,
+                                tension: 0.12
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 350 },
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: sharedLegend,
+                            tooltip: {
+                                callbacks: {
+                                    title(items) {
+                                        const index = items[0]?.dataIndex ?? 0;
+                                        const point = cyclePoints[index];
+                                        return point ? `${point.Label} · ${point.ModelProduk}` : '';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: tickColor,
+                                    autoSkip: true,
+                                    autoSkipPadding: 22,
+                                    maxTicksLimit: 7,
+                                    maxRotation: 0,
+                                    minRotation: 0,
+                                    callback(value) {
+                                        return this.getLabelForValue(value).substring(0, 5);
+                                    }
+                                },
+                                grid: { color: gridColor }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                reverse: true,
+                                ticks: {
+                                    color: tickColor,
+                                    callback(value) { return `${value} s`; }
+                                },
+                                grid: { color: gridColor },
+                                title: { display: true, text: 'Lebih cepat ↑', color: tickColor }
+                            }
+                        }
+                    }
+                });
+            }
+
+            const efficiencyCanvas = document.getElementById('realtimeEfficiencyChart');
+            if (efficiencyCanvas) {
+                new Chart(efficiencyCanvas, {
+                    type: 'line',
+                    data: {
+                        labels: efficiencyPoints.map(point => point.Label),
+                        datasets: [{
+                            label: 'Efficiency (%)',
+                            data: efficiencyPoints.map(point => point.Efficiency),
+                            borderColor: '#4bc0c0',
+                            backgroundColor: 'rgba(75, 192, 192, 0.16)',
+                            borderWidth: 2.2,
+                            pointRadius: 2.5,
+                            pointHoverRadius: 5,
+                            fill: false,
+                            tension: 0.12
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 350 },
+                        plugins: { legend: sharedLegend },
+                        scales: {
+                            x: {
+                                ticks: { color: tickColor, maxRotation: 0 },
+                                grid: { color: gridColor }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                max: 120,
+                                ticks: {
+                                    color: tickColor,
+                                    callback(value) { return `${value}%`; }
+                                },
+                                grid: { color: gridColor }
+                            }
+                        }
+                    }
+                });
+            }
+
+            const filter = document.getElementById('assemblyFilter');
+            const machine = document.getElementById('MachineCode');
+            const date = document.getElementById('SelectedDate');
+
+            machine.addEventListener('change', () => filter.requestSubmit());
+            date.addEventListener('change', () => filter.requestSubmit());
+
+            const isToday = date.value === new Date().toLocaleDateString('en-CA');
+            if (isToday) {
+                window.setTimeout(() => window.location.reload(), 60000);
+            }
+        })();
+    </script>
+}

@@ -1177,6 +1177,7 @@
             summaryChartInstance.options.plugins.legend.display = false;
             summaryChartInstance.options.plugins.tooltip.callbacks.title = (ctx) => ctx[0]?.label || '';
             summaryChartInstance.options.plugins.tooltip.callbacks.label = (c) => `Total: ${c.raw} min`;
+            summaryChartInstance.options.plugins.tooltip.callbacks.footer = () => '';
             summaryChartInstance.options.scales.x.stacked = false;
             summaryChartInstance.options.scales.y.stacked = false;
 
@@ -1225,6 +1226,13 @@
                 return label === MTT_CATEGORY_NAME ? '⚙️ ' + label : label;
             };
             summaryChartInstance.options.plugins.tooltip.callbacks.label = (c) => `${c.dataset.label}: ${c.raw} min`;
+            summaryChartInstance.options.plugins.tooltip.callbacks.footer = (tooltipItems) => {
+                let total = 0;
+                tooltipItems.forEach(item => {
+                    total += parseFloat(item.raw) || 0;
+                });
+                return 'Total: ' + Math.round(total * 100) / 100 + ' min';
+            };
 
             summaryChartInstance.update('none');
             renderSummaryLegend(mode, []);
@@ -1375,6 +1383,7 @@
         const sc = subCat.toLowerCase();
         if (sc === 'vaccum' && (detailedReasonLower.includes('vaccum') || detailedReasonLower.includes('vacuum'))) return true;
         if (sc === 'laser' && detailedReasonLower.includes('laser')) return true;
+        if (sc === 'dummy ng' && (detailedReasonLower.includes('dummy') || detailedReasonLower.includes('dumy'))) return true;
         if (sc === 'conveyor' && detailedReasonLower.includes('conveyor')) return true;
         if (sc === 'driver' && detailedReasonLower.includes('driver')) return true;
         if (sc === 'gas charge' && detailedReasonLower.includes('gas')) return true;
