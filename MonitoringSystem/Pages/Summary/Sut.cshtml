@@ -630,11 +630,13 @@
 
                                     <td class="col-lg">
                                         <input type="hidden" name="ProductId[@i]" value="@(product?.Product_Id ?? "")" />
+                                        <input type="hidden" name="OriginalProductName[@i]" value="@(product?.ProductName ?? "")" />
                                         <input type="text" class="form-control" name="ProductName[@i]"
                                                value="@(product?.ProductName ?? "")" placeholder="Product Name" />
                                     </td>
 
                                     <td class="col-md">
+                                        <input type="hidden" name="OriginalMachineCode[@i]" value="@(product?.MachineCode ?? "")" />
                                         <input type="text" class="form-control" name="MachineCode[@i]"
                                                value="@(product?.MachineCode ?? "")" />
                                     </td>
@@ -711,6 +713,8 @@
                 <form method="post" asp-page-handler="Update">
                     <input type="hidden" name="FilterMachineCode" value="@Model.FilterMachineCode" />
                     <input type="hidden" id="edit-product-id" name="ProductId" />
+                    <input type="hidden" id="edit-original-product-name" name="OriginalProductName" />
+                    <input type="hidden" id="edit-original-machine-code" name="OriginalMachineCode" />
                     <div class="modal-body">
                         <div class="mb-2">
                             <label class="form-label">Product Name</label>
@@ -883,7 +887,7 @@
             document.getElementById('form-sut').submit();
         }
 
-              function openEditModal(i, btn) {
+        function openEditModal(i, btn) {
             const row = btn.closest('tr');
             const get = name => row.querySelector(`input[name="${name}[${i}]"]`)?.value ?? '';
 
@@ -897,6 +901,8 @@
             console.log('SUT:', get('SUT'));
 
             document.getElementById('edit-product-id').value     = productId;
+            document.getElementById('edit-original-product-name').value = get('OriginalProductName');
+            document.getElementById('edit-original-machine-code').value = get('OriginalMachineCode');
             document.getElementById('edit-product-name').value   = get('ProductName');
             document.getElementById('edit-machine-code').value   = get('MachineCode');
             document.getElementById('edit-description').value    = get('Description');

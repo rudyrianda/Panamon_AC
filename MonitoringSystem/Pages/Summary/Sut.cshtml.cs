@@ -110,36 +110,81 @@ namespace MonitoringSystem.Pages.Shared
         public async Task<IActionResult> OnPostUpdateAsync(
             string? FilterMachineCode,
             string? ProductId,
+            string? OriginalProductName,
+            string? OriginalMachineCode,
             string? ProductName, string? MachineCode, string? Description,
             int? ProdPlan, int? SUT, int? NoOfOperator, int? QtyHour,
             int? ProdHeadHour, int? CycleTimeVacum, int? WorkHour)
         {
             try
             {
-                await _context.Database.ExecuteSqlRawAsync(@"
-                    UPDATE MasterData SET
-                        ProductName    = {0},
-                        MachineCode    = {1},
-                        Description    = {2},
-                        ProdPlan       = {3},
-                        SUT            = {4},
-                        NoOfOperator   = {5},
-                        QtyHour        = {6},
-                        ProdHeadHour   = {7},
-                        CycleTimeVacum = {8},
-                        WorkHour       = {9}
-                    WHERE Product_Id   = {10}",
-                    ProductName ?? (object)DBNull.Value,
-                    MachineCode ?? (object)DBNull.Value,
-                    Description ?? (object)DBNull.Value,
-                    ProdPlan ?? (object)DBNull.Value,
-                    SUT ?? (object)DBNull.Value,
-                    NoOfOperator ?? (object)DBNull.Value,
-                    QtyHour ?? (object)DBNull.Value,
-                    ProdHeadHour ?? (object)DBNull.Value,
-                    CycleTimeVacum ?? (object)DBNull.Value,
-                    WorkHour ?? (object)DBNull.Value,
-                    ProductId);
+                if (string.IsNullOrWhiteSpace(ProductName))
+                {
+                    TempData["StatusMessage"] = "error";
+                    TempData["Message"] = "Product Name wajib diisi.";
+                    return RedirectToPage(new { FilterMachineCode });
+                }
+
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+                int affectedRows;
+
+                if (!string.IsNullOrWhiteSpace(ProductId))
+                {
+                    affectedRows = await _context.Database.ExecuteSqlInterpolatedAsync($@"
+                        UPDATE MasterData SET
+                            ProductName    = {ProductName},
+                            MachineCode    = {MachineCode},
+                            Description    = {Description},
+                            ProdPlan       = {ProdPlan},
+                            SUT            = {SUT},
+                            NoOfOperator   = {NoOfOperator},
+                            QtyHour        = {QtyHour},
+                            ProdHeadHour   = {ProdHeadHour},
+                            CycleTimeVacum = {CycleTimeVacum},
+                            WorkHour       = {WorkHour}
+                        WHERE Product_Id = {ProductId}");
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(OriginalProductName))
+                    {
+                        await transaction.RollbackAsync();
+                        TempData["StatusMessage"] = "error";
+                        TempData["Message"] = "Data tidak memiliki identitas yang valid dan tidak dapat diupdate.";
+                        return RedirectToPage(new { FilterMachineCode });
+                    }
+
+                    // Data lama tanpa Product_Id diidentifikasi memakai nilai asli yang
+                    // tidak ikut berubah saat user mengedit modal.
+                    affectedRows = await _context.Database.ExecuteSqlInterpolatedAsync($@"
+                        UPDATE MasterData SET
+                            ProductName    = {ProductName},
+                            MachineCode    = {MachineCode},
+                            Description    = {Description},
+                            ProdPlan       = {ProdPlan},
+                            SUT            = {SUT},
+                            NoOfOperator   = {NoOfOperator},
+                            QtyHour        = {QtyHour},
+                            ProdHeadHour   = {ProdHeadHour},
+                            CycleTimeVacum = {CycleTimeVacum},
+                            WorkHour       = {WorkHour}
+                        WHERE (Product_Id IS NULL OR LTRIM(RTRIM(Product_Id)) = '')
+                          AND ProductName = {OriginalProductName}
+                          AND ((MachineCode = {OriginalMachineCode})
+                               OR (MachineCode IS NULL AND {OriginalMachineCode} IS NULL))");
+                }
+
+                if (affectedRows != 1)
+                {
+                    await transaction.RollbackAsync();
+                    TempData["StatusMessage"] = "error";
+                    TempData["Message"] = affectedRows == 0
+                        ? "Data tidak ditemukan. Tidak ada perubahan yang disimpan."
+                        : "Ditemukan lebih dari satu data yang sama. Perubahan dibatalkan untuk menjaga data SUT.";
+                    return RedirectToPage(new { FilterMachineCode });
+                }
+
+                await transaction.CommitAsync();
 
                 TempData["StatusMessage"] = "success";
                 TempData["Message"] = $"Product '{ProductName}' berhasil diupdate.";

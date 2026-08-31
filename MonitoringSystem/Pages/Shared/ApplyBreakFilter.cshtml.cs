@@ -56,9 +56,16 @@ namespace MonitoringSystem.Pages.Shared
                 .OrderBy(b => b.StartTime)
                 .ToListAsync();
 
-            if (dbBreakTimes.Any())
+            // Ignore placeholder rows left by the old break-time structure.
+            // A 00:00-00:00 row with no reason is not a user-defined break and
+            // must not prevent the shift-based defaults from being generated.
+            var validDbBreakTimes = dbBreakTimes
+                .Where(IsValidBreakTime)
+                .ToList();
+
+            if (validDbBreakTimes.Any())
             {
-                return dbBreakTimes.Select(b => new BreakTimeInput { 
+                return validDbBreakTimes.Select(b => new BreakTimeInput {
                     StartTime = b.StartTime, 
                     EndTime = b.EndTime, 
                     Reason = b.Reason ?? "" 
@@ -75,7 +82,15 @@ namespace MonitoringSystem.Pages.Shared
                 using (var connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
-                    var sql = "SELECT DISTINCT ShiftMode FROM [OEESN] WHERE CAST(Date AS DATE) = @date AND ShiftMode IS NOT NULL";
+                    var sql = @"
+                        SELECT DISTINCT UPPER(LTRIM(RTRIM(ShiftMode)))
+                        FROM [OEESN]
+                        WHERE [Date] >= @date
+                          AND [Date] < DATEADD(DAY, 1, @date)
+                          AND MachineCode IN ('MCH1-01', 'MCH1-02')
+                          AND SN_GOOD IS NOT NULL
+                          AND LTRIM(RTRIM(SN_GOOD)) <> ''
+                          AND ShiftMode IS NOT NULL";
                     using (var command = new SqlCommand(sql, connection))
                     {
                         command.Parameters.AddWithValue("@date", date.ToDateTime(TimeOnly.MinValue));
@@ -151,22 +166,32 @@ namespace MonitoringSystem.Pages.Shared
             _context.Set<AdditionalBreakTime>().RemoveRange(existing);
             
             // Add new ones
-            if (BreakTimes != null && BreakTimes.Any())
+            var validBreakTimes = BreakTimes?
+                .Where(bt => bt.StartTime != bt.EndTime && !string.IsNullOrWhiteSpace(bt.Reason))
+                .ToList() ?? new List<BreakTimeInput>();
+
+            if (validBreakTimes.Any())
             {
-                foreach(var bt in BreakTimes)
+                foreach(var bt in validBreakTimes)
                 {
                     _context.Set<AdditionalBreakTime>().Add(new AdditionalBreakTime
                     {
                         Date = dateToSave,
                         StartTime = bt.StartTime,
                         EndTime = bt.EndTime,
-                        Reason = bt.Reason ?? "",
+                        Reason = bt.Reason.Trim(),
                         CreatedAt = DateTime.Now
                     });
                 }
             }
             await _context.SaveChangesAsync();
             return new JsonResult(new { success = true });
+        }
+
+        private static bool IsValidBreakTime(AdditionalBreakTime breakTime)
+        {
+            return breakTime.StartTime != breakTime.EndTime
+                && !string.IsNullOrWhiteSpace(breakTime.Reason);
         }
     }
 }

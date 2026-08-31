@@ -101,13 +101,13 @@ namespace MonitoringSystem.Pages.LossTimeReport
         };
 
         // Pilihan "All" di UI berarti gabungan dua line yang tersedia: CU dan CS.
-        // Gunakan cakupan yang sama untuk actual, BP, dan working time.
+        // Gunakan cakupan line yang sama untuk actual dan BP.
         private static readonly string[] TrendMachineLines = { "MCH1-01", "MCH1-02" };
 
         // Menampung total Working Loss saja (untuk ringkasan & grafik)
         public double[] TotalActualPerMonth { get; set; } = new double[12];
         public double[] TotalPlanPerMonth { get; set; } = new double[12];
-        public double[] RatioLossVsWt { get; set; } = new double[12];
+        public double?[] RatioActualVsBp { get; set; } = new double?[12];
 
         public void OnGet()
         {
@@ -135,8 +135,6 @@ namespace MonitoringSystem.Pages.LossTimeReport
                 .GroupBy(x => new { x.Category, x.Plan.Month })
                 .Select(g => new { Category = g.Key.Category, Month = g.Key.Month, Total = g.Sum(x => x.Plan.TargetMinutes) })
                 .ToList();
-
-            var workingTimeRaw = GetMonthlyWorkingTime(SelectedYear, MachineLine);
 
             // Semua kategori untuk Tabel
             var allCats = actualsRaw.Select(x => x.Category)
@@ -181,6 +179,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
             }
 
             // Hitung Total (HANYA WORKING LOSS)
+            var currentMonthStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
             for (int i = 0; i < 12; i++)
             {
                 TotalActualPerMonth[i] = DetailActuals
@@ -191,13 +190,21 @@ namespace MonitoringSystem.Pages.LossTimeReport
                     .Where(x => GetCategoryGroup(x.Key) == "Working Loss")
                     .Sum(x => x.Value[i]);
 
-                int monthNum = (i + 4) > 12 ? (i + 4) - 12 : (i + 4);
+                int calendarMonth = i + 4 <= 12 ? i + 4 : i - 8;
+                int calendarYear = calendarMonth >= 4 ? SelectedYear : SelectedYear + 1;
+                var fiscalMonthStart = new DateTime(calendarYear, calendarMonth, 1);
 
-                double workingTime = workingTimeRaw.ContainsKey(monthNum) ? workingTimeRaw[monthNum] : 0;
-                if (workingTime > 0)
+                // Bulan yang belum berjalan dibuat null agar garis rasio berhenti
+                // di bulan sekarang, bukan turun ke angka nol pada bulan berikutnya.
+                if (fiscalMonthStart > currentMonthStart)
                 {
-                    RatioLossVsWt[i] = Math.Round((TotalActualPerMonth[i] / workingTime) * 100, 2);
+                    RatioActualVsBp[i] = null;
+                    continue;
                 }
+
+                RatioActualVsBp[i] = TotalPlanPerMonth[i] > 0
+                    ? Math.Round((TotalActualPerMonth[i] / TotalPlanPerMonth[i]) * 100, 2)
+                    : 0;
             }
 
             // Kirim ke Frontend: Hanya DetailActuals/DetailPlans yang masuk Working Loss untuk grafik
@@ -208,7 +215,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
                 // Filter dictionary agar JS Chart hanya merender Working Loss
                 Actuals = DetailActuals.Where(x => LegendCategories.Contains(x.Key)).ToDictionary(x => x.Key, x => x.Value),
                 Plans = DetailPlans.Where(x => LegendCategories.Contains(x.Key)).ToDictionary(x => x.Key, x => x.Value),
-                RatioLossVsWt = RatioLossVsWt
+                RatioActualVsBp = RatioActualVsBp
             };
 
             ChartDataJson = System.Text.Json.JsonSerializer.Serialize(chartPayload);
@@ -233,8 +240,12 @@ namespace MonitoringSystem.Pages.LossTimeReport
 
         private string NormalizeCategoryName(string input, bool isPlan = false)
         {
-            if (string.IsNullOrWhiteSpace(input)) return "Uncategorized";
+            if (string.IsNullOrWhiteSpace(input)) return "Other";
             string name = input.Trim().ToLower();
+
+            // Samakan dengan halaman Detail Loss Time untuk kategori unknown.
+            if (name == "other" || name == "others" || name == "uncategorized")
+                return "Other";
 
             if (name.Contains("change model") || name.Contains("model changing"))
                 return "Model Change Loss";
@@ -245,7 +256,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
             if (name.Contains("machine trouble") || name.Contains("machine tools trouble"))
                 return "Machine & Tools Trouble";
 
-            // Map all fixed/management loss to Uncategorized so they show up under Working Loss
+            // Map all fixed/management loss to Other so they show up under Working Loss
             // HANYA UNTUK ACTUAL DATA. Untuk BP/Plan, JANGAN di-map agar mereka ter-filter keluar oleh GetCategoryGroup!
             if (!isPlan)
             {
@@ -256,7 +267,7 @@ namespace MonitoringSystem.Pages.LossTimeReport
                     name.Contains("morning assembly") || name.Contains("cleaning") ||
                     name.Contains("general assy") || name.Contains("others") || name.Contains("fixed loss") || name.Contains("management loss"))
                 {
-                    return "Uncategorized";
+                    return "Other";
                 }
             }
 

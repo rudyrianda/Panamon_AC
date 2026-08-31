@@ -808,6 +808,130 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
     background-color: #fff;
 }
 
+/* Quality dashboard fills the available viewport at every browser zoom level. */
+.quality-dashboard {
+    height: calc(100dvh - 128px);
+    min-height: 720px;
+}
+
+.quality-dashboard > form,
+.quality-main-row {
+    height: 100%;
+}
+
+.quality-filter-column {
+    display: grid;
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.quality-station-panel {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+}
+
+.quality-station-panel .btn-custom-group {
+    flex: 1;
+}
+
+.quality-station-panel .btn-custom-group > button {
+    flex: 1;
+    min-height: 0;
+}
+
+.quality-content-column {
+    display: grid;
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: auto minmax(280px, 1.05fr) minmax(250px, 0.95fr);
+    gap: 1rem;
+}
+
+.quality-kpi-row,
+.quality-upper-charts,
+.quality-yearly-chart {
+    min-height: 0;
+}
+
+.quality-upper-charts > [class*="col-"],
+.quality-yearly-chart > [class*="col-"] {
+    min-height: 0;
+}
+
+.quality-content-column .grid-border {
+    margin-bottom: 0;
+}
+
+.quality-chart-body {
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+    min-height: 0;
+}
+
+.quality-chart-body > canvas {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Keep the filter column compact on standard-height desktop viewports (100% zoom). */
+@media (min-width: 768px) and (max-height: 1000px) {
+    .quality-station-panel .section-title {
+        margin-bottom: 6px;
+        padding-bottom: 4px;
+    }
+
+    .quality-station-panel .btn-custom-group {
+        gap: 5px;
+        min-height: 0;
+    }
+
+    .quality-station-panel .btn-custom-group > button {
+        padding: 3px 8px;
+        font-size: 0.9rem;
+        line-height: 1;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .quality-dashboard {
+        height: auto;
+        min-height: 0;
+    }
+
+    .quality-dashboard > form,
+    .quality-main-row {
+        height: auto;
+    }
+
+    .quality-filter-column,
+    .quality-content-column {
+        display: block;
+        height: auto;
+    }
+
+    .quality-station-panel .btn-custom-group > button {
+        min-height: 44px;
+    }
+
+    .quality-kpi-row > [class*="col-"] {
+        margin-bottom: 0.5rem;
+    }
+
+    .quality-upper-charts > [class*="col-"] {
+        height: 340px;
+        margin-bottom: 1rem;
+    }
+
+    .quality-yearly-chart {
+        height: 340px;
+    }
+}
+
 /* ====================================================
    13. NAVIGATION MENU STYLES
    ==================================================== */

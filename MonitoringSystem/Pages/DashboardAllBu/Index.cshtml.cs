@@ -72,7 +72,8 @@ public class IndexModel : PageModel
             DataLS = new LSDataModel { Line1 = new LineData(), Line2 = new LineData() },
             DataFan = new Dictionary<string, LineData>(),
             DataWP = new Dictionary<string, LineData>(),
-            DataRef = new LineData()
+            DataRef = new LineData(),
+            DataWD = new LineData()
         };
 
         // ── 1. DATA BU AC (CU & CS) ──
@@ -175,84 +176,35 @@ public class IndexModel : PageModel
             var defectsSKD = new List<object>();
             try
             {
-                using var connDefect = new SqlConnection(_configuration.GetConnectionString("LSConnection"));
-                connDefect.Open();
+                const string defectSql = @"
+                    SELECT
+                        COALESCE(NULLIF(LTRIM(RTRIM(Defect)), ''), 'Unspecified') AS Category,
+                        COUNT(*) AS Count
+                    FROM dbo.NG_RPTS
+                    WHERE CONVERT(date, [Date]) = CONVERT(date, GETDATE())
+                      AND MachineCode = @MachineCode
+                    GROUP BY COALESCE(NULLIF(LTRIM(RTRIM(Defect)), ''), 'Unspecified')
+                    ORDER BY Count DESC";
 
-                using (var cmd2T = new SqlCommand(@"
-                    SELECT dn.DefectName, COUNT(*) AS Count
-                    FROM dbo.Defect_Results dr
-                    JOIN dbo.Defect_Names dn ON dr.DefectId = dn.Id
-                    WHERE CONVERT(date, dr.DateTime) = CONVERT(date, GETDATE())
-                      AND dr.LocationId != 10
-                    GROUP BY dn.DefectName
-                    ORDER BY Count DESC", connDefect))
-                {
-                    cmd2T.CommandTimeout = 30;
-                    using var r = cmd2T.ExecuteReader();
-                    while (r.Read())
-                        defects2T.Add(new { category = r["DefectName"].ToString(), count = Convert.ToInt32(r["Count"]) });
-                }
+                var defectsLine1 = await conn.QueryAsync<dynamic>(defectSql, new { MachineCode = "Line1" });
+                defects2T = defectsLine1
+                    .Select(d => (object)new { category = (string)d.Category, count = (int)d.Count })
+                    .ToList();
 
-                using (var cmdSKD = new SqlCommand(@"
-                    SELECT dn.DefectName, COUNT(*) AS Count
-                    FROM dbo.Defect_Results dr
-                    JOIN dbo.Defect_Names dn ON dr.DefectId = dn.Id
-                    WHERE CONVERT(date, dr.DateTime) = CONVERT(date, GETDATE())
-                      AND dr.LocationId = 10
-                    GROUP BY dn.DefectName
-                    ORDER BY Count DESC", connDefect))
-                {
-                    cmdSKD.CommandTimeout = 30;
-                    using var r = cmdSKD.ExecuteReader();
-                    while (r.Read())
-                        defectsSKD.Add(new { category = r["DefectName"].ToString(), count = Convert.ToInt32(r["Count"]) });
-                }
+                var defectsLine2 = await conn.QueryAsync<dynamic>(defectSql, new { MachineCode = "Line2" });
+                defectsSKD = defectsLine2
+                    .Select(d => (object)new { category = (string)d.Category, count = (int)d.Count })
+                    .ToList();
             }
             catch (Exception ex) { _logger.LogWarning(ex, "Query Defect LS gagal"); }
 
-            var (lossTime2T, loadTime2T, hourlyEvents2T) = LS_GetAssemblyLossTime(conn, lsBreakTimes, lsWorkingTime, "2T");
-            var (lossTimeSKD, loadTimeSKD, hourlyEventsSKD) = LS_GetAssemblyLossTime(conn, lsBreakTimes, lsWorkingTime, "SKD");
+            var (lossTime2T, loadTime2T, hourlyEvents2T) = LS_GetAssemblyLossTime(conn, lsBreakTimes, lsWorkingTime, "Line1");
+            var (lossTimeSKD, loadTimeSKD, hourlyEventsSKD) = LS_GetAssemblyLossTime(conn, lsBreakTimes, lsWorkingTime, "Line2");
 
-            var line1 = new LineData();
-            try
-            {
-                using var cmd = new SqlCommand(@"
-                    SELECT TOP 1 DailyPlan, Target, Actual
-                    FROM dbo.FINAL1
-                    WHERE CONVERT(date, Date) = CONVERT(date, GETDATE())
-                    ORDER BY Date DESC", conn);
-                using var reader = cmd.ExecuteReader();
-                if (reader.Read())
-                {
-                    line1.TotalActual = reader["Actual"] != DBNull.Value ? Convert.ToInt32(reader["Actual"]) : 0;
-                    line1.TotalPlan = reader["Target"] != DBNull.Value ? Convert.ToInt32(reader["Target"]) : 0;
-                    line1.DailyPlan = reader["DailyPlan"] != DBNull.Value ? Convert.ToInt32(reader["DailyPlan"]) : 0;
-                }
-            }
-            catch (Exception ex) { _logger.LogWarning(ex, "Query FINAL1 (2T) gagal"); }
-
-            var line2 = new LineData();
-            try
-            {
-                using var connSKD = new SqlConnection(_configuration.GetConnectionString("LSConnection"));
-                connSKD.Open();
-
-                using (var cmdActual = new SqlCommand(@"
-                    SELECT COUNT(*) AS Actual
-                    FROM [dbo].[Production_Results]
-                    WHERE CONVERT(date, ScanningDate) = CONVERT(date, GETDATE())", connSKD))
-                {
-                    cmdActual.CommandTimeout = 30;
-                    var result = cmdActual.ExecuteScalar();
-                    line2.TotalActual = (result != null && result != DBNull.Value) ? Convert.ToInt32(result) : 0;
-                }
-
-                if (line2.TotalActual > 0)
-                    line2.TotalPlan = LS_CalculateSKDTargetByModelSegment(connSKD, lsBreakTimes);
-            }
-            catch (Exception ex) { _logger.LogWarning(ex, "Query SKD (Actual/Target) gagal"); }
-
-            line2.DailyPlan = LS_CalculateSKDDailyPlan(conn);
+            // LS_Production: Line1 = 2T and Line2 = SKD.
+            // Match the BU Report data source: actual scans from OEESN and plans from ProductionRecords/ProductionPlan.
+            var line1 = await GetCurrentLsLineDataAsync(conn, "Line1");
+            var line2 = await GetCurrentLsLineDataAsync(conn, "Line2");
 
             line1.DefectsByCategory = defects2T;
             line2.DefectsByCategory = defectsSKD;
@@ -284,30 +236,9 @@ public class IndexModel : PageModel
         try
         {
             using var conn = new SqlConnection(_configuration.GetConnectionString("FanConnection"));
-            int totalActualFan = 0, totalPlanFan = 0, dailyPlanFan = 0;
-
-            for (int i = 1; i <= 7; i++)
-            {
-                try
-                {
-                    string query = $"SELECT TOP 1 DailyPlan, Target AS TotalPlan, Actual AS TotalActual FROM dbo.FINAL{i} ORDER BY ID DESC";
-                    var data = await conn.QueryFirstOrDefaultAsync<LineData>(query);
-                    if (data != null)
-                    {
-                        totalActualFan += data.TotalActual;
-                        totalPlanFan += data.TotalPlan;
-                        dailyPlanFan += data.DailyPlan;
-                    }
-                }
-                catch (Exception ex) { _logger.LogWarning(ex, "Query FINAL{Index} Fan gagal", i); }
-            }
-
-            viewModel.DataFan.Add("total", new LineData
-            {
-                TotalActual = totalActualFan,
-                TotalPlan = totalPlanFan,
-                DailyPlan = dailyPlanFan
-            });
+            viewModel.DataFan["total"] = await GetCurrentProductionDataAsync(
+                conn,
+                Enumerable.Range(1, 7).Select(i => $"Line{i}").ToArray());
         }
         catch (Exception ex) { _logger.LogWarning(ex, "Data Fan gagal"); }
 
@@ -363,6 +294,15 @@ public class IndexModel : PageModel
             });
         }
         catch (Exception ex) { _logger.LogWarning(ex, "Data WP gagal"); }
+
+        // ── 6. DATA BU REFRIGERATOR (REF = Line1, WD = Line2) ──
+        try
+        {
+            using var conn = new SqlConnection(_configuration.GetConnectionString("RefConnection"));
+            viewModel.DataRef = await GetCurrentProductionDataAsync(conn, new[] { "Line1" });
+            viewModel.DataWD = await GetCurrentProductionDataAsync(conn, new[] { "Line2" });
+        }
+        catch (Exception ex) { _logger.LogWarning(ex, "Data Refrigerator gagal"); }
 
         if (!viewModel.DataFan.ContainsKey("total")) viewModel.DataFan["total"] = new LineData();
 
@@ -568,6 +508,88 @@ public class IndexModel : PageModel
     }
 
     // ════════════════════════════════════════════════════════════
+    // HELPER: CURRENT PRODUCTION DATA (OEESN + PRODUCTION PLAN)
+    // ════════════════════════════════════════════════════════════
+    private static async Task<LineData> GetCurrentProductionDataAsync(
+        SqlConnection conn,
+        IReadOnlyCollection<string> machineCodes)
+    {
+        if (conn.State != System.Data.ConnectionState.Open)
+            await conn.OpenAsync();
+
+        const string currentSql = @"
+            WITH LatestPerLine AS (
+                SELECT
+                    MachineCode,
+                    TargetUnit,
+                    TotalUnit,
+                    ROW_NUMBER() OVER (PARTITION BY MachineCode ORDER BY SDate DESC, ID DESC) AS rn
+                FROM dbo.OEESN
+                WHERE CONVERT(date, SDate) = CONVERT(date, GETDATE())
+                  AND MachineCode IN @MachineCodes
+            )
+            SELECT
+                CAST(ISNULL(SUM(TotalUnit), 0) AS int) AS TotalActual,
+                CAST(ISNULL(SUM(TargetUnit), 0) AS int) AS TotalPlan
+            FROM LatestPerLine
+            WHERE rn = 1";
+
+        var result = await conn.QuerySingleAsync<LineData>(
+            currentSql,
+            new { MachineCodes = machineCodes });
+
+        const string dailyPlanSql = @"
+            SELECT CAST(ISNULL(SUM(pr.Quantity), 0) AS int)
+            FROM dbo.ProductionRecords pr
+            INNER JOIN dbo.ProductionPlan pp ON pr.PlanId = pp.Id
+            WHERE pr.MachineCode IN @MachineCodes
+              AND CONVERT(date, pp.CurrentDate) = CONVERT(date, GETDATE())";
+
+        result.DailyPlan = await conn.ExecuteScalarAsync<int>(
+            dailyPlanSql,
+            new { MachineCodes = machineCodes });
+
+        return result;
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // HELPER: LS PRODUCTION DATA (OEESN + PRODUCTION PLAN)
+    // ════════════════════════════════════════════════════════════
+    private static async Task<LineData> GetCurrentLsLineDataAsync(
+        SqlConnection conn,
+        string machineCode)
+    {
+        if (conn.State != System.Data.ConnectionState.Open)
+            await conn.OpenAsync();
+
+        const string productionSql = @"
+            SELECT
+                CAST(COUNT(*) AS int) AS TotalActual,
+                CAST(ISNULL(MAX(TargetUnit), 0) AS int) AS TotalPlan
+            FROM dbo.OEESN
+            WHERE CONVERT(date, SDate) = CONVERT(date, GETDATE())
+              AND MachineCode = @MachineCode
+              AND NULLIF(LTRIM(RTRIM(ISNULL(SN_GOOD, ''))), '') IS NOT NULL";
+
+        var result = await conn.QuerySingleAsync<LineData>(
+            productionSql,
+            new { MachineCode = machineCode });
+
+        const string dailyPlanSql = @"
+            SELECT CAST(ISNULL(SUM(pr.Quantity), 0) AS int)
+            FROM dbo.ProductionRecords pr
+            INNER JOIN dbo.ProductionPlan pp ON pr.PlanId = pp.Id
+            WHERE pr.MachineCode = @MachineCode
+              AND CONVERT(date, pp.CurrentDate) = CONVERT(date, GETDATE())";
+
+        result.DailyPlan = await conn.ExecuteScalarAsync<int>(
+            dailyPlanSql,
+            new { MachineCode = machineCode });
+
+        return result;
+    }
+
+    // ════════════════════════════════════════════════════════════
     // HELPER: AC LINE DATA
     // ════════════════════════════════════════════════════════════
     private async Task<LineData> GetACLineData(SqlConnection conn, string machineCode)
@@ -742,118 +764,6 @@ public class IndexModel : PageModel
         int lossTime = totalLossSeconds / 60;
         int loadTime = Math.Max(0, workingTime - lossTime);
         return (lossTime, loadTime, hourlyEvents);
-    }
-
-    // ════════════════════════════════════════════════════════════
-    // HELPER LS: Hitung Target SKD per segmen model
-    // ════════════════════════════════════════════════════════════
-    private int LS_CalculateSKDTargetByModelSegment(
-        SqlConnection connLSBU,
-        List<(TimeSpan Start, TimeSpan End)> breakTimes)
-    {
-        var segments = new List<(double CycleTimeSec, DateTime SegStart)>();
-
-        try
-        {
-            using var cmd = new SqlCommand(@"
-                SELECT
-                    g.CycleTime,
-                    MIN(p.ScanningDate) AS SegStart
-                FROM dbo.Production_Results p
-                JOIN dbo.GlobalModelCodes g ON p.ModelCodeId = g.ModelCodeId
-                WHERE CONVERT(date, p.ScanningDate) = CONVERT(date, GETDATE())
-                  AND g.CycleTime IS NOT NULL
-                  AND g.CycleTime > 0
-                GROUP BY p.ModelCodeId, g.CycleTime
-                ORDER BY SegStart ASC", connLSBU);
-            cmd.CommandTimeout = 30;
-
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                double ct = Convert.ToDouble(reader["CycleTime"]);
-                DateTime segSt = Convert.ToDateTime(reader["SegStart"]);
-                if (ct > 0) segments.Add((ct, segSt));
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Query model segments SKD gagal");
-            return 0;
-        }
-
-        if (segments.Count == 0) return 0;
-
-        int totalTarget = 0;
-        DateTime now = DateTime.Now;
-        TimeSpan workStart = new TimeSpan(7, 7, 0);
-        TimeSpan workEnd = new TimeSpan(15, 55, 0);
-
-        for (int i = 0; i < segments.Count; i++)
-        {
-            var (cycleTimeSec, segStart) = segments[i];
-            DateTime segEnd = (i + 1 < segments.Count) ? segments[i + 1].SegStart : now;
-
-            var effStart = segStart.TimeOfDay < workStart ? workStart : segStart.TimeOfDay;
-            var effEnd = segEnd.TimeOfDay > workEnd ? workEnd : segEnd.TimeOfDay;
-
-            if (effEnd <= effStart) continue;
-
-            double workSec = (effEnd - effStart).TotalSeconds;
-            workSec -= breakTimes.Sum(b =>
-            {
-                var bs = b.Start < effStart ? effStart : b.Start;
-                var be = b.End > effEnd ? effEnd : b.End;
-                return be > bs ? (be - bs).TotalSeconds : 0;
-            });
-
-            totalTarget += (int)(Math.Max(0, workSec) / cycleTimeSec);
-        }
-
-        return totalTarget;
-    }
-
-    // ════════════════════════════════════════════════════════════
-    // HELPER LS: Hitung DailyPlan SKD
-    // ════════════════════════════════════════════════════════════
-    private int LS_CalculateSKDDailyPlan(SqlConnection conn)
-    {
-        int dailyPlan = 0;
-        try
-        {
-            using (var cmd = new SqlCommand(@"
-                SELECT ISNULL(SUM(pr.Quantity), 0)
-                FROM dbo.ProductionRecords pr
-                JOIN dbo.ProductionPlan pp ON pr.PlanId = pp.Id
-                WHERE CONVERT(date, pp.CurrentDate) = CONVERT(date, GETDATE())
-                  AND pr.MachineCode = 'SKD'", conn))
-            {
-                cmd.CommandTimeout = 30;
-                var result = cmd.ExecuteScalar();
-                dailyPlan = (result != null && result != DBNull.Value) ? Convert.ToInt32(result) : 0;
-            }
-
-            if (dailyPlan == 0)
-            {
-                using var cmd = new SqlCommand(@"
-                    SELECT ISNULL(SUM(sp.SapPlanNormal), 0)
-                    FROM dbo.SapPlan sp
-                    JOIN dbo.ProductionPlan pp ON sp.PlanId = pp.Id
-                    WHERE sp.MachineCode = 'SKD'
-                      AND CONVERT(date, pp.CurrentDate) = CONVERT(date, GETDATE())", conn);
-                cmd.CommandTimeout = 30;
-                var result = cmd.ExecuteScalar();
-                dailyPlan = (result != null && result != DBNull.Value) ? Convert.ToInt32(result) : 0;
-                _logger.LogInformation("SKD DailyPlan fallback SapPlan: {Val}", dailyPlan);
-            }
-            else
-            {
-                _logger.LogInformation("SKD DailyPlan ProductionRecords: {Val}", dailyPlan);
-            }
-        }
-        catch (Exception ex) { _logger.LogWarning(ex, "Query DailyPlan SKD gagal"); }
-
-        return dailyPlan;
     }
 
     // ════════════════════════════════════════════════════════════

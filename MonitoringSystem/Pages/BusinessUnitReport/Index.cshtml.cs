@@ -136,14 +136,40 @@ namespace MonitoringSystem.Pages.BusinessUnitReport
             
             if (string.IsNullOrEmpty(connStr)) return buChart;
 
+            // LS_Production stores production scans in OEESN, not FINAL1.
+            // Line1 represents 2T and Line2 represents SKD; both contribute
+            // to the single Laundry chart shown on this report.
             string sql = @"
-                SELECT DAY([Date]) as Day, 
-                       SUM(ISNULL([Target], 0)) as TotalTarget,
-                       SUM(ISNULL([Actual], 0)) as TotalActual
-                FROM [dbo].[FINAL1]
-                WHERE YEAR([Date]) = @SelectedYear 
-                  AND MONTH([Date]) = @SelectedMonth
-                GROUP BY DAY([Date])";
+                WITH ActualPerDay AS (
+                    SELECT
+                        DAY(SDate) AS Day,
+                        COUNT(*) AS TotalActual
+                    FROM dbo.OEESN
+                    WHERE SDate >= @StartDate
+                      AND SDate < @EndDate
+                      AND MachineCode IN ('Line1', 'Line2')
+                      AND SN_GOOD IS NOT NULL
+                      AND LTRIM(RTRIM(SN_GOOD)) <> ''
+                    GROUP BY DAY(SDate)
+                ),
+                PlanPerDay AS (
+                    SELECT
+                        DAY(pp.CurrentDate) AS Day,
+                        SUM(ISNULL(pr.Quantity, 0)) AS TotalPlan
+                    FROM dbo.ProductionRecords pr
+                    INNER JOIN dbo.ProductionPlan pp ON pp.Id = pr.PlanId
+                    WHERE pp.CurrentDate >= @StartDate
+                      AND pp.CurrentDate < @EndDate
+                      AND pr.MachineCode IN ('Line1', 'Line2')
+                    GROUP BY DAY(pp.CurrentDate)
+                )
+                SELECT
+                    COALESCE(a.Day, p.Day) AS Day,
+                    ISNULL(p.TotalPlan, 0) AS TotalPlan,
+                    ISNULL(a.TotalActual, 0) AS TotalActual
+                FROM ActualPerDay a
+                FULL OUTER JOIN PlanPerDay p ON p.Day = a.Day
+                ORDER BY COALESCE(a.Day, p.Day);";
 
             try
             {
@@ -152,8 +178,9 @@ namespace MonitoringSystem.Pages.BusinessUnitReport
                     conn.Open();
                     using (var cmd = new SqlCommand(sql, conn))
                     {
-                        cmd.Parameters.AddWithValue("@SelectedYear", SelectedYear);
-                        cmd.Parameters.AddWithValue("@SelectedMonth", SelectedMonth);
+                        var startDate = new DateTime(SelectedYear, SelectedMonth, 1);
+                        cmd.Parameters.AddWithValue("@StartDate", startDate);
+                        cmd.Parameters.AddWithValue("@EndDate", startDate.AddMonths(1));
 
                         using (var reader = cmd.ExecuteReader())
                         {
@@ -162,7 +189,7 @@ namespace MonitoringSystem.Pages.BusinessUnitReport
                                 var d = combinedData.FirstOrDefault(x => x.Day == (int)reader["Day"]);
                                 if (d != null)
                                 {
-                                    d.Plan = Convert.ToInt32(reader["TotalTarget"]);
+                                    d.Plan = Convert.ToInt32(reader["TotalPlan"]);
                                     d.Shift1_Unit = Convert.ToDecimal(reader["TotalActual"]);
                                 }
                             }
@@ -189,7 +216,7 @@ namespace MonitoringSystem.Pages.BusinessUnitReport
                 }
                 buChart.ChangePlanData.Add(effectivePlan);
                 buChart.ActualNormalData.Add(data.Shift1_Unit);
-                buChart.ActualOvertimeData.Add(0); // No overtime data in FINAL1
+                buChart.ActualOvertimeData.Add(0); // OEESN does not separate overtime for this chart.
             }
 
             return buChart;

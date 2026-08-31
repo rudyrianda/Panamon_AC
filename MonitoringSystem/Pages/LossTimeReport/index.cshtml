@@ -735,6 +735,10 @@ main.pb-5 {
             '#c58c85', '#82b366', '#d7bde2', '#a67c52', '#7fb3d5',
             '#f0b27a', '#76448a', '#117864', '#922b21', '#717d7e'
         ];
+        const categoryColors = {
+            // Unknown loss records are displayed consistently with Detail Loss Time.
+            'Other': '#8e44ad'
+        };
 
         let datasets = [];
         let colorIdx = 0;
@@ -749,7 +753,7 @@ main.pb-5 {
         const activeCategories = Object.keys(chartData.Actuals);
 
         activeCategories.forEach((cat) => {
-            let color = barColors[colorIdx % barColors.length];
+            let color = categoryColors[cat] || barColors[colorIdx % barColors.length];
 
             bpDatasetIndices.push(datasets.length);
             datasets.push({
@@ -779,17 +783,39 @@ main.pb-5 {
         const isLight = document.body.classList.contains('light-mode');
         
         datasets.push({
-            type: 'line', label: 'Wt act loss (%)',
-            data: chartData.RatioLossVsWt,
+            type: 'line', label: 'Act Loss vs BP Loss (%)',
+            data: chartData.RatioActualVsBp,
             borderColor: isLight ? '#666666' : '#FFFFFF', 
             backgroundColor: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.2)', 
-            tension: 0.1, yAxisID: 'y_ratio_wt', order: 1, hidden: false
+            tension: 0.1, spanGaps: false, yAxisID: 'y_ratio_bp', order: 1, hidden: false
         });
 
         // ============================================================
         // INIT CHART
         // ============================================================
         const c0 = getChartColors();
+
+        // Tooltip default menempel pada batang yang di-hover. Untuk BP, itu
+        // membuat panel detail menutupi batang Actual di sebelah kanannya.
+        Chart.Tooltip.positioners.bpRight = function (items, eventPosition) {
+            const nearestBar = items
+                .filter(item => item.element && this.chart.data.datasets[item.datasetIndex]?.type === 'bar')
+                .reduce((nearest, item) => {
+                    if (!nearest) return item;
+                    return Math.abs(item.element.x - eventPosition.x) < Math.abs(nearest.element.x - eventPosition.x)
+                        ? item
+                        : nearest;
+                }, null);
+
+            const label = nearestBar ? this.chart.data.datasets[nearestBar.datasetIndex]?.label || '' : '';
+            if (!label.endsWith(' (Plan)')) return eventPosition;
+
+            return {
+                x: nearestBar.element.x + (nearestBar.element.width / 2) + 50,
+                y: eventPosition.y,
+                xAlign: 'left'
+            };
+        };
 
         // Buat sumbu X dua tingkat: penanda BP/Act dekat batang dan bulan di bawahnya.
         const barRoleLabelsPlugin = {
@@ -849,29 +875,33 @@ main.pb-5 {
                 plugins: {
                     tooltip: {
                         mode: 'index', intersect: false,
-                        position: 'nearest',
+                        position: 'bpRight',
                         caretSize: 8,
                         caretPadding: 40,
                         backgroundColor: c0.tooltipBg,
                         borderColor: c0.tooltipBorder,
                         borderWidth: 1,
-                        padding: 12,
-                        titleFont: { weight: 'bold', size: 15 },
-                        bodyFont: { size: 13 },
+                        padding: { top: 15, right: 18, bottom: 15, left: 18 },
+                        titleFont: { weight: '700', size: 17, lineHeight: 1.3 },
+                        bodyFont: { weight: '600', size: 15, lineHeight: 1.35 },
+                        footerFont: { weight: '700', size: 15, lineHeight: 1.35 },
+                        titleMarginBottom: 8,
+                        bodySpacing: 3,
+                        footerMarginTop: 9,
+                        boxWidth: 12,
+                        boxHeight: 12,
                         titleColor: c0.tooltipText,   // ✅ FIX: property langsung, bukan callback
                         bodyColor:  c0.tooltipText,   // ✅ FIX: property langsung, bukan callback
                         footerColor: c0.tooltipText,  // ✅ FIX: property langsung, bukan callback
                         itemSort: function(a, b) {
-                            const lA = a.dataset.label || '';
-                            const lB = b.dataset.label || '';
-                            if (lA.includes('Wt act loss')) return 1;
-                            if (lB.includes('Wt act loss')) return -1;
+                            if (a.dataset.type === 'line') return 1;
+                            if (b.dataset.type === 'line') return -1;
                             return b.parsed.y - a.parsed.y; 
                         },
                         callbacks: {
                             label: function (context) {
                                 const label = context.dataset.label || '';
-                                if (label.includes('Ratio') || label.includes('Wt act loss')) {
+                                if (context.dataset.type === 'line') {
                                     if (context.parsed.y === null || context.parsed.y === undefined) return null;
                                     return label + ': ' + context.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%';
                                 }
@@ -904,7 +934,7 @@ main.pb-5 {
                             generateLabels: function (chart) {
                                 const original = Chart.defaults.plugins.legend.labels.generateLabels;
                                 const labels = original.call(this, chart);
-                                return labels.filter(l => l.text.includes('(Act)') || l.text.includes('Ratio') || l.text.includes('Wt act loss'))
+                                return labels.filter(l => l.text.includes('(Act)') || chart.data.datasets[l.datasetIndex]?.type === 'line')
                                              .map(l => { l.text = l.text.replace(' (Act)', ''); return l; });
                             }
                         },
@@ -931,12 +961,13 @@ main.pb-5 {
                         ticks: { color: c0.textColor },
                         grid:  { color: c0.gridColor }
                     },
-                    y_ratio_wt: {
+                    y_ratio_bp: {
                         type: 'linear', display: true, position: 'right',
                         grid: { drawOnChartArea: false },
-                        title: { display: true, text: 'WT vs Act Loss (%)', color: c0.textColor },
+                        title: { display: true, text: 'Act Loss vs BP Loss (%)', color: c0.textColor },
                         ticks: { color: c0.textColor, callback: v => v + '%' },
-                        suggestedMax: 5
+                        beginAtZero: true,
+                        suggestedMax: 100
                     }
                 }
             }

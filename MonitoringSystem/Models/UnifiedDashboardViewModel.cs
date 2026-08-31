@@ -13,6 +13,8 @@ namespace MonitoringSystem.Models
 
         public LineData DataRef { get; set; }
 
+        public LineData DataWD { get; set; }
+
         public Dictionary<string, LineData> DataWP { get; set; }
 
     }
@@ -42,7 +44,6 @@ namespace MonitoringSystem.Models
         // LS
         public List<object> DefectsByCategory { get; set; } = new List<object>();
 
-        public bool IsDummy { get; set; } = false;
     }
 
     public class LossTimeData

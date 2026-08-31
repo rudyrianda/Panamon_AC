@@ -13,17 +13,109 @@
     }
 }
 
+<script>
+    // Tandai halaman ini agar penyesuaian density tidak memengaruhi halaman report lain.
+    document.body.classList.add('production-report-page');
+</script>
+
 <style>
+    /*
+     * Browser zoom 80% membuat tinggi viewport CSS sekitar 25% lebih besar.
+     * Ukuran berbasis vh di bawah menjaga ukuran fisik report tetap konsisten
+     * dengan tampilan 100%, sambil tetap dibatasi agar tidak membesar berlebihan.
+     */
+    body.production-report-page {
+        --production-control-height: clamp(28px, 3.05vh, 35px);
+        --production-font-size: clamp(12px, 1.31vh, 15px);
+        --production-line-height: clamp(20px, 2.18vh, 25px);
+        --production-border-width: clamp(2px, 0.218vh, 2.5px);
+        --production-chart-height: clamp(350px, 38.05vh, 438px);
+        --production-page-gap: clamp(7px, 0.77vh, 8.75px);
+    }
+
+    body.production-report-page .main-header {
+        height: clamp(45px, 4.9vh, 56px) !important;
+    }
+
+    body.production-report-page .header-content {
+        height: clamp(30px, 3.27vh, 37.5px) !important;
+        padding-inline: clamp(25px, 2.72vh, 31.25px) !important;
+        margin-top: clamp(9px, 0.98vh, 11.25px) !important;
+    }
+
+    body.production-report-page .header-left img {
+        height: clamp(12px, 1.31vh, 15px) !important;
+    }
+
+    body.production-report-page .header-center .logo-panamon {
+        height: clamp(15px, 1.64vh, 18.75px) !important;
+    }
+
+    body.production-report-page .header-right {
+        font-size: var(--production-font-size) !important;
+        gap: clamp(12px, 1.31vh, 15px) !important;
+    }
+
+    body.production-report-page > .container-fluid.p-0.d-flex {
+        height: calc(100vh - clamp(45px, 4.9vh, 56px)) !important;
+        margin-top: clamp(45px, 4.9vh, 56px) !important;
+    }
+
+    body.production-report-page #bdSidebar {
+        width: clamp(75px, 8.16vh, 94px) !important;
+        height: calc(100vh - clamp(70px, 7.62vh, 87.5px)) !important;
+        margin-top: clamp(4px, 0.44vh, 5px) !important;
+        padding-block: clamp(8px, 0.87vh, 10px) !important;
+        border-width: var(--production-border-width) !important;
+        border-left-width: 0 !important;
+    }
+
+    body.production-report-page #bdSidebar .nav-item a {
+        width: clamp(88px, 9.58vh, 110px) !important;
+        height: clamp(56px, 6.1vh, 70px) !important;
+    }
+
+    body.production-report-page #bdSidebar .nav-item a i {
+        width: clamp(25px, 2.72vh, 31.25px);
+        font-size: clamp(16px, 1.74vh, 20px);
+    }
+
+    body.production-report-page #bdSidebar .nav-label {
+        font-size: clamp(8.5px, 0.93vh, 10.625px) !important;
+    }
+
+    body.production-report-page #bdSidebar .logout-btn {
+        width: clamp(88px, 9.58vh, 110px) !important;
+        height: clamp(50px, 5.45vh, 62.5px) !important;
+    }
+
+    body.production-report-page #bdSidebar .logout-btn i {
+        font-size: clamp(15px, 1.64vh, 18.75px) !important;
+    }
+
+    body.production-report-page #bdSidebar .logout-btn .nav-label {
+        font-size: clamp(9px, 0.98vh, 11.25px) !important;
+    }
+
+    body.production-report-page .main-content-wrapper {
+        height: calc(100vh - clamp(45px, 4.9vh, 56px));
+    }
+
+    body.production-report-page .footer-copyright,
+    body.production-report-page .footer-copyright p {
+        font-size: clamp(11px, 1.2vh, 13.75px) !important;
+    }
+
     /* FILTER AREA WITH LINES - SUPER COMPACT */
     .filter-area-with-lines {
         position: relative;
         padding: 1px 0;
         margin-bottom: 8px;
-        margin-top: -20px;
+        margin-top: clamp(-25px, -2.18vh, -20px);
         min-height: 10px;
-         width: calc(100% - 14px);
-        margin-left: 7px;
-        margin-right: 7px;
+        width: calc(100% - var(--production-page-gap) - var(--production-page-gap));
+        margin-left: var(--production-page-gap);
+        margin-right: var(--production-page-gap);
 
     }
     .panamon-bottom-line,
@@ -53,7 +145,7 @@
     .filter-content {
         position: relative;
         z-index: 2;
-        padding: 6px 0;
+        padding: clamp(6px, 0.66vh, 7.5px) 0;
         border-radius: 15px;
         margin-left: 7px;
         margin-right: 7px;
@@ -64,10 +156,10 @@
     }
 
     .filter-content .form-select-sm {
-        height: 28px;
+        height: var(--production-control-height);
         padding: 0 22px 0 8px;
-        font-size: 12px;
-        line-height: 20px;
+        font-size: var(--production-font-size);
+        line-height: var(--production-line-height);
         border-radius: 999px;
         background-color: rgba(255, 255, 255, 0.05);
         border: 2px solid rgba(255, 255, 255, 0.5);
@@ -88,8 +180,29 @@
     .filter-content .form-select-sm option {
         background-color: rgba(50, 60, 80, 0.95);
         color: #ffffff;
-        font-size: 12px;
+        font-size: var(--production-font-size);
         padding: 8px;
+    }
+
+    .filter-content form.gap-3 {
+        column-gap: clamp(1rem, 1.74vh, 1.25rem) !important;
+        row-gap: clamp(0.5rem, 0.87vh, 0.625rem) !important;
+    }
+
+    .filter-content .gap-2 {
+        gap: clamp(0.5rem, 0.87vh, 0.625rem) !important;
+    }
+
+    #MachineLine {
+        width: clamp(70px, 7.62vh, 87.5px) !important;
+    }
+
+    #SelectedMonth {
+        width: clamp(110px, 11.98vh, 137.5px) !important;
+    }
+
+    #SelectedYear {
+        width: clamp(80px, 8.71vh, 100px) !important;
     }
 
     .filter-content .form-select-sm option:hover {
@@ -183,12 +296,13 @@
 
     .filter-content .btn {
         border-radius: 999px !important;
+        border-width: var(--production-border-width) !important;
     }
     /* TABLE STYLING - COMPACT */
     .table th,
     .table td {
-        font-size: 12px;
-        padding: 0.1rem;
+        font-size: var(--production-font-size);
+        padding: clamp(0.1rem, 0.175vh, 0.125rem);
         white-space: nowrap;
         word-wrap: break-word;
         vertical-align: middle;
@@ -301,51 +415,52 @@
 
     table.table-bordered > :not(caption) > * > * {
         border-color: rgba(255, 255, 255, 0.5) !important;
-        border-width: 1.5px !important;
+        border-width: clamp(1.5px, 0.164vh, 1.875px) !important;
     }
 
     /* CHART CONTAINER - SUPER COMPACT */
     #dayDiv {
         position: relative;
-        width: calc(100% - 14px);
+        width: calc(100% - var(--production-page-gap) - var(--production-page-gap));
         max-width: 100%;
         height: auto;
         margin-top: 0.25rem;
         margin-bottom: 0.25rem;
-        margin-left: 7px;
-        margin-right: 7px;
+        margin-left: var(--production-page-gap);
+        margin-right: var(--production-page-gap);
         background: rgba(255, 255, 255, 0.20);
         border-radius: 12px;
-        padding: 8px 12px 6px 12px;
+        padding: clamp(8px, 0.87vh, 10px) clamp(12px, 1.31vh, 15px) clamp(6px, 0.66vh, 7.5px);
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
         border: 2px solid rgba(255, 255, 255, 0.3) !important;
+        border-width: var(--production-border-width) !important;
         overflow: visible !important;
     }
 
     #dayChart {
         width: 100% !important;
         max-width: 100%;
-        height: 350px !important;
-        margin-bottom: 6px;
+        height: var(--production-chart-height) !important;
+        margin-bottom: clamp(6px, 0.66vh, 7.5px);
     }
     /* TOTAL INFO - SUPER COMPACT */
     .total-info-text {
         display: flex;
         justify-content: flex-end;
         align-items: center;
-        gap: 15px;
+        gap: clamp(15px, 1.64vh, 18.75px);
         padding: 2px 0;
     }
 
     .total-info-text span {
-        font-size: 0.75rem;
+        font-size: clamp(0.75rem, 1.31vh, 0.9375rem);
         color: #ffffff;
         font-weight: 500;
         white-space: nowrap;
     }
 
     .total-info-text strong {
-        font-size: 0.85rem;
+        font-size: clamp(0.85rem, 1.48vh, 1.0625rem);
         font-weight: 700;
         margin-left: 3px;
     }
@@ -357,20 +472,20 @@
     /* COMPACT FILTER */
     .filter-content .form-select-sm,
     .filter-content .btn-sm {
-        height: 28px;
+        height: var(--production-control-height);
         min-height: 20px;
-        font-size: 12px;
-        line-height: 20px;
+        font-size: var(--production-font-size);
+        line-height: var(--production-line-height);
     }
 
     .filter-content .form-select-sm {
-        height: 28px;
+        height: var(--production-control-height);
         padding: 0;
         padding-left: 12px;
         padding-right: 28px;
         padding-top: -2px;
-        font-size: 12px;
-        line-height: 16px;
+        font-size: var(--production-font-size);
+        line-height: clamp(16px, 1.74vh, 20px);
         border-radius: 999px;
         background-color: rgba(255, 255, 255, 0.05);
         border: 2px solid rgba(255, 255, 255, 0.5);
@@ -388,7 +503,7 @@
         justify-content: center;
     }
     .filter-content .btn-sm {
-        padding: 0 12px;
+        padding: 0 clamp(12px, 1.31vh, 15px);
         border-radius: 999px;
     }
 
@@ -400,8 +515,8 @@
 
     .filter-content label,
     .filter-content .form-check-label {
-        font-size: 12px;
-        line-height: 20px;
+        font-size: var(--production-font-size);
+        line-height: var(--production-line-height);
     }
 
     /* CRITICAL OVERFLOW CONTROL */
@@ -425,9 +540,9 @@
     }
 
     .table-responsive {
-        max-width: calc(100% - 14px);
-        margin-left: 7px;
-        margin-right: 7px;
+        max-width: calc(100% - var(--production-page-gap) - var(--production-page-gap));
+        margin-left: var(--production-page-gap);
+        margin-right: var(--production-page-gap);
         overflow-x: auto;
         overflow-y: auto;
         max-height: calc(100vh - 480px);
@@ -461,13 +576,13 @@
     }
     /* CUSTOM SHIFT BUTTONS - KOTAK KAYAK GAMBAR */
     .shift-button {
-        width: 28px;
-        height: 28px;
+        width: var(--production-control-height);
+        height: var(--production-control-height);
         border-radius: 6px;
         background-color: rgba(70, 80, 100, 0.6);
         border: 2px solid rgba(255, 255, 255, 0.3);
         color: #ffffff;
-        font-size: 12px;
+        font-size: var(--production-font-size);
         font-weight: 600;
         display: flex;
         align-items: center;
@@ -502,6 +617,7 @@
     .main-content-wrapper .p-4 {
         padding-left: 1px !important;
         padding-right: 1px !important;
+        padding-top: clamp(24px, 2.61vh, 30px) !important;
     }
 
     #reportContainer {
@@ -516,13 +632,13 @@
     /* HEADER DI DALAM BOX */
     .chart-box-header {
         position: relative;
-        padding-bottom: 6px;
-        margin-bottom: 6px;
+        padding-bottom: clamp(6px, 0.66vh, 7.5px);
+        margin-bottom: clamp(6px, 0.66vh, 7.5px);
     }
 
     /* TEKS JUDUL */
     .chart-box-title {
-        font-size: 0.85rem;
+        font-size: clamp(0.85rem, 1.48vh, 1.0625rem);
         font-weight: 700;
         color: #ffffff;
         letter-spacing: 0.3px;
@@ -706,6 +822,7 @@
                                     <option value="All" selected>All</option>
                                     <option value="MCH1-01">CU</option>
                                     <option value="MCH1-02">CS</option>
+                                    <option value="CAC">CAC</option>
                                 </select>
                             </div>
 
@@ -1086,6 +1203,8 @@
             const tooltipTitleColor = isLightMode ? '#1a1a2e' : '#ffffff';
             const tooltipBodyColor = isLightMode ? '#1a1a2e' : '#ffffff';
             const gridColor = isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+            const chartDensity = Math.min(1.25, Math.max(1, window.innerHeight / 920));
+            const chartPx = value => Math.round(value * chartDensity);
 
             // ===== CHART =====
             new Chart(document.getElementById('dayChart'), {
@@ -1095,12 +1214,12 @@
                     datasets: [
                         { type: 'line', label: 'Act Ratio (%)', data: ratioActualData, borderColor: '#FACC15', backgroundColor: 'rgba(255, 215, 0, 0.2)', tension: 0.1, yAxisID: 'y1' },
                         { type: 'line', label: 'Plan Ratio (%)', data: ratioPlanData, borderColor: isLightMode ? '#666666' : '#FFFFFF', backgroundColor: isLightMode ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.2)', tension: 0.1, yAxisID: 'y1' },
-                           { label: 'SAP Plan Normal', data: originalPlanData.map(v => v === 0 ? null : v), backgroundColor: '#3cb9fc', borderColor: '#3cb9fc', borderWidth: 0, barThickness: 15, stack: 'OriginalPlan', yAxisID: 'y' },
-            { label: 'SAP Plan Overtime', data: originalPlanOvertimeData.map(v => v === 0 ? null : v), backgroundColor: '#1a3a6b', borderColor: '#1a3a6b', borderWidth: 0, barThickness: 15, stack: 'OriginalPlan', yAxisID: 'y' },
-               { label: 'Change Plan', data: chartChangePlanData.map(v => v === 0 ? null : v), backgroundColor: '#a32ca3', borderColor: '#a32ca3', borderWidth: 0, barThickness: 15, stack: 'Plan', yAxisID: 'y' },
-            { label: 'Overtime Plan', data: chartChangePlanOtData.map(v => v === 0 ? null : v), backgroundColor: '#6a1b9a', borderColor: '#6a1b9a', borderWidth: 0, barThickness: 15, stack: 'Plan', yAxisID: 'y' },
-                        { label: 'Act Normal', data: normalData.map(v => v === 0 ? null : v), backgroundColor: '#35FF00', borderColor: '#35FF00', borderWidth: 0, barThickness: 15, stack: 'Actual', yAxisID: 'y' },
-                        { label: 'Act Overtime', data: overtimeData.map(v => v === 0 ? null : v), backgroundColor: '#006330', borderColor: '#006330', borderWidth: 0, barThickness: 15, stack: 'Actual', yAxisID: 'y' }
+                           { label: 'SAP Plan Normal', data: originalPlanData.map(v => v === 0 ? null : v), backgroundColor: '#3cb9fc', borderColor: '#3cb9fc', borderWidth: 0, barThickness: chartPx(15), stack: 'OriginalPlan', yAxisID: 'y' },
+            { label: 'SAP Plan Overtime', data: originalPlanOvertimeData.map(v => v === 0 ? null : v), backgroundColor: '#1a3a6b', borderColor: '#1a3a6b', borderWidth: 0, barThickness: chartPx(15), stack: 'OriginalPlan', yAxisID: 'y' },
+               { label: 'Change Plan', data: chartChangePlanData.map(v => v === 0 ? null : v), backgroundColor: '#a32ca3', borderColor: '#a32ca3', borderWidth: 0, barThickness: chartPx(15), stack: 'Plan', yAxisID: 'y' },
+            { label: 'Overtime Plan', data: chartChangePlanOtData.map(v => v === 0 ? null : v), backgroundColor: '#6a1b9a', borderColor: '#6a1b9a', borderWidth: 0, barThickness: chartPx(15), stack: 'Plan', yAxisID: 'y' },
+                        { label: 'Act Normal', data: normalData.map(v => v === 0 ? null : v), backgroundColor: '#35FF00', borderColor: '#35FF00', borderWidth: 0, barThickness: chartPx(15), stack: 'Actual', yAxisID: 'y' },
+                        { label: 'Act Overtime', data: overtimeData.map(v => v === 0 ? null : v), backgroundColor: '#006330', borderColor: '#006330', borderWidth: 0, barThickness: chartPx(15), stack: 'Actual', yAxisID: 'y' }
                     ]
                 },
                 options: {
@@ -1113,15 +1232,13 @@
                            x: {
                 stacked: true,
                 ticks: {
+                        font: { size: chartPx(12) },
                         color: function(context) {
                 const day = parseInt(chartLabels[context.index]); // paksa jadi integer
                 const month = parseInt(document.getElementById('SelectedMonth').value) - 1;
                 const year = parseInt(document.getElementById('SelectedYear').value);
                 const date = new Date(year, month, day);
                 const dayOfWeek = date.getDay();
-
-                // DEBUG - hapus setelah berhasil
-                console.log(`Day: ${day}, DayOfWeek: ${dayOfWeek}, Date: ${date}`);
 
                 if (dayOfWeek === 0 || dayOfWeek === 6) {
                     return '#FF4444';
@@ -1134,16 +1251,16 @@
                         y: {
                             type: 'linear',
                             position: 'left',
-                            title: { display: true, text: 'Production Qty (unit)', color: chartTextColor },
-                            ticks: { color: chartTextColor },
+                            title: { display: true, text: 'Production Qty (unit)', color: chartTextColor, font: { size: chartPx(12) } },
+                            ticks: { color: chartTextColor, font: { size: chartPx(12) } },
                             grid: { color: gridColor }
                         },
                         y1: {
                             type: 'linear',
                             position: 'right',
                             max: 120,
-                            title: { display: true, text: 'Ratio (%)', color: chartTextColor },
-                            ticks: { color: chartTextColor, callback: v => v + '%' },
+                            title: { display: true, text: 'Ratio (%)', color: chartTextColor, font: { size: chartPx(12) } },
+                            ticks: { color: chartTextColor, font: { size: chartPx(12) }, callback: v => v + '%' },
                             grid: { drawOnChartArea: false }
                         }
                     },
@@ -1151,7 +1268,7 @@
                         legend: {
                             labels: {
                                 color: chartTextColor,
-                                font: { weight: '600' }
+                                font: { weight: '600', size: chartPx(12) }
                             }
                         },
                         tooltip: {
@@ -1160,10 +1277,10 @@
                             backgroundColor: tooltipBgColor,
                             borderColor: isLightMode ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.2)',
                             borderWidth: 1,
-                            padding: 12,
-                            titleFont: { weight: 'bold', size: 15 },
-                            bodyFont: { size: 13 },
-                            caretPadding: 40
+                            padding: chartPx(12),
+                            titleFont: { weight: 'bold', size: chartPx(15) },
+                            bodyFont: { size: chartPx(13) },
+                            caretPadding: chartPx(40)
                         }
                     }
                 }

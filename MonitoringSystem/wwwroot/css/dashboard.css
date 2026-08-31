@@ -908,6 +908,18 @@ body {
     overflow: hidden !important;
 }
 
+/*
+   Browser zoom 80% enlarges the CSS viewport by 25%, which previously made
+   the percentage-based grid wider while fixed-size gauges and text shrank.
+   Restore the 100% wallboard scale while keeping its visual bounds inside
+   the current viewport. This class is set only when devicePixelRatio is 0.8.
+*/
+html.dashboard-zoom-80 body {
+    zoom: 1.25;
+    width: 80% !important;
+    height: 80vh !important;
+}
+
 .main-content {
     flex: 1 1 0 !important;
     min-height: 0 !important;
@@ -951,6 +963,14 @@ body {
     height: 100% !important;
     min-height: 0 !important;
     overflow: hidden !important;
+}
+
+/* Turunkan judul metric khusus card Audio, Fan, dan Water Pump. */
+.stat-card.bottom-card .card-title {
+    width: 100%;
+    margin: 32px auto 6px;
+    font-size: 0.95rem;
+    text-align: center;
 }
 
 .right-panel {
@@ -1127,16 +1147,131 @@ body.light-mode .main-footer {
     margin-left: auto;
 }
 
-.dummy-badge {
-    position: absolute;
-    top: 32px;
+/* ═══════════════════════════════════════════════════════════════
+   Ukuran proporsional yang seragam untuk seluruh card Dashboard BU
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+    --bu-gauge-size: clamp(150px, 10.2vw, 198px);
+    --bu-gauge-width: clamp(278px, 18.1vw, 348px);
+    --bu-legend-width: clamp(125px, 7.3vw, 140px);
+}
+
+.stat-card {
+    box-sizing: border-box;
+}
+
+/* Tinggi card Audio/Fan/WP sama dengan masing-masing card di kanan. */
+.bottom-row {
+    flex-basis: calc((100% - 16px) / 3) !important;
+}
+
+.right-panel .stat-card {
+    flex: 1 1 0 !important;
+    height: 0 !important;
+}
+
+/* Judul dan nama BU seragam di seluruh card. */
+.stat-card.bottom-card .card-title,
+.right-panel .stat-card .card-title {
+    width: 100%;
+    margin: 32px auto 6px;
+    padding: 0;
+    font-size: 0.95rem;
+    line-height: 1.2;
+    text-align: center;
+}
+
+.stat-card .card-subtitle {
+    top: 12px;
     right: 15px;
-    font-size: 0.65rem;
-    font-weight: bold;
-    color: #1a1a2e;
-    background-color: #F59E0B;
-    padding: 2px 8px;
-    border-radius: 4px;
-    letter-spacing: 0.5px;
-    z-index: 20;
+    font-size: 0.78rem;
+    line-height: 1.2;
+}
+
+.stat-card .metric-header {
+    margin-bottom: 6px;
+}
+
+/* Setiap line memakai gauge, legend, dan jarak yang sama. */
+.view-section.ach {
+    justify-content: center !important;
+    align-items: center !important;
+    gap: clamp(4px, 0.55vw, 10px) !important;
+}
+
+.view-section.ach .gauge-container,
+.view-section.ach[style*="justify-content:center"] .gauge-container {
+    flex: 0 1 var(--bu-gauge-width) !important;
+    width: var(--bu-gauge-width) !important;
+    max-width: calc(50% - 5px) !important;
+    height: var(--bu-gauge-size) !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    gap: clamp(5px, 0.5vw, 10px) !important;
+    justify-content: center !important;
+}
+
+/* Card satu-line boleh memakai lebar gauge penuh yang sama. */
+.view-section.ach[style*="justify-content:center"] .gauge-container {
+    max-width: var(--bu-gauge-width) !important;
+}
+
+.view-section.ach .gauge-container > div {
+    justify-content: center;
+    gap: clamp(5px, 0.5vw, 10px);
+}
+
+.view-section.ach .canvas-wrapper,
+.view-section.ach[style*="justify-content:center"] .canvas-wrapper {
+    flex: 0 0 var(--bu-gauge-size) !important;
+    width: var(--bu-gauge-size) !important;
+    min-width: var(--bu-gauge-size) !important;
+    max-width: var(--bu-gauge-size) !important;
+    height: var(--bu-gauge-size) !important;
+    max-height: var(--bu-gauge-size) !important;
+    aspect-ratio: 1 / 1;
+}
+
+.view-section.ach .gauge-container .legend-and-total,
+.view-section.ach[style*="justify-content:center"] .legend-and-total {
+    flex: 0 0 var(--bu-legend-width) !important;
+    width: var(--bu-legend-width) !important;
+    min-width: var(--bu-legend-width) !important;
+    max-width: var(--bu-legend-width) !important;
+    padding: 4px 6px !important;
+    gap: 4px !important;
+}
+
+.view-section.ach .gauge-container .legend-row {
+    width: 100% !important;
+    min-height: 22px;
+    gap: 6px !important;
+    padding-bottom: 3px !important;
+    margin-bottom: 2px !important;
+}
+
+.view-section.ach .gauge-container .legend-key {
+    min-width: 50px !important;
+    font-size: 0.76rem !important;
+    line-height: 1.15;
+}
+
+.view-section.ach .gauge-container .legend-value {
+    font-size: 0.84rem !important;
+    line-height: 1.15;
+}
+
+.view-section.ach .gauge-container .legend-row.total-plan-row .legend-value {
+    font-size: 1rem !important;
+}
+
+.view-section.ach .gauge-container .legend-dot {
+    width: 14px !important;
+    height: 14px !important;
+    border-width: 3px !important;
+}
+
+/* Naikkan area gauge pada tiga card kanan agar lebih seimbang secara vertikal. */
+.right-panel .view-section.ach .gauge-container {
+    transform: translateY(-10px);
 }

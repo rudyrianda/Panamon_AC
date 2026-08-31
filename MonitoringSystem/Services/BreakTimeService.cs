@@ -38,9 +38,15 @@ namespace MonitoringSystem.Services
                 .OrderBy(b => b.StartTime)
                 .ToListAsync();
 
-            if (dbBreakTimes.Any())
+            // Ignore placeholder rows left by the old break-time structure so
+            // production-based defaults can still be generated for the date.
+            var validDbBreakTimes = dbBreakTimes
+                .Where(b => b.StartTime != b.EndTime && !string.IsNullOrWhiteSpace(b.Reason))
+                .ToList();
+
+            if (validDbBreakTimes.Any())
             {
-                return dbBreakTimes.Select(b => new BreakTimeInfo { 
+                return validDbBreakTimes.Select(b => new BreakTimeInfo {
                     StartTime = b.StartTime.ToTimeSpan(), 
                     EndTime = b.EndTime.ToTimeSpan(), 
                     Reason = b.Reason ?? "" 
@@ -57,7 +63,15 @@ namespace MonitoringSystem.Services
                 using (var connection = new SqlConnection(connectionString))
                 {
                     await connection.OpenAsync();
-                    var sql = "SELECT DISTINCT ShiftMode FROM [OEESN] WHERE CAST(Date AS DATE) = @date AND ShiftMode IS NOT NULL";
+                    var sql = @"
+                        SELECT DISTINCT UPPER(LTRIM(RTRIM(ShiftMode)))
+                        FROM [OEESN]
+                        WHERE [Date] >= @date
+                          AND [Date] < DATEADD(DAY, 1, @date)
+                          AND MachineCode IN ('MCH1-01', 'MCH1-02')
+                          AND SN_GOOD IS NOT NULL
+                          AND LTRIM(RTRIM(SN_GOOD)) <> ''
+                          AND ShiftMode IS NOT NULL";
                     using (var command = new SqlCommand(sql, connection))
                     {
                         command.Parameters.AddWithValue("@date", dateOnly.ToDateTime(TimeOnly.MinValue));

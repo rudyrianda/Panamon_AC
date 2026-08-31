@@ -63,9 +63,10 @@ namespace MonitoringSystem.Pages.Performance
         public int CachedWorkingTime { get; set; }
         public double CachedLossTime { get; set; }
         public int CachedDefect { get; set; }
-        public string CurrentModelName { get; private set; } = "-";
-        public int CurrentModelTotal { get; private set; }
         public List<CycleTimeChartPoint> CycleTimeChartPoints { get; private set; } = new();
+        public int? DailyMinimumCycleTime { get; private set; }
+        public int? DailyMaximumCycleTime { get; private set; }
+        public double? DailyAverageCycleTime { get; private set; }
 
         public List<ProductionAchievement> listProdAchieve = new List<ProductionAchievement>();
         public List<AssemblyTime> assemblyTimes = new List<AssemblyTime>();
@@ -78,7 +79,6 @@ namespace MonitoringSystem.Pages.Performance
         {
             LoadBreakTimesFromDb(); // Aman: sudah di-comment isinya, return langsung
             GetHourlyAchievement();
-            GetCurrentModelTotal();
             LoadCycleTimeMonitoring();
             GetAssemblyTime();
 
@@ -783,78 +783,17 @@ namespace MonitoringSystem.Pages.Performance
             }
         }
 
-        private void GetCurrentModelTotal()
-        {
-            CurrentModelName = "-";
-            CurrentModelTotal = 0;
-
-            var shiftStart = SelectedDate.Date.AddHours(7);
-            var shiftEnd = shiftStart.AddDays(1);
-
-            try
-            {
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    connection.Open();
-                    const string query = @"
-                    WITH ShiftData AS
-                    (
-                        SELECT Product_Id, SDate
-                        FROM OEESN
-                        WHERE MachineCode = @MachineCode
-                          AND SDate >= @ShiftStart
-                          AND SDate < @ShiftEnd
-                    ),
-                    LastScan AS
-                    (
-                        SELECT TOP (1) Product_Id
-                        FROM ShiftData
-                        ORDER BY SDate DESC
-                    )
-                    SELECT
-                        COALESCE(model.ProductName, lastScan.Product_Id) AS CurrentModel,
-                        COUNT(*) AS ModelTotal
-                    FROM LastScan lastScan
-                    INNER JOIN ShiftData shiftData
-                        ON shiftData.Product_Id = lastScan.Product_Id
-                    OUTER APPLY
-                    (
-                        SELECT TOP (1) masterData.ProductName
-                        FROM MasterData masterData
-                        WHERE masterData.Product_Id = lastScan.Product_Id
-                          AND masterData.MachineCode = @MachineCode
-                    ) model
-                    GROUP BY COALESCE(model.ProductName, lastScan.Product_Id);";
-
-                    using (SqlCommand command = new SqlCommand(query, connection))
-                    {
-                        command.Parameters.Add("@MachineCode", System.Data.SqlDbType.VarChar, 30).Value = MachineCode;
-                        command.Parameters.Add("@ShiftStart", System.Data.SqlDbType.DateTime2).Value = shiftStart;
-                        command.Parameters.Add("@ShiftEnd", System.Data.SqlDbType.DateTime2).Value = shiftEnd;
-
-                        using (SqlDataReader reader = command.ExecuteReader())
-                        {
-                            if (reader.Read())
-                            {
-                                CurrentModelName = reader.IsDBNull(0) ? "-" : reader.GetString(0);
-                                CurrentModelTotal = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error in GetCurrentModelTotal: " + ex.Message);
-            }
-        }
-
         private void LoadCycleTimeMonitoring()
         {
             CycleTimeChartPoints.Clear();
+            DailyMinimumCycleTime = null;
+            DailyMaximumCycleTime = null;
+            DailyAverageCycleTime = null;
+
             var scans = new List<CycleTimeScan>();
             var shiftStart = SelectedDate.Date.AddHours(7);
             var shiftEnd = shiftStart.AddDays(1);
+            var dailySummaryEnd = SelectedDate.Date.AddHours(16);
 
             try
             {
@@ -927,21 +866,40 @@ namespace MonitoringSystem.Pages.Performance
 
                 LoadCycleBreakTimes();
 
-                CycleTimeChartPoints = scans
+                var validCycles = scans
                     .Select(scan => new
                     {
                         Scan = scan,
                         ActualCycleTime = GetCycleTimeWithoutBreak(scan)
                     })
                     .Where(item => item.ActualCycleTime.HasValue && item.Scan.PlanCycleTime > 0)
+                    .Select(item => new
+                    {
+                        item.Scan,
+                        ActualCycleTime = item.ActualCycleTime!.Value
+                    })
+                    .ToList();
+
+                CycleTimeChartPoints = validCycles
                     .Select(item => new CycleTimeChartPoint
                     {
                         Label = item.Scan.WaktuScan.ToString("HH:mm:ss"),
                         ModelProduk = item.Scan.ModelProduk,
                         PlanCycleTime = item.Scan.PlanCycleTime,
-                        ActualCycleTime = item.ActualCycleTime!.Value
+                        ActualCycleTime = item.ActualCycleTime
                     })
                     .ToList();
+
+                var dailyCycles = validCycles
+                    .Where(item => item.Scan.WaktuScan >= shiftStart && item.Scan.WaktuScan < dailySummaryEnd)
+                    .ToList();
+
+                if (dailyCycles.Count > 0)
+                {
+                    DailyMinimumCycleTime = dailyCycles.Min(item => item.ActualCycleTime);
+                    DailyMaximumCycleTime = dailyCycles.Max(item => item.ActualCycleTime);
+                    DailyAverageCycleTime = Math.Round(dailyCycles.Average(item => item.ActualCycleTime), 1);
+                }
             }
             catch (Exception ex)
             {
@@ -970,6 +928,17 @@ namespace MonitoringSystem.Pages.Performance
                     EndTime = rest.EndTime,
                     Reason = "Rest Time"
                 }));
+
+            var today = DateTime.Today;
+            if (SelectedDate.Year == today.Year && SelectedDate.Month == today.Month)
+            {
+                breakTimes.Add(new BreakTimeInfo
+                {
+                    StartTime = new TimeSpan(12, 15, 0),
+                    EndTime = new TimeSpan(13, 0, 0),
+                    Reason = "Istirahat Siang"
+                });
+            }
 
             _cycleBreakTimes = breakTimes
                 .GroupBy(item => new { item.StartTime, item.EndTime })

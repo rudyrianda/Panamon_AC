@@ -41,6 +41,8 @@ namespace MonitoringSystem.Pages.LossTime
 
         [BindProperty] public DateTime StartSelectedDate { get; set; } = DateTime.Today;
         [BindProperty] public DateTime EndSelectedDate { get; set; } = DateTime.Today;
+        [BindProperty] public DateTime? DateRangeStart { get; set; }
+        [BindProperty] public DateTime? DateRangeEnd { get; set; }
         [BindProperty] public int SelectedMonth { get; set; } = DateTime.Today.Month;
         [BindProperty] public int SelectedYear { get; set; } = DateTime.Today.Year;
         [BindProperty] public int TargetYear { get; set; } = DateTime.Today.Year;
@@ -50,17 +52,20 @@ namespace MonitoringSystem.Pages.LossTime
         [BindProperty] public string SelectedMachineName { get; set; } = "All";
         [BindProperty] public List<string> SelectedShifts { get; set; } = new List<string> { "1", "2", "3" };
         [BindProperty] public int SelectedPageSize { get; set; } = 10;
+        [BindProperty] public string ChartCategoryFilter { get; set; } = "all";
 
         [BindProperty] public IFormFile UploadedExcel { get; set; }
         [BindProperty] public string UploadMachineLine { get; set; }
 
         public bool IsFiltering { get; set; } = false;
+        public bool HasActiveDateRange => DateRangeStart.HasValue && DateRangeEnd.HasValue;
         public Dictionary<string, int> CategorySummary { get; set; } = new Dictionary<string, int>();
         public string ChartDataJson { get; set; }
         public string DailyChartDataJson { get; set; }
 
         // ? NEW: MTT sub-category daily chart data
         public string MttDailyChartDataJson { get; set; }
+        public string MttSummaryChartDataJson { get; set; }
 
         public List<string> MachineNameList { get; set; } = new List<string>();
         public List<LossTimeRecord> AllMttRecords { get; set; } = new List<LossTimeRecord>();
@@ -188,6 +193,88 @@ namespace MonitoringSystem.Pages.LossTime
             EndSelectedDate = StartSelectedDate.AddMonths(1).AddDays(-1);
         }
 
+        private void NormalizeDateRange()
+        {
+            if (!DateRangeStart.HasValue || !DateRangeEnd.HasValue)
+            {
+                DateRangeStart = null;
+                DateRangeEnd = null;
+                return;
+            }
+
+            var start = DateRangeStart.Value.Date;
+            var end = DateRangeEnd.Value.Date;
+            if (start > end)
+                (start, end) = (end, start);
+
+            start = start < StartSelectedDate ? StartSelectedDate : start;
+            end = end > EndSelectedDate ? EndSelectedDate : end;
+
+            if (start > end)
+            {
+                DateRangeStart = null;
+                DateRangeEnd = null;
+                return;
+            }
+
+            DateRangeStart = start;
+            DateRangeEnd = end;
+        }
+
+        private List<LossTimeRecord> ApplyDisplayDateRange(List<LossTimeRecord> records)
+        {
+            if (!HasActiveDateRange) return records;
+
+            var start = DateRangeStart!.Value.Date;
+            var end = DateRangeEnd!.Value.Date;
+            return records.Where(record => record.Date.Date >= start && record.Date.Date <= end).ToList();
+        }
+
+        private List<LossTimeRecord> ApplyEquivalentPreviousMonthRange(List<LossTimeRecord> records)
+        {
+            if (!HasActiveDateRange) return records;
+
+            var previousMonthStart = StartSelectedDate.AddMonths(-1);
+            int daysInPreviousMonth = DateTime.DaysInMonth(previousMonthStart.Year, previousMonthStart.Month);
+            int startDay = Math.Min(DateRangeStart!.Value.Day, daysInPreviousMonth);
+            int endDay = Math.Min(DateRangeEnd!.Value.Day, daysInPreviousMonth);
+            var start = new DateTime(previousMonthStart.Year, previousMonthStart.Month, startDay);
+            var end = new DateTime(previousMonthStart.Year, previousMonthStart.Month, endDay);
+
+            return records.Where(record => record.Date.Date >= start && record.Date.Date <= end).ToList();
+        }
+
+        private void PopulateAttachmentStatus(IEnumerable<LossTimeRecord> records, string recordSource)
+        {
+            if (!string.Equals(recordSource, "Assembly", StringComparison.OrdinalIgnoreCase)) return;
+
+            var recordList = records
+                .Where(record => record.RecordId > 0)
+                .ToList();
+
+            if (!recordList.Any()) return;
+
+            var recordIds = recordList
+                .Select(record => record.RecordId)
+                .Distinct()
+                .ToHashSet();
+
+            // Jangan gunakan recordIds.Contains() di dalam LINQ-to-SQL. Pada SQL Server
+            // lama EF menerjemahkannya menjadi OPENJSON dengan path '$' dan query gagal.
+            var sourceAttachmentRecordIds = _context.LossTimeAttachments
+                .Where(attachment => attachment.RecordSource == recordSource)
+                .Select(attachment => attachment.RecordId)
+                .Distinct()
+                .ToList();
+
+            var attachedRecordIds = sourceAttachmentRecordIds
+                .Where(recordIds.Contains)
+                .ToHashSet();
+
+            foreach (var record in recordList)
+                record.HasAttachment = attachedRecordIds.Contains(record.RecordId);
+        }
+
         public IActionResult OnPostFilter()
         {
             _cachedBreakTimes = null;
@@ -202,9 +289,37 @@ namespace MonitoringSystem.Pages.LossTime
             return Page();
         }
 
+        public IActionResult OnPostDateRange(string dateRangeAction)
+        {
+            CurrentPage = 1;
+            PageSize = SelectedPageSize > 0 ? SelectedPageSize : 10;
+            ChartCategoryFilter = string.Equals(ChartCategoryFilter, "mtt", StringComparison.OrdinalIgnoreCase)
+                ? "mtt"
+                : "all";
+            SetDatesFromMonthYear();
+
+            if (string.Equals(dateRangeAction, "clear", StringComparison.OrdinalIgnoreCase))
+            {
+                DateRangeStart = null;
+                DateRangeEnd = null;
+            }
+            else
+            {
+                NormalizeDateRange();
+            }
+
+            if (SelectedShifts == null || !SelectedShifts.Any())
+                SelectedShifts = new List<string> { "1", "2", "3" };
+
+            LoadMachineNameList();
+            LoadData();
+            return Page();
+        }
+
         public IActionResult OnPostChangePage(int pageNumber, int pageSize, int selectedMonth, int selectedYear,
             string machineLine, List<string> selectedShifts,
-            string selectedSource = "Assembly", string selectedMachineName = "All")
+            string selectedSource = "Assembly", string selectedMachineName = "All",
+            DateTime? dateRangeStart = null, DateTime? dateRangeEnd = null)
         {
             CurrentPage = pageNumber;
             PageSize = pageSize;
@@ -215,6 +330,9 @@ namespace MonitoringSystem.Pages.LossTime
             SelectedShifts = selectedShifts ?? new List<string> { "1", "2", "3" };
             SelectedSource = selectedSource;
             SelectedMachineName = selectedMachineName;
+            DateRangeStart = dateRangeStart;
+            DateRangeEnd = dateRangeEnd;
+            NormalizeDateRange();
             LoadMachineNameList();
             LoadData();
             return Page();
@@ -235,6 +353,8 @@ namespace MonitoringSystem.Pages.LossTime
             CurrentPage = 1;
             SelectedSource = "Assembly";
             SelectedMachineName = "All";
+            DateRangeStart = null;
+            DateRangeEnd = null;
             LoadMachineNameList();
             LoadData();
             return Page();
@@ -331,27 +451,34 @@ namespace MonitoringSystem.Pages.LossTime
                 lastMonthRecords = lastMonthRecords.Where(r => r.Location == MachineLine).ToList();
             }
 
-            PrepareSummaryChartData(currentRecords, lastMonthRecords);
+            var displayedRecords = ApplyDisplayDateRange(currentRecords);
+            var displayedLastMonthRecords = ApplyEquivalentPreviousMonthRange(lastMonthRecords);
+
+            PrepareSummaryChartData(displayedRecords, displayedLastMonthRecords);
             PrepareDailyChartData(currentRecords);
-            // ? NEW: Prepare MTT sub-category daily chart
+            // Panel atas mengikuti Date Range, sedangkan Daily tetap satu bulan penuh.
+            PrepareMttDailyChartData(displayedRecords);
+            MttSummaryChartDataJson = MttDailyChartDataJson;
             PrepareMttDailyChartData(currentRecords);
 
-            TotalRecords = currentRecords.Count;
+            TotalRecords = displayedRecords.Count;
             EnsureValidCurrentPage();
-            LossTimeData = currentRecords
+            LossTimeData = displayedRecords
                 .OrderByDescending(r => r.Date)
                 .ThenBy(r => r.Location)
                 .Skip((CurrentPage - 1) * PageSize)
                 .Take(PageSize)
                 .ToList();
 
-            Console.WriteLine($"? LoadDataFromAssembly: {currentRecords.Count} records in {sw.ElapsedMilliseconds}ms");
+            Console.WriteLine($"? LoadDataFromAssembly: {displayedRecords.Count} displayed records in {sw.ElapsedMilliseconds}ms");
 
-            AllMttRecords = currentRecords
+            AllMttRecords = displayedRecords
     .Where(r => r.Category == "Machine & Tools Trouble")
     .OrderByDescending(r => r.Date)
     .ThenBy(r => r.Location)
     .ToList();
+
+            PopulateAttachmentStatus(LossTimeData.Concat(AllMttRecords), SelectedSource);
         }
 
 
@@ -411,14 +538,19 @@ namespace MonitoringSystem.Pages.LossTime
             var currentRecords = GetMachineRecords(StartSelectedDate, EndSelectedDate);
             var lastMonthRecords = GetMachineRecords(lastMonthStart, lastMonthEnd);
 
-            PrepareSummaryChartData(currentRecords, lastMonthRecords);
+            var displayedRecords = ApplyDisplayDateRange(currentRecords);
+            var displayedLastMonthRecords = ApplyEquivalentPreviousMonthRange(lastMonthRecords);
+
+            PrepareSummaryChartData(displayedRecords, displayedLastMonthRecords);
             PrepareDailyChartData(currentRecords);
-            // ? NEW: Prepare MTT sub-category daily chart for machine source too
+            // Panel atas mengikuti Date Range, sedangkan Daily tetap satu bulan penuh.
+            PrepareMttDailyChartData(displayedRecords);
+            MttSummaryChartDataJson = MttDailyChartDataJson;
             PrepareMttDailyChartData(currentRecords);
 
-            TotalRecords = currentRecords.Count;
+            TotalRecords = displayedRecords.Count;
             EnsureValidCurrentPage();
-            LossTimeData = currentRecords
+            LossTimeData = displayedRecords
                 .OrderByDescending(r => r.Date)
                 .Skip((CurrentPage - 1) * PageSize)
                 .Take(PageSize)
@@ -426,11 +558,13 @@ namespace MonitoringSystem.Pages.LossTime
 
             Console.WriteLine($"? LoadDataFromMachine: {LossTimeData.Count} records in {sw.ElapsedMilliseconds}ms");
 
-            AllMttRecords = currentRecords
+            AllMttRecords = displayedRecords
     .Where(r => r.Category == "Machine & Tools Trouble")
     .OrderByDescending(r => r.Date)
     .ThenBy(r => r.Location)
     .ToList();
+
+            PopulateAttachmentStatus(LossTimeData.Concat(AllMttRecords), SelectedSource);
         }
 
         private List<LossTimeRecord> GetMachineRecords(DateTime start, DateTime end)
@@ -1481,5 +1615,6 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
         public string Shift { get; set; }
         public string Category { get; set; }
         public string DetailedReason { get; set; }
+        public bool HasAttachment { get; set; }
     }
 }  // ← tutup namespace

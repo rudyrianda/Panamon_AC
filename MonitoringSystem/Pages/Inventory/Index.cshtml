@@ -32,6 +32,7 @@
 
 <link rel="stylesheet" href="~/css/inventory.css" />
 
+<div class="inventory-dashboard">
 <div class="filter-area-with-lines">
     <div class="panamon-bottom-line"></div>
     <div class="panamon-bottomm-line"></div>
@@ -59,6 +60,8 @@
                             <option value="" selected="@(string.IsNullOrEmpty(Model.FilterMachineLine))">All</option>
                             <option value="MCH1-01" selected="@(Model.FilterMachineLine == "MCH1-01")">CU</option>
                             <option value="MCH1-02" selected="@(Model.FilterMachineLine == "MCH1-02")">CS</option>
+                            <option value="CAC" selected="@(Model.FilterMachineLine == "CAC")">CAC</option>
+                            <option value="Machine" selected="@(Model.FilterMachineLine == "Machine")">Machine</option>
                         </select>
                     </div>
                     <button type="submit" class="btn btn-primary">Search</button>
@@ -161,6 +164,7 @@
 
         </div>
     </div>
+</div>
 </div>
 
 <script>

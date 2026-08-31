@@ -57,6 +57,8 @@ namespace MonitoringSystem.Pages.ProductionReport
             public int OriginalPlan { get; set; } = 0;
             public int OtOriginalPlan { get; set; } = 0;
             public int NoOfOperator { get; set; } = 0;
+            public int PlanNoOfWorker { get; set; } = 0;
+            public int PlanNoOfWorkerOvertime { get; set; } = 0;
             public int OtOperatorCount { get; set; } = 0;
             public TimeSpan LastOtTime { get; set; } = TimeSpan.Zero;
             public TimeSpan? OT_S1_Time { get; set; } = null;
@@ -279,6 +281,31 @@ namespace MonitoringSystem.Pages.ProductionReport
       AND pp.CurrentDate < DATEADD(MONTH, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1))
       AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')
       {planShiftFilter}";
+
+            // Workforce shown in Production Achievement must follow the latest
+            // Change Plan values saved in ProductionRecords, not oeesn.NoOfOperator.
+            // MAX prevents the same line workforce from being counted repeatedly
+            // when a day contains multiple product rows; All lines are then summed.
+            string planWorkerSql = $@"
+    SELECT Day,
+           SUM(PlanNoOfWorker) AS PlanNoOfWorker,
+           SUM(PlanNoOfWorkerOvertime) AS PlanNoOfWorkerOvertime
+    FROM (
+        SELECT DAY(pp.CurrentDate) AS Day,
+               pr.MachineCode,
+               MAX(ISNULL(pr.NoDirectOfWorker, 0)) AS PlanNoOfWorker,
+               MAX(ISNULL(pr.NoDirectOfWorkerOvertime, 0)) AS PlanNoOfWorkerOvertime
+        FROM ProductionPlan pp
+        INNER JOIN ProductionRecords pr ON pp.Id = pr.PlanId
+        WHERE pp.CurrentDate >= DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)
+          AND pp.CurrentDate < DATEADD(MONTH, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1))
+          {(MachineLine != "All"
+                        ? "AND pr.MachineCode = @MachineLine"
+                        : "AND pr.MachineCode IN ('MCH1-01', 'MCH1-02')")}
+          {planShiftFilter}
+        GROUP BY DAY(pp.CurrentDate), pr.MachineCode
+    ) workerByMachine
+    GROUP BY Day";
 
             string actualSql = $@"
 WITH ShiftData AS (
@@ -519,6 +546,30 @@ GROUP BY DAY(pp.CurrentDate)";
                                 }
                             }
                         }
+
+                        using (var workerCmd = new SqlCommand(planWorkerSql, conn))
+                        {
+                            workerCmd.Parameters.AddWithValue("@SelectedYear", SelectedYear);
+                            workerCmd.Parameters.AddWithValue("@SelectedMonth", SelectedMonth);
+                            if (MachineLine != "All") workerCmd.Parameters.AddWithValue("@MachineLine", MachineLine);
+
+                            using (var reader = workerCmd.ExecuteReader())
+                            {
+                                while (reader.Read())
+                                {
+                                    var d = combinedData.FirstOrDefault(x => x.Day == (int)reader["Day"]);
+                                    if (d != null)
+                                    {
+                                        d.PlanNoOfWorker = reader["PlanNoOfWorker"] != DBNull.Value
+                                            ? Convert.ToInt32(reader["PlanNoOfWorker"])
+                                            : 0;
+                                        d.PlanNoOfWorkerOvertime = reader["PlanNoOfWorkerOvertime"] != DBNull.Value
+                                            ? Convert.ToInt32(reader["PlanNoOfWorkerOvertime"])
+                                            : 0;
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     using (var actualCmd = new SqlCommand(actualSql, conn))
@@ -707,16 +758,7 @@ GROUP BY DAY(pp.CurrentDate)";
 
                 OvertimeMinutes.Add(totalOtMinutes);
 
-                int overtimeOpCount = 0;
-                if (isWeekend)
-                {
-                    overtimeOpCount = data.NoOfOperator;
-                }
-                else
-                {
-                    overtimeOpCount = (data.Overtime_Unit > 0 || totalOtMinutes > 0) ? data.NoOfOperator : 0;
-                }
-                OvertimeOperators.Add(overtimeOpCount);
+                OvertimeOperators.Add(data.PlanNoOfWorkerOvertime);
 
                 decimal normalUnits = 0;
                 decimal overtimeUnits = 0;
@@ -751,7 +793,7 @@ GROUP BY DAY(pp.CurrentDate)";
                 }
                 NormalData.Add(normalUnits);
                 OvertimeData.Add(overtimeUnits);
-                NoOfDirectWorkers.Add(data.NoOfOperator);
+                NoOfDirectWorkers.Add(data.PlanNoOfWorker);
 
                 dailyLosses.TryGetValue(data.Day, out int lossDurationSec);
 

@@ -178,6 +178,11 @@
     window.addEventListener('resize', updateMachineTabControls);
 
     updateClock();
+    var initialActiveTab = document.querySelector('.machine-tab.active');
+    if (initialActiveTab) {
+        machineTitle.textContent = initialActiveTab.dataset.machine.toUpperCase();
+        loadMachineData(initialActiveTab);
+    }
     window.requestAnimationFrame(updateMachineTabControls);
     window.setInterval(updateClock, 1000);
 }());

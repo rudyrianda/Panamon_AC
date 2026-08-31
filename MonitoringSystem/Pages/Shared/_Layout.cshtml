@@ -45,7 +45,7 @@
 
 </head>
 
-<body class="reusable-bg">
+<body class="reusable-bg @(title == "Machine" ? "machine-production-layout" : null)">
     <script>
         (function () {
             var m = document.cookie.match(/(?:^|; )(?:themeMode|layoutType)=([^;]*)/);

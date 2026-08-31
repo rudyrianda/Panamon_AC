@@ -59,7 +59,6 @@
 
     // ✅ OPTIMASI: Sort sekali di sini, reuse di bawah
     var sortedProdAchieve = Model.listProdAchieve.OrderByDescending(item => item.Time).ToList();
-    var currentModelPlanTotal = 0;
 }
 
 @functions {
@@ -386,6 +385,9 @@
         height: 100%;
         border-collapse: collapse !important;
     }
+    .perf-card .table tbody td {
+        vertical-align: middle !important;
+    }
     .perf-card .table tbody tr { border-bottom: 2px solid rgba(255, 255, 255, 0.22) !important; }
     body.light-mode .perf-card .table tbody tr { border-bottom: 2px solid rgba(61, 121, 176, 0.45) !important; }
     .perf-card .table tbody tr td.perf-td { border-left: 2px solid rgba(255, 255, 255, 0.22) !important; }
@@ -476,13 +478,95 @@
     }
 
     .perf-cycle-chart-wrap {
+        position: relative;
         height: calc(100% - 42px);
         padding: .25rem .65rem .35rem;
     }
 
+    .perf-cycle-day-summary {
+        position: absolute;
+        top: 8px;
+        right: 10px;
+        z-index: 4;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(96px, 1fr));
+        gap: 5px 7px;
+        width: min(340px, calc(100% - 90px));
+        box-sizing: border-box;
+        padding: 3px;
+        border-radius: 5px;
+        background: #47496d;
+        pointer-events: auto;
+    }
+
+    .perf-cycle-day-summary > div {
+        min-width: 0;
+        padding: .24rem .42rem;
+        border: 1px solid rgba(255, 255, 255, .1);
+        border-radius: 4px;
+        background: rgba(16, 31, 64, .68);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, .12);
+        text-align: center;
+    }
+
+    .perf-cycle-day-summary .average-cycle {
+        pointer-events: none;
+    }
+
+    .perf-cycle-day-summary .minimum,
+    .perf-cycle-day-summary .maximum {
+        cursor: pointer;
+        transition: border-color .16s ease, background-color .16s ease, transform .16s ease;
+    }
+
+    .perf-cycle-day-summary .minimum:hover,
+    .perf-cycle-day-summary .minimum:focus-visible,
+    .perf-cycle-day-summary .maximum:hover,
+    .perf-cycle-day-summary .maximum:focus-visible {
+        border-color: rgba(126, 226, 255, .48);
+        background: rgba(23, 43, 82, .84);
+        outline: none;
+        transform: translateY(-1px);
+    }
+
+    .perf-cycle-day-summary span {
+        display: block;
+        overflow: hidden;
+        color: rgba(220, 228, 240, .75);
+        font-size: .62rem;
+        font-weight: 800;
+        letter-spacing: .05em;
+        line-height: 1.1;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, .75);
+    }
+
+    .perf-cycle-day-summary strong {
+        display: block;
+        margin-top: .1rem;
+        color: #ffffff;
+        font-size: .82rem;
+        font-weight: 800;
+        line-height: 1.1;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, .75);
+    }
+
+    .perf-cycle-day-summary .minimum strong {
+        color: #8ff0d0;
+    }
+
+    .perf-cycle-day-summary .maximum strong {
+        color: #ff8294;
+    }
+
+    .perf-cycle-day-summary .average-cycle strong {
+        color: #54c7ec;
+    }
+
     .perf-cycle-window-nav {
         position: absolute;
-        top: 5px;
+        top: 50%;
         right: auto;
         bottom: auto;
         left: 10px;
@@ -496,6 +580,7 @@
         background: rgba(16, 31, 64, .88);
         box-shadow: 0 4px 12px rgba(0, 0, 0, .28);
         backdrop-filter: blur(3px);
+        transform: translateY(-50%);
     }
 
     .perf-cycle-window-nav button {
@@ -551,6 +636,20 @@
         color: #1a1a2e;
     }
 
+    body.light-mode .perf-cycle-day-summary span {
+        color: rgba(26, 26, 46, .7);
+    }
+
+    body.light-mode .perf-cycle-day-summary {
+        background: #dfe8ea;
+    }
+
+    body.light-mode .perf-cycle-day-summary > div {
+        border-color: rgba(61, 121, 176, .18);
+        background: rgba(239, 246, 252, .78);
+        box-shadow: 0 2px 6px rgba(25, 50, 82, .1);
+    }
+
     @@media (max-width: 1200px) {
         .perf-cycle-heading {
             justify-content: flex-start;
@@ -559,6 +658,16 @@
 
         .perf-cycle-heading h2 {
             font-size: .92rem;
+        }
+
+        .perf-cycle-day-summary {
+            grid-template-columns: repeat(3, minmax(82px, 1fr));
+            gap: 4px 6px;
+            width: min(290px, calc(100% - 82px));
+        }
+
+        .perf-cycle-day-summary strong {
+            font-size: .72rem;
         }
     }
 
@@ -647,105 +756,6 @@
         align-self: flex-start;
     }
 
-    .perf-hourly-total-row {
-        display: grid;
-        grid-template-columns: 32% 32% 18% 18%;
-        flex: 0 0 52px;
-        align-items: stretch;
-        border-top: 2px solid rgba(84, 199, 236, 0.55);
-        background: linear-gradient(90deg, rgba(61, 121, 176, 0.92), rgba(43, 85, 137, 0.88));
-        color: #ffffff;
-    }
-
-    .perf-hourly-total-row > span {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 0;
-        padding: .45rem .65rem;
-        border-right: 1px solid rgba(255, 255, 255, 0.14);
-        font-weight: 700;
-        line-height: 1.5;
-    }
-
-    .perf-hourly-total-row > span:last-child {
-        border-right: 0;
-    }
-
-    .perf-hourly-total-label {
-        position: relative;
-        cursor: help;
-    }
-
-    .perf-hourly-total-label::before,
-    .perf-hourly-total-label::after {
-        position: absolute;
-        z-index: 20;
-        left: 68%;
-        pointer-events: none;
-        opacity: 0;
-        visibility: hidden;
-        transition: opacity .15s ease, transform .15s ease;
-    }
-
-    .perf-hourly-total-label::before {
-        content: "";
-        bottom: calc(100% + 2px);
-        border: 7px solid transparent;
-        border-top-color: #101f40;
-        transform: translate(-50%, -3px);
-    }
-
-    .perf-hourly-total-label::after {
-        content: attr(data-tooltip);
-        bottom: calc(100% + 16px);
-        width: max-content;
-        max-width: 380px;
-        padding: .65rem .85rem;
-        border: 1px solid rgba(84, 199, 236, .48);
-        border-radius: 7px;
-        background: #101f40;
-        box-shadow: 0 8px 22px rgba(0, 0, 0, .38);
-        color: #ffffff;
-        font-size: 1rem;
-        font-weight: 600;
-        line-height: 1.35;
-        white-space: nowrap;
-        transform: translate(-12%, 4px);
-    }
-
-    .perf-hourly-total-label:hover::before,
-    .perf-hourly-total-label:hover::after,
-    .perf-hourly-total-label:focus-visible::before,
-    .perf-hourly-total-label:focus-visible::after {
-        opacity: 1;
-        visibility: visible;
-    }
-
-    .perf-hourly-total-label:hover::before,
-    .perf-hourly-total-label:focus-visible::before {
-        transform: translate(-50%, 0);
-    }
-
-    .perf-hourly-total-label:hover::after,
-    .perf-hourly-total-label:focus-visible::after {
-        transform: translate(-12%, 0);
-    }
-
-    .perf-hourly-total-model {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .perf-hourly-total-value {
-        color: #8ff0d0;
-    }
-
-    body.light-mode .perf-hourly-total-row {
-        border-top-color: rgba(24, 112, 158, 0.65);
-        background: linear-gradient(90deg, rgba(61, 121, 176, 0.94), rgba(48, 96, 150, 0.92));
-    }
 </style>
 
 <div class="row mx-3 perf-page-shell">
@@ -796,7 +806,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td rowspan="2" class="perf-th align-middle border border-end fs-4 fw-bold py-3">TAKE TIME</td>
+                        <td rowspan="2" class="perf-th align-middle border border-end fs-4 fw-bold py-3">TAKT TIME</td>
                         <td class="perf-th fs-4 fw-bold py-3">PLAN</td>
                         <td class="perf-td fs-4 fw-bold py-3" id="val-planTaktTime">@planTaktTime s</td>
                     </tr>
@@ -824,6 +834,11 @@
     <div class="col-7 perf-dashboard-right">
         <div class="perf-panel perf-cycle-panel rounded-3 mb-3" style="contain: layout style;">
             <div class="perf-cycle-heading">
+                <div class="perf-cycle-window-nav" aria-label="Navigasi periode cycle time">
+                    <button type="button" id="CycleWindowPrevious" title="Lihat 2 jam sebelumnya" aria-label="Lihat 2 jam sebelumnya">&#8249;</button>
+                    <span class="perf-cycle-window-label" id="CycleWindowLabel">--:--–--:--</span>
+                    <button type="button" id="CycleWindowNext" title="Lihat 2 jam berikutnya" aria-label="Lihat 2 jam berikutnya">&#8250;</button>
+                </div>
                 <h2>CYCLE TIME</h2>
                 <div class="perf-cycle-legend" aria-hidden="true">
                     <span><i class="perf-cycle-legend-line plan"></i>Plan SUT (s)</span>
@@ -832,11 +847,20 @@
             </div>
             <div class="perf-cycle-chart-wrap">
                 <canvas id="PerformanceCycleTimeChart"></canvas>
-            </div>
-            <div class="perf-cycle-window-nav" aria-label="Navigasi periode cycle time">
-                <button type="button" id="CycleWindowPrevious" title="Lihat 2 jam sebelumnya" aria-label="Lihat 2 jam sebelumnya">&#8249;</button>
-                <span class="perf-cycle-window-label" id="CycleWindowLabel">--:--–--:--</span>
-                <button type="button" id="CycleWindowNext" title="Lihat 2 jam berikutnya" aria-label="Lihat 2 jam berikutnya">&#8250;</button>
+                <div class="perf-cycle-day-summary" aria-label="Ringkasan cycle time pukul 07:00 sampai 16:00">
+                    <div class="average-cycle" title="Rata-rata cycle time pukul 07:00–16:00 di luar break time">
+                        <span>AVG CYCLE</span>
+                        <strong>@(Model.DailyAverageCycleTime.HasValue ? $"{Model.DailyAverageCycleTime.Value:0.#} s" : "—")</strong>
+                    </div>
+                    <div class="minimum" role="button" tabindex="0" data-cycle-summary-target="minimum" title="Klik untuk melihat cycle tercepat terbaru pada grafik">
+                        <span>MIN CYCLE</span>
+                        <strong>@(Model.DailyMinimumCycleTime.HasValue ? $"{Model.DailyMinimumCycleTime.Value} s" : "—")</strong>
+                    </div>
+                    <div class="maximum" role="button" tabindex="0" data-cycle-summary-target="maximum" title="Klik untuk melihat cycle terlambat terbaru pada grafik">
+                        <span>MAX CYCLE</span>
+                        <strong>@(Model.DailyMaximumCycleTime.HasValue ? $"{Model.DailyMaximumCycleTime.Value} s" : "—")</strong>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -856,7 +880,10 @@
                         <tr>
                             <th scope="col" style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important;">TIME</th>
                             <th scope="col" style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important;">MODEL</th>
-                            <th scope="col" style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important;">PLAN</th>
+                            <th scope="col"
+                                title="Plan By SUT"
+                                aria-label="Plan By SUT"
+                                style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important; cursor: help;">PLAN</th>
                             <th scope="col" style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important;">ACTUAL</th>
                         </tr>
                     </thead>
@@ -891,13 +918,6 @@
                                             );
                                             previousModel = sortedProdAchieve[i].Model;
 
-                                            if (string.Equals(
-                                                sortedProdAchieve[i].Model,
-                                                Model.CurrentModelName,
-                                                StringComparison.OrdinalIgnoreCase))
-                                            {
-                                                currentModelPlanTotal += planPerHour;
-                                            }
                                         }
                                         @planPerHour
                                             </td>
@@ -914,14 +934,6 @@
                     </tbody>
                 </table>
             </div>
-            <div class="perf-hourly-total-row fs-4">
-                <span class="perf-hourly-total-label"
-                      tabindex="0"
-                      data-tooltip="Total dari model yang sedang berjalan saat ini">TOTAL</span>
-                <span class="perf-hourly-total-model">@Model.CurrentModelName</span>
-                <span>@currentModelPlanTotal</span>
-                <span class="perf-hourly-total-value">@Model.CurrentModelTotal</span>
-            </div>
         </div>
     </div>
 </div>
@@ -935,8 +947,24 @@
             const tickColor   = isLightMode ? '#1a1a2e'                : 'rgba(220,228,240,0.75)';
 
             const CYCLE_WINDOW_MINUTES = 120;
+            const CYCLE_SCALE_TICKS = [0, 10, 20, 30, 40, 50, 60, 100, 150, 200, 250];
             let cycleWindowEndMinute = null;
             let cycleWindowPinnedToLatest = true;
+
+            function cycleSecondsToScalePosition(value) {
+                const seconds = Number(value) || 0;
+                if (seconds <= CYCLE_SCALE_TICKS[0]) return 0;
+
+                for (let index = 0; index < CYCLE_SCALE_TICKS.length - 1; index++) {
+                    const lower = CYCLE_SCALE_TICKS[index];
+                    const upper = CYCLE_SCALE_TICKS[index + 1];
+                    if (seconds <= upper) {
+                        return index + ((seconds - lower) / (upper - lower));
+                    }
+                }
+
+                return CYCLE_SCALE_TICKS.length - 1;
+            }
 
             function cycleLabelToShiftMinute(label) {
                 const parts = String(label || '').split(':').map(Number);
@@ -1003,8 +1031,8 @@
                     bounds,
                     points,
                     labels: points.map(point => point.Label),
-                    planData: points.map(point => point.PlanCycleTime),
-                    actualData: points.map(point => point.ActualCycleTime),
+                    planData: points.map(point => cycleSecondsToScalePosition(point.PlanCycleTime)),
+                    actualData: points.map(point => cycleSecondsToScalePosition(point.ActualCycleTime)),
                     windowEnd,
                     windowStart: Math.max(0, windowEnd - CYCLE_WINDOW_MINUTES)
                 };
@@ -1115,6 +1143,14 @@
                             titleSpacing: 4,
                             bodySpacing: 5,
                             callbacks: {
+                                labelColor(context) {
+                                    const color = context.dataset.borderColor;
+                                    return {
+                                        borderColor: color,
+                                        backgroundColor: color,
+                                        borderWidth: 0
+                                    };
+                                },
                                 title(items) {
                                     const index = items[0]?.dataIndex ?? 0;
                                     const point = cycleWindowView.points[index];
@@ -1147,10 +1183,18 @@
                             grid: { color: gridColor }
                         },
                         y: {
-                            beginAtZero: true,
+                            min: 0,
+                            max: CYCLE_SCALE_TICKS.length - 1,
                             ticks: {
                                 color: tickColor,
-                                callback(value) { return `${formatCycleValue(value, 0)} s`; }
+                                stepSize: 1,
+                                autoSkip: false,
+                                callback(value) {
+                                    const index = Math.round(Number(value));
+                                    return Number(value) === index && CYCLE_SCALE_TICKS[index] !== undefined
+                                        ? `${CYCLE_SCALE_TICKS[index]} s`
+                                        : '';
+                                }
                             },
                             grid: { color: gridColor }
                         }
@@ -1167,7 +1211,7 @@
                 const bounds = cycleWindowView.bounds;
 
                 label.textContent = `${cycleShiftMinuteToTime(cycleWindowView.windowStart)}–${cycleShiftMinuteToTime(cycleWindowView.windowEnd)}`;
-                previousButton.disabled = !bounds.hasData || cycleWindowView.windowStart <= bounds.min;
+                previousButton.disabled = !bounds.hasData || cycleWindowView.windowStart <= 0;
                 nextButton.disabled = !bounds.hasData || cycleWindowPinnedToLatest || cycleWindowView.windowEnd >= bounds.max;
             }
 
@@ -1181,12 +1225,84 @@
                 performanceCycleChart.update('none');
             }
 
+            function getLatestDailyCycleExtreme(type) {
+                const dailyEndMinute = 9 * 60; // 07:00 sampai sebelum 16:00
+                const dailyPoints = (cycleTimeData || []).filter(point => {
+                    const minute = cycleLabelToShiftMinute(point.Label);
+                    return minute !== null && minute >= 0 && minute < dailyEndMinute;
+                });
+
+                if (!dailyPoints.length) return null;
+
+                const extremeValue = type === 'minimum'
+                    ? Math.min(...dailyPoints.map(point => Number(point.ActualCycleTime)))
+                    : Math.max(...dailyPoints.map(point => Number(point.ActualCycleTime)));
+
+                // Cari dari belakang agar nilai yang sama selalu menunjuk scan paling baru.
+                for (let index = dailyPoints.length - 1; index >= 0; index--) {
+                    if (Number(dailyPoints[index].ActualCycleTime) === extremeValue) {
+                        return dailyPoints[index];
+                    }
+                }
+
+                return null;
+            }
+
+            function focusCyclePointFromSummary(type) {
+                const targetPoint = getLatestDailyCycleExtreme(type);
+                if (!targetPoint) return;
+
+                const bounds = getCycleTimeBounds(cycleTimeData);
+                const targetMinute = cycleLabelToShiftMinute(targetPoint.Label);
+                if (!bounds.hasData || targetMinute === null) return;
+
+                const desiredEnd = targetMinute + (CYCLE_WINDOW_MINUTES / 2);
+                cycleWindowEndMinute = bounds.max <= CYCLE_WINDOW_MINUTES
+                    ? bounds.max
+                    : Math.min(bounds.max, Math.max(CYCLE_WINDOW_MINUTES, desiredEnd));
+                cycleWindowPinnedToLatest = cycleWindowEndMinute >= bounds.max;
+                updateCycleWindowChart();
+
+                const targetIndex = cycleWindowView.points.indexOf(targetPoint);
+                if (targetIndex < 0) return;
+
+                const activeElements = [
+                    { datasetIndex: 0, index: targetIndex },
+                    { datasetIndex: 1, index: targetIndex }
+                ];
+                const actualElement = performanceCycleChart.getDatasetMeta(1).data[targetIndex];
+                const tooltipPosition = actualElement
+                    ? { x: actualElement.x, y: actualElement.y }
+                    : { x: performanceCycleChart.chartArea.left, y: performanceCycleChart.chartArea.top };
+
+                performanceCycleChart.setActiveElements(activeElements);
+                performanceCycleChart.tooltip.setActiveElements(activeElements, tooltipPosition);
+                performanceCycleChart.update('none');
+            }
+
+            const cycleDaySummary = document.querySelector('.perf-cycle-day-summary');
+            cycleDaySummary?.addEventListener('click', event => {
+                const target = event.target.closest('[data-cycle-summary-target]');
+                if (!target) return;
+                focusCyclePointFromSummary(target.dataset.cycleSummaryTarget);
+            });
+            cycleDaySummary?.addEventListener('keydown', event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                const target = event.target.closest('[data-cycle-summary-target]');
+                if (!target) return;
+                event.preventDefault();
+                focusCyclePointFromSummary(target.dataset.cycleSummaryTarget);
+            });
+
             document.getElementById('CycleWindowPrevious').addEventListener('click', () => {
                 const bounds = getCycleTimeBounds(cycleTimeData);
                 if (!bounds.hasData) return;
 
                 const currentEnd = cycleWindowEndMinute ?? bounds.max;
-                cycleWindowEndMinute = Math.max(0, currentEnd - CYCLE_WINDOW_MINUTES);
+                const previousEnd = currentEnd - CYCLE_WINDOW_MINUTES;
+                cycleWindowEndMinute = previousEnd < CYCLE_WINDOW_MINUTES
+                    ? CYCLE_WINDOW_MINUTES
+                    : previousEnd;
                 cycleWindowPinnedToLatest = false;
                 updateCycleWindowChart();
             });
@@ -1234,11 +1350,10 @@
                         oldHourly.innerHTML = newHourly.innerHTML;
                     }
 
-                    const oldHourlyTotal = document.querySelector('.perf-hourly-total-row');
-                    const newHourlyTotal = doc.querySelector('.perf-hourly-total-row');
-                    if(oldHourlyTotal && newHourlyTotal) {
-                        oldHourlyTotal.innerHTML = newHourlyTotal.innerHTML;
-                        oldHourlyTotal.title = newHourlyTotal.title;
+                    const oldCycleSummary = document.querySelector('.perf-cycle-day-summary');
+                    const newCycleSummary = doc.querySelector('.perf-cycle-day-summary');
+                    if(oldCycleSummary && newCycleSummary) {
+                        oldCycleSummary.innerHTML = newCycleSummary.innerHTML;
                     }
 
                     // 3. Update Cycle Time Chart dari HTML terbaru.

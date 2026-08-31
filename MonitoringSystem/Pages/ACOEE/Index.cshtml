@@ -8,14 +8,14 @@
     {
         new { Name = "EVAPORATOR", Running = true, Oee = "77.7", Ability = "92.7", Operating = "83.8", Quality = "100", State = "", Duration = "" },
         new { Name = "200T", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
-        new { Name = "100T A", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "CHANGE MODEL", Duration = "151 MIN" },
-        new { Name = "SF 250", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO STATUS", Duration = "97 SEC" },
+        new { Name = "100T A", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "SF 250", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
         new { Name = "FIX 80", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
         new { Name = "CONDENSOR", Running = true, Oee = "76.6", Ability = "91.9", Operating = "83.4", Quality = "100", State = "", Duration = "" },
         new { Name = "100 T B", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
         new { Name = "EXPANDER LHI CHIN", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
         new { Name = "EXPANDER KYOSHIN", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
-        new { Name = "HAIRPIN BENDER NEW", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO SHIFT", Duration = "157 MIN" }
+        new { Name = "HAIRPIN BENDER NEW", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" }
     };
 }
 
@@ -27,9 +27,10 @@
     <title>AC OEE - PANAMON</title>
     <link rel="stylesheet" href="~/lib/fontawesome/css/all.min.css" />
     <link rel="stylesheet" href="~/css/fonts.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/background-style.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/ac-oee.css" asp-append-version="true" />
 </head>
-<body class="ac-oee-page">
+<body class="ac-oee-page ac-oee-dashboard-page">
     <div class="oee-shell">
         <header class="oee-header">
             <a class="panasonic-brand" href="/" aria-label="Panasonic home">
@@ -52,14 +53,8 @@
                     <a class="side-link active" href="/ACOEE">
                         <i class="fa-solid fa-fan"></i><span>Dashboard</span>
                     </a>
-                    <a class="side-link" href="/ACOEE/ProductionData">
-                        <i class="fa-solid fa-chart-column"></i><span>Production<br />Data</span>
-                    </a>
                     <a class="side-link" href="/LossTimeReport/index">
                         <i class="fa-regular fa-clock"></i><span>Downtime<br />History</span>
-                    </a>
-                    <a class="side-link" href="/ACOEE/Inventory">
-                        <i class="fa-solid fa-cube"></i><span>Inventory<br />Data</span>
                     </a>
                 </nav>
                 <div class="sidebar-divider"></div>
@@ -71,7 +66,7 @@
             <main class="oee-main">
                 <section class="summary-grid" aria-label="Machine summary">
                     <article class="summary-card total-card">
-                        <div><span class="summary-label">TOTAL MACHINE</span><strong>17</strong></div>
+                        <div><span class="summary-label">TOTAL MACHINE</span><strong>20</strong></div>
                         <i class="fa-solid fa-chart-simple summary-icon"></i>
                     </article>
                     <article class="summary-card operating-card">
@@ -79,7 +74,7 @@
                         <i class="fa-solid fa-rotate summary-icon"></i>
                     </article>
                     <article class="summary-card stop-card">
-                        <div><span class="summary-label">STOP</span><strong>15</strong></div>
+                        <div><span class="summary-label">STOP</span><strong>18</strong></div>
                         <i class="fa-solid fa-triangle-exclamation summary-icon"></i>
                     </article>
                 </section>

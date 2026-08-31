@@ -11,8 +11,21 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"]</title>
-    <link rel="stylesheet" href="~/css/dashboard.css" />
+    <link rel="stylesheet" href="~/css/dashboard.css" asp-append-version="true" />
     <script src="~/lib/chartjs/chart.umd.min.js"></script>
+    <script>
+        // Keep the wallboard's 100% visual size when the browser is set to 80%.
+        (function () {
+            const syncDashboardZoom = () => {
+                const isEightyPercent = window.devicePixelRatio >= 0.79
+                    && window.devicePixelRatio <= 0.81;
+                document.documentElement.classList.toggle('dashboard-zoom-80', isEightyPercent);
+            };
+
+            syncDashboardZoom();
+            window.addEventListener('resize', syncDashboardZoom);
+        })();
+    </script>
 </head>
 <body>
 
@@ -81,7 +94,7 @@
                     </div>
                 </div>
                 
-                <div class="stat-card bottom-card">
+                <div class="stat-card bottom-card" onclick="window.open('http://10.83.34.226:6003/', 'fan_dashboard')" style="cursor:pointer;">
                     <div class="metric-header">
                         <div id="title_fan" class="card-title">Assembly Achievement</div>
                     </div>
@@ -91,7 +104,7 @@
                     </div>
                 </div>
 
-                <div class="stat-card bottom-card" onclick="window.open('http://10.83.32.31:7189', 'wp_dashboard')" style="cursor:pointer;">
+                <div class="stat-card bottom-card" onclick="window.open('http://10.83.32.31:6002', 'wp_dashboard')" style="cursor:pointer;">
                     <div class="metric-header">
                         <div id="title_wp" class="card-title">Assembly Achievement</div>
                     </div>
@@ -116,7 +129,7 @@
                 </div>
             </div>
 
-            <div class="stat-card" onclick="window.open('http://10.83.34.43:8080', 'audio_dashboard')" style="cursor:pointer;">
+            <div class="stat-card" onclick="window.open('http://10.83.34.43:7000', 'ls_dashboard')" style="cursor:pointer;">
                 <div class="metric-header">
                     <div id="title_ls" class="card-title">Assembly Achievement</div>
                 </div>
@@ -127,7 +140,7 @@
             </div>
 
             <!-- SESUDAH (jadi card Refrigerator) -->
-            <div class="stat-card">
+            <div class="stat-card" onclick="window.open('http://10.83.33.103:4447', 'ref_dashboard')" style="cursor:pointer;">
                 <div class="metric-header">
                     <div id="title_ref" class="card-title">Assembly Achievement</div>
                 </div>
@@ -352,21 +365,16 @@
         // ═══════════════════════════════════════════════════════
         function initChartInstance(id) { updateGauge(id, null, null, 0, 0, 0); }
 
-        // data DUMY
-                function toggleDummyBadge(elementId, isDummy) {
-            const el = document.getElementById(elementId);
-            if (el) el.style.display = isDummy ? 'block' : 'none';
-        }
-
         function updateGauge(canvasId, valId, endId, act, curPlan, dayPlan) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
 
             act = act||0; curPlan = curPlan||0; dayPlan = dayPlan||0;
 
-            const pct       = curPlan > 0 ? (act/curPlan)*100 : 0;
-            const planPct   = dayPlan > 0 ? Math.min((curPlan/dayPlan)*100, 120) : 0;
-            const actualPct = dayPlan > 0 ? Math.min((act/dayPlan)*100, 120) : 0;
+            const pct        = curPlan > 0 ? (act/curPlan)*100 : 0;
+            const gaugeScale = dayPlan > 0 ? dayPlan : Math.max(curPlan, act);
+            const planPct    = gaugeScale > 0 ? Math.min((curPlan/gaugeScale)*100, 120) : 0;
+            const actualPct  = gaugeScale > 0 ? Math.min((act/gaugeScale)*100, 120) : 0;
             const needlePct = Math.min(pct, 120);
 
             const wrapper = canvas.parentElement;
@@ -645,7 +653,7 @@
 
                 // ── WP ──
                 if (data.dataWP?.total) {
-                    const wp       = data.dataWP.total;
+                    const wp = data.dataWP.total;
                     updateGauge('wp_1_ach', null, null, wp.totalActual, wp.totalPlan, wp.dailyPlan);
 
                     const wpDef    = wp.defectsByCategory || [];
@@ -682,7 +690,7 @@
 
                 // ── Ref ──
                 updateGauge('ref_1_ach', null, null, data.dataRef.totalActual, data.dataRef.totalPlan, data.dataRef.dailyPlan);
-                updateGauge('ref_2_ach', null, null, 0, 0, 0);
+                updateGauge('ref_2_ach', null, null, data.dataWD.totalActual, data.dataWD.totalPlan, data.dataWD.dailyPlan);
 
             } catch (err) { console.error(err); }
         }

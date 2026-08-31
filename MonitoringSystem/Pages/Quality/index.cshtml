@@ -26,12 +26,12 @@
     </div>
 </div>
 
-<div class="container-fluid dashboard-container">
+<div class="container-fluid dashboard-container quality-dashboard">
     <form method="post">
         <input type="hidden" id="selectedMachineCode" name="MachineCode" value="@Model.MachineCode" />
 
-        <div class="row g-3">
-            <div class="col-md-2">
+        <div class="row g-3 quality-main-row">
+            <div class="col-md-2 quality-filter-column">
                 <div class="grid-border">
                     <label class="fw-semibold" style="font-size: 0.9rem; color: var(--panasonic-blue); margin-bottom: 8px; display: block;">SELECT LINE</label>
                     <select class="form-control" id="machineDropdown" style="background-color: white; border: 2px solid var(--panasonic-blue); color: var(--text-dark); padding: 8px; border-radius: 5px; margin-bottom: 10px;" onchange="document.getElementById('selectedMachineCode').value = this.value; this.form.submit();">
@@ -41,7 +41,7 @@
                     </select>
                 </div>
 
-                <div class="grid-border">
+                <div class="grid-border quality-station-panel">
                     <div class="section-title" style="font-size:1rem;">STATION</div>
                     <div class="btn-custom-group">
                             <button type="submit" name="Station" value="" class="@(string.IsNullOrEmpty(Model.Station) ? "btn-blue-active" : "btn-outline-inactive")">ALL STATION</button>
@@ -69,9 +69,9 @@
                 </div>
             </div>
 
-            <div class="col-md-10">
+            <div class="col-md-10 quality-content-column">
 
-                <div class="row g-2 mb-3">
+                <div class="row g-2 quality-kpi-row">
                     <div class="col-md-3">
                         <div class="kpi-box">
                             <div class="kpi-header">TARGET RATIO</div>
@@ -106,20 +106,20 @@
                     </div>
                 </div>
 
-                <div class="row g-3 mb-3" style="height: 380px;">
+                <div class="row g-3 quality-upper-charts">
                     <div class="col-md-6">
                         <div class="grid-border fill-height">
                             <div class="section-title">DEFECT CLASSIFICATION (BY STATION)</div>
-                            <div class="flex-grow-1 d-flex justify-content-center align-items-center">
-                                <canvas id="pieb" style="max-height: 300px; max-width: 100%;"></canvas>
+                            <div class="quality-chart-body flex-grow-1 d-flex justify-content-center align-items-center">
+                                <canvas id="pieb"></canvas>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="grid-border fill-height">
                             <div class="section-title">DEFECT CAUSES</div>
-                            <div class="flex-grow-1 d-flex justify-content-center align-items-center">
-                                <canvas id="bar" style="max-height: 300px; width: 100%;"></canvas>
+                            <div class="quality-chart-body flex-grow-1 d-flex justify-content-center align-items-center">
+                                <canvas id="bar"></canvas>
                             </div>
                         </div>
                     </div>
@@ -136,12 +136,12 @@
                 @*     </div> *@
                 @* </div> *@
 
-                <div class="row g-0">
+                <div class="row g-0 quality-yearly-chart">
                     <div class="col-12">
-                        <div class="grid-border fill-height" style="height: 350px;">
+                        <div class="grid-border fill-height">
                             <div class="section-title">YEARLY DEFECT GRAPHICS @DateTime.Parse(Model.StartDate).Year</div>
-                            <div class="flex-grow-1 d-flex justify-content-center">
-                                <canvas id="bara" style="width: 100%; height: 100%;"></canvas>
+                            <div class="quality-chart-body flex-grow-1 d-flex justify-content-center">
+                                <canvas id="bara"></canvas>
                             </div>
                         </div>
                     </div>
