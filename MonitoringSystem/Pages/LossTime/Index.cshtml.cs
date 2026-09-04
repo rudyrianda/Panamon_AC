@@ -13,6 +13,7 @@ namespace MonitoringSystem.Pages.LossTime
 {
     public class IndexModel : PageModel
     {
+        private const int DefaultPageSize = 10;
         private readonly ApplicationDbContext _context;
 
         public IndexModel(ApplicationDbContext context, IConfiguration configuration, IWebHostEnvironment webHostEnvironment, MonitoringSystem.Services.BreakTimeService breakTimeService)
@@ -34,7 +35,7 @@ namespace MonitoringSystem.Pages.LossTime
         public List<LossTimeRecord> LossTimeData { get; set; } = new List<LossTimeRecord>();
         public int TotalDuration { get; set; }
         public int CurrentPage { get; set; } = 1;
-        public int PageSize { get; set; } = 10;
+        public int PageSize { get; set; } = DefaultPageSize;
         public int TotalPages => (int)Math.Ceiling((double)TotalRecords / PageSize);
         public int TotalRecords { get; set; }
         public bool HasDataToDisplay => TotalRecords > 0;
@@ -51,7 +52,7 @@ namespace MonitoringSystem.Pages.LossTime
         [BindProperty] public string SelectedSource { get; set; } = "Assembly";
         [BindProperty] public string SelectedMachineName { get; set; } = "All";
         [BindProperty] public List<string> SelectedShifts { get; set; } = new List<string> { "1", "2", "3" };
-        [BindProperty] public int SelectedPageSize { get; set; } = 10;
+        [BindProperty] public int SelectedPageSize { get; set; } = DefaultPageSize;
         [BindProperty] public string ChartCategoryFilter { get; set; } = "all";
 
         [BindProperty] public IFormFile UploadedExcel { get; set; }
@@ -177,7 +178,7 @@ namespace MonitoringSystem.Pages.LossTime
 
 
 
-        public void OnGet(int pageNumber = 1, int pageSize = 10)
+        public void OnGet(int pageNumber = 1, int pageSize = DefaultPageSize)
         {
             CurrentPage = pageNumber;
             PageSize = pageSize;
@@ -244,6 +245,18 @@ namespace MonitoringSystem.Pages.LossTime
             return records.Where(record => record.Date.Date >= start && record.Date.Date <= end).ToList();
         }
 
+        private int[] GetDisplayDays()
+        {
+            if (!HasActiveDateRange)
+                return Enumerable.Range(1, DateTime.DaysInMonth(SelectedYear, SelectedMonth)).ToArray();
+
+            var start = DateRangeStart!.Value.Date;
+            var end = DateRangeEnd!.Value.Date;
+            return Enumerable.Range(0, (end - start).Days + 1)
+                .Select(offset => start.AddDays(offset).Day)
+                .ToArray();
+        }
+
         private void PopulateAttachmentStatus(IEnumerable<LossTimeRecord> records, string recordSource)
         {
             if (!string.Equals(recordSource, "Assembly", StringComparison.OrdinalIgnoreCase)) return;
@@ -281,6 +294,7 @@ namespace MonitoringSystem.Pages.LossTime
             CurrentPage = 1;
             PageSize = SelectedPageSize;
             SetDatesFromMonthYear();
+            NormalizeDateRange();
             if (SelectedShifts == null || !SelectedShifts.Any())
                 SelectedShifts = new List<string> { "1", "2", "3" };
             LoadMachineNameList();
@@ -292,7 +306,7 @@ namespace MonitoringSystem.Pages.LossTime
         public IActionResult OnPostDateRange(string dateRangeAction)
         {
             CurrentPage = 1;
-            PageSize = SelectedPageSize > 0 ? SelectedPageSize : 10;
+            PageSize = SelectedPageSize > 0 ? SelectedPageSize : DefaultPageSize;
             ChartCategoryFilter = string.Equals(ChartCategoryFilter, "mtt", StringComparison.OrdinalIgnoreCase)
                 ? "mtt"
                 : "all";
@@ -347,8 +361,8 @@ namespace MonitoringSystem.Pages.LossTime
             SetDatesFromMonthYear();
             MachineLine = "All";
             SelectedShifts = new List<string> { "1", "2", "3" };
-            SelectedPageSize = 10;
-            PageSize = 10;
+            SelectedPageSize = DefaultPageSize;
+            PageSize = DefaultPageSize;
             IsFiltering = false;
             CurrentPage = 1;
             SelectedSource = "Assembly";
@@ -455,19 +469,15 @@ namespace MonitoringSystem.Pages.LossTime
             var displayedLastMonthRecords = ApplyEquivalentPreviousMonthRange(lastMonthRecords);
 
             PrepareSummaryChartData(displayedRecords, displayedLastMonthRecords);
-            PrepareDailyChartData(currentRecords);
-            // Panel atas mengikuti Date Range, sedangkan Daily tetap satu bulan penuh.
+            PrepareDailyChartData(displayedRecords);
             PrepareMttDailyChartData(displayedRecords);
             MttSummaryChartDataJson = MttDailyChartDataJson;
-            PrepareMttDailyChartData(currentRecords);
 
             TotalRecords = displayedRecords.Count;
             EnsureValidCurrentPage();
             LossTimeData = displayedRecords
                 .OrderByDescending(r => r.Date)
                 .ThenBy(r => r.Location)
-                .Skip((CurrentPage - 1) * PageSize)
-                .Take(PageSize)
                 .ToList();
 
             Console.WriteLine($"? LoadDataFromAssembly: {displayedRecords.Count} displayed records in {sw.ElapsedMilliseconds}ms");
@@ -542,18 +552,14 @@ namespace MonitoringSystem.Pages.LossTime
             var displayedLastMonthRecords = ApplyEquivalentPreviousMonthRange(lastMonthRecords);
 
             PrepareSummaryChartData(displayedRecords, displayedLastMonthRecords);
-            PrepareDailyChartData(currentRecords);
-            // Panel atas mengikuti Date Range, sedangkan Daily tetap satu bulan penuh.
+            PrepareDailyChartData(displayedRecords);
             PrepareMttDailyChartData(displayedRecords);
             MttSummaryChartDataJson = MttDailyChartDataJson;
-            PrepareMttDailyChartData(currentRecords);
 
             TotalRecords = displayedRecords.Count;
             EnsureValidCurrentPage();
             LossTimeData = displayedRecords
                 .OrderByDescending(r => r.Date)
-                .Skip((CurrentPage - 1) * PageSize)
-                .Take(PageSize)
                 .ToList();
 
             Console.WriteLine($"? LoadDataFromMachine: {LossTimeData.Count} records in {sw.ElapsedMilliseconds}ms");
@@ -747,8 +753,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
             try
             {
 
-                int daysInMonth = DateTime.DaysInMonth(SelectedYear, SelectedMonth);
-                var days = Enumerable.Range(1, daysInMonth).ToArray();
+                var days = GetDisplayDays();
                 var dailyGroups = currentRecords
                     .GroupBy(r => new { Day = r.Date.Day, r.Category })
                     .ToDictionary(g => g.Key, g => g.Sum(x => x.Duration));
@@ -778,8 +783,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
         {
             try
             {
-                int daysInMonth = DateTime.DaysInMonth(SelectedYear, SelectedMonth);
-                var days = Enumerable.Range(1, daysInMonth).ToArray();
+                var days = GetDisplayDays();
 
                 // Filter hanya records MTT
                 var mttRecords = currentRecords
@@ -1209,12 +1213,13 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
 
         public int GetTotalDurationAllCategories() => CategorySummary.Values.Sum();
         public double SecondsToMinutes(int seconds) => Math.Round(seconds / 60.0, 2);
-        public List<int> GetPageSizeOptions() => new List<int> { 10 };
+        public List<int> GetPageSizeOptions() => new List<int> { DefaultPageSize };
 
         public IActionResult OnPostExportExcel()
         {
 
             SetDatesFromMonthYear();
+            NormalizeDateRange();
             List<LossTimeRecord> exportData;
             if (SelectedSource == "Machine")
                 exportData = GetMachineRecords(StartSelectedDate, EndSelectedDate).OrderByDescending(x => x.Date).ToList();
@@ -1229,6 +1234,10 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                         .OrderByDescending(x => x.Date).ToList();
                 }
             }
+            exportData = ApplyDisplayDateRange(exportData);
+
+            var exportStart = HasActiveDateRange ? DateRangeStart!.Value : StartSelectedDate;
+            var exportEnd = HasActiveDateRange ? DateRangeEnd!.Value : EndSelectedDate;
             using (var workbook = new XLWorkbook())
             {
                 var ws = workbook.Worksheets.Add("Loss Time Data");
@@ -1248,7 +1257,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                 {
                     workbook.SaveAs(stream);
                     return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        $"LossTime_{SelectedSource}_{StartSelectedDate:yyyyMMdd}-{EndSelectedDate:yyyyMMdd}.xlsx");
+                        $"LossTime_{SelectedSource}_{exportStart:yyyyMMdd}-{exportEnd:yyyyMMdd}.xlsx");
                 }
             }
         }

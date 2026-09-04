@@ -912,12 +912,17 @@ body {
    Browser zoom 80% enlarges the CSS viewport by 25%, which previously made
    the percentage-based grid wider while fixed-size gauges and text shrank.
    Restore the 100% wallboard scale while keeping its visual bounds inside
-   the current viewport. This class is set only when devicePixelRatio is 0.8.
+   the current viewport. The class is set from the detected browser zoom.
 */
+html.dashboard-zoom-80 {
+    overflow: hidden;
+}
+
 html.dashboard-zoom-80 body {
-    zoom: 1.25;
-    width: 80% !important;
+    width: 80vw !important;
     height: 80vh !important;
+    transform: scale(1.25);
+    transform-origin: top left;
 }
 
 .main-content {

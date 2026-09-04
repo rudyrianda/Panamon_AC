@@ -30,7 +30,7 @@
     }
 }
 
-<link rel="stylesheet" href="~/css/inventory.css" />
+<link rel="stylesheet" href="~/css/inventory.css" asp-append-version="true" />
 
 <div class="inventory-dashboard">
 <div class="filter-area-with-lines">
@@ -171,4 +171,4 @@
     window.__invStatusMessage = '@TempData["StatusMessage"]';
     window.__invMessage = '@TempData["Message"]';
 </script>
-<script src="~/js/inventory-export.js"></script>
+<script src="~/js/inventory-export.js" asp-append-version="true"></script>

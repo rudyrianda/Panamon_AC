@@ -106,6 +106,10 @@
         font-size: clamp(11px, 1.2vh, 13.75px) !important;
     }
 
+    body.production-report-page .footer-copyright {
+        margin-top: clamp(-20px, -1.96vh, -18px) !important;
+    }
+
     /* FILTER AREA WITH LINES - SUPER COMPACT */
     .filter-area-with-lines {
         position: relative;
@@ -541,6 +545,7 @@
 
     .table-responsive {
         max-width: calc(100% - var(--production-page-gap) - var(--production-page-gap));
+        margin-top: clamp(6px, 0.66vh, 7.5px);
         margin-left: var(--production-page-gap);
         margin-right: var(--production-page-gap);
         overflow-x: auto;

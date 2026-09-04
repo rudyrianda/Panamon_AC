@@ -5,9 +5,17 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <OutputType>Exe</OutputType>
+    <!-- Publish output lives inside the project directory. Never treat it as
+         source content, otherwise every publish nests publish/publish/... and
+         normal builds eventually reference stale or missing copied assets. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);publish\**;publish/**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="publish\**" />
+    <Content Remove="publish\**" />
+    <EmbeddedResource Remove="publish\**" />
+    <None Remove="publish\**" />
     <Compile Remove="wwwroot\data\NewFolder\**" />
     <Content Remove="wwwroot\data\NewFolder\**" />
     <EmbeddedResource Remove="wwwroot\data\NewFolder\**" />

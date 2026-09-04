@@ -316,6 +316,13 @@ button { color: inherit; }
     box-shadow: inset 0 0 28px rgba(73, 112, 153, .07), 0 8px 18px rgba(0, 0, 0, .12);
 }
 
+/* Match the Machine page cards to the translucent card background used by AC OEE. */
+body.machine-production-layout:not(.light-mode) .glass-panel,
+body.machine-production-layout:not(.light-mode) .machine-title-panel {
+    background: rgba(255, 255, 255, .10);
+    background-clip: padding-box;
+}
+
 .production-overview {
     min-width: 0;
     min-height: 0;

@@ -36,6 +36,7 @@ namespace MonitoringSystem.Pages.Performance
 
         private readonly MonitoringSystem.Services.BreakTimeService _breakTimeService;
         private List<BreakTimeInfo> _cycleBreakTimes = new();
+        private List<(TimeSpan Start, TimeSpan End)>? _allBreakTimesCache;
 
         public PerformanceModel(ApplicationDbContext context, IServiceProvider serviceProvider, MonitoringSystem.Services.BreakTimeService breakTimeService)
         {
@@ -80,16 +81,11 @@ namespace MonitoringSystem.Pages.Performance
             LoadBreakTimesFromDb(); // Aman: sudah di-comment isinya, return langsung
             GetHourlyAchievement();
             LoadCycleTimeMonitoring();
-            GetAssemblyTime();
 
             CachedPlan = GetProductionPlan();
-            CachedActual = GetActualProduction();
-            CachedTarget = GetTargetFromOEESN();
-            CachedPlanTaktTime = GetPlanTaktTime();
-            CachedEfficiency = GetEfficiencyFromOEESN();
+            LoadOeesnMetrics();
             CachedWorkingTime = GetWorkingTimeBySummaryLogic();
             CachedLossTime = GetLossTimeBySummaryLogic();
-            CachedDefect = GetTotalDefectBySummaryLogic();
 
             Plan = CachedPlan;
             Actual = CachedActual;
@@ -178,6 +174,68 @@ namespace MonitoringSystem.Pages.Performance
                 Console.WriteLine("Error in GetTargetFromOEESN: " + ex.Message);
             }
             return target;
+        }
+
+        private void LoadOeesnMetrics()
+        {
+            var dayStart = SelectedDate.Date;
+            var dayEnd = dayStart.AddDays(1);
+            var shiftStart = dayStart.AddHours(7);
+            var shiftEnd = shiftStart.AddDays(1);
+
+            try
+            {
+                using var connection = new SqlConnection(connectionString);
+                connection.Open();
+
+                const string query = @"
+                SELECT
+                    (SELECT COUNT(*)
+                     FROM OEESN
+                     WHERE MachineCode = @MachineCode
+                       AND SDate >= @ShiftStart
+                       AND SDate < @ShiftEnd) AS Actual,
+                    ISNULL((SELECT TOP (1) TargetUnit
+                            FROM OEESN
+                            WHERE MachineCode = @MachineCode
+                            ORDER BY SDate DESC), 0) AS Target,
+                    ISNULL((SELECT TOP (1) Performance
+                            FROM OEESN
+                            WHERE MachineCode = @MachineCode
+                            ORDER BY SDate DESC), 0) AS Efficiency,
+                    ISNULL((SELECT TOP (1) md.SUT
+                            FROM OEESN o
+                            INNER JOIN MasterData md ON o.Product_Id = md.Product_Id
+                            WHERE o.MachineCode = @MachineCode
+                              AND o.SDate >= @DayStart
+                              AND o.SDate < @DayEnd
+                            ORDER BY o.SDate DESC), 0) AS PlanTaktTime,
+                    (SELECT COUNT(*)
+                     FROM NG_RPTS
+                     WHERE MachineCode = @MachineCode
+                       AND SDate >= @DayStart
+                       AND SDate < @DayEnd) AS Defect;";
+
+                using var command = new SqlCommand(query, connection);
+                command.Parameters.Add("@MachineCode", System.Data.SqlDbType.VarChar, 30).Value = MachineCode;
+                command.Parameters.Add("@ShiftStart", System.Data.SqlDbType.DateTime2).Value = shiftStart;
+                command.Parameters.Add("@ShiftEnd", System.Data.SqlDbType.DateTime2).Value = shiftEnd;
+                command.Parameters.Add("@DayStart", System.Data.SqlDbType.DateTime2).Value = dayStart;
+                command.Parameters.Add("@DayEnd", System.Data.SqlDbType.DateTime2).Value = dayEnd;
+
+                using var reader = command.ExecuteReader();
+                if (!reader.Read()) return;
+
+                CachedActual = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader.GetValue(0));
+                CachedTarget = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader.GetValue(1));
+                CachedEfficiency = reader.IsDBNull(2) ? 0 : Convert.ToInt32(reader.GetValue(2));
+                CachedPlanTaktTime = reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3));
+                CachedDefect = reader.IsDBNull(4) ? 0 : Convert.ToInt32(reader.GetValue(4));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error in LoadOeesnMetrics: " + ex.Message);
+            }
         }
 
         public int GetPlanForSummary(DateTime selectedDate, string machineCode)
@@ -338,10 +396,6 @@ namespace MonitoringSystem.Pages.Performance
 
                 LoadAllData();
 
-                var actualData = GetActualPerHour();
-                var labels = actualData.Select(data => data.EndTime).ToList();
-                var efficiencyData = CalculateCumulativeEfficiencyForChart(actualData);
-
                 var differenceProd = CachedActual - CachedTarget;
                 var defectRatio = (CachedActual > 0)
                     ? Math.Round(100.0 - ((double)CachedDefect / CachedActual * 100.0))
@@ -356,7 +410,7 @@ namespace MonitoringSystem.Pages.Performance
 
                 // Hitung Hourly Table Data
                 var sortedProdAchieve = listProdAchieve
-                    .OrderBy(p => p.StartTime)
+                    .OrderByDescending(p => p.Time)
                     .ThenBy(p => p.Model)
                     .ToList();
 
@@ -390,8 +444,6 @@ namespace MonitoringSystem.Pages.Performance
 
                 return new JsonResult(new
                 {
-                    Labels = labels ?? new List<string>(),
-                    Efficiency = efficiencyData ?? new List<double>(),
                     planProd = CachedPlan,
                     targetProd = CachedTarget,
                     actualProd = CachedActual,
@@ -402,7 +454,11 @@ namespace MonitoringSystem.Pages.Performance
                     defectRatio = defectRatio,
                     workingTime = CachedWorkingTime > 0 ? CachedWorkingTime : 0,
                     lossTime = Math.Round(CachedLossTime, 1),
-                    hourlyList = hourlyList
+                    hourlyList = hourlyList,
+                    cycleTimeData = CycleTimeChartPoints,
+                    dailyAverageCycleTime = DailyAverageCycleTime,
+                    dailyMinimumCycleTime = DailyMinimumCycleTime,
+                    dailyMaximumCycleTime = DailyMaximumCycleTime
                 });
             }
             catch (Exception ex)
@@ -733,6 +789,7 @@ namespace MonitoringSystem.Pages.Performance
                     connection.Open();
                     string query = @"
                     SELECT MIN(OEESN.SDate) As FirstTime,
+                           MAX(OEESN.SDate) As LastTime,
                            CAST(DATEADD(HOUR, DATEDIFF(HOUR, 0, OEESN.SDate), 0) AS TIME) AS StartTime,
                            CAST(DATEADD(HOUR, DATEDIFF(HOUR, 0, OEESN.SDate) + 1, 0) AS TIME) As EndTime,
                            Masterdata.ProductName As Model, 
@@ -741,21 +798,28 @@ namespace MonitoringSystem.Pages.Performance
                            COUNT(*) AS Actual
                     FROM OEESN
                     JOIN Masterdata ON OEESN.Product_Id = MasterData.Product_Id AND Masterdata.MachineCode = @MachineCode
-                    WHERE CAST(SDate As DATE) = @Date AND OEESN.MachineCode = @MachineCode
+                    WHERE OEESN.SDate >= @DayStart
+                      AND OEESN.SDate < @DayEnd
+                      AND OEESN.MachineCode = @MachineCode
                     GROUP BY DATEDIFF(HOUR, 0, SDate), Masterdata.ProductName, MasterData.QtyHour, MasterData.SUT
                     ORDER BY MIN(OEESN.SDate);";
 
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
-                        command.Parameters.AddWithValue("@Date", SelectedDate);
-                        command.Parameters.AddWithValue("@MachineCode", MachineCode);
+                        command.Parameters.Add("@DayStart", System.Data.SqlDbType.DateTime2).Value = SelectedDate.Date;
+                        command.Parameters.Add("@DayEnd", System.Data.SqlDbType.DateTime2).Value = SelectedDate.Date.AddDays(1);
+                        command.Parameters.Add("@MachineCode", System.Data.SqlDbType.VarChar, 30).Value = MachineCode;
 
                         using (SqlDataReader reader = command.ExecuteReader())
                         {
+                            var latestWorkingTime = TimeSpan.Zero;
                             while (reader.Read())
                             {
-                                var startTime = reader.GetTimeSpan(1);
-                                var endTime = reader.GetTimeSpan(2);
+                                var firstTime = reader.GetDateTime(0);
+                                var lastTime = reader.GetDateTime(1);
+                                var startTime = reader.GetTimeSpan(2);
+                                var endTime = reader.GetTimeSpan(3);
+                                var model = reader.GetString(4);
 
                                 // ✅ IsOverlappingWithBreakTime selalu return false — tidak ada filtering
                                 if (IsOverlappingWithBreakTime(startTime, endTime))
@@ -763,16 +827,23 @@ namespace MonitoringSystem.Pages.Performance
 
                                 listProdAchieve.Add(new ProductionAchievement
                                 {
-                                    FirstTime = reader.GetDateTime(0),
+                                    FirstTime = firstTime,
                                     StartTime = startTime,
                                     EndTime = endTime,
                                     Time = $"{startTime:hh\\:mm} - {endTime:hh\\:mm}",
-                                    Model = reader.GetString(3),
-                                    Plan = reader.GetInt32(4),
-                                    SUT = reader.GetInt32(5),
-                                    Actual = reader.GetInt32(6)
+                                    Model = model,
+                                    Plan = reader.GetInt32(5),
+                                    SUT = reader.GetInt32(6),
+                                    Actual = reader.GetInt32(7)
                                 });
+
+                                _firstTimeCache[$"first_{model}_{startTime}_{endTime}_{SelectedDate:yyyyMMdd}"] = firstTime.TimeOfDay;
+                                _lastTimeCache[$"last_{model}_{startTime}_{endTime}_{SelectedDate:yyyyMMdd}"] = lastTime.TimeOfDay;
+                                if (lastTime.TimeOfDay > latestWorkingTime)
+                                    latestWorkingTime = lastTime.TimeOfDay;
                             }
+
+                            _lastWorkingTimeCache[MachineCode] = latestWorkingTime;
                         }
                     }
                 }
@@ -785,6 +856,8 @@ namespace MonitoringSystem.Pages.Performance
 
         private void LoadCycleTimeMonitoring()
         {
+            const int maximumCycleMultiplier = 3;
+
             CycleTimeChartPoints.Clear();
             DailyMinimumCycleTime = null;
             DailyMaximumCycleTime = null;
@@ -872,7 +945,10 @@ namespace MonitoringSystem.Pages.Performance
                         Scan = scan,
                         ActualCycleTime = GetCycleTimeWithoutBreak(scan)
                     })
-                    .Where(item => item.ActualCycleTime.HasValue && item.Scan.PlanCycleTime > 0)
+                    .Where(item =>
+                        item.ActualCycleTime.HasValue
+                        && item.Scan.PlanCycleTime > 0
+                        && item.ActualCycleTime.Value <= (long)item.Scan.PlanCycleTime * maximumCycleMultiplier)
                     .Select(item => new
                     {
                         item.Scan,
@@ -913,8 +989,12 @@ namespace MonitoringSystem.Pages.Performance
 
             try
             {
-                breakTimes.AddRange(
-                    _breakTimeService.GetBreakTimesForDateAsync(SelectedDate).GetAwaiter().GetResult());
+                var configuredBreakTimes =
+                    _breakTimeService.GetBreakTimesForDateAsync(SelectedDate).GetAwaiter().GetResult();
+                breakTimes.AddRange(configuredBreakTimes);
+                _allBreakTimesCache = configuredBreakTimes
+                    .Select(item => (item.StartTime, item.EndTime))
+                    .ToList();
             }
             catch (Exception ex)
             {
@@ -1129,7 +1209,8 @@ namespace MonitoringSystem.Pages.Performance
         // ✅ CACHE: GetModelPlan — cek cache dulu sebelum query DB
         public int GetModelPlan(string model)
         {
-            var cacheKey = $"modelplan_{model}_{MachineCode}_{SelectedDate:yyyyMMdd}";
+            // Query plan hanya bergantung pada tanggal dan line, bukan nama model.
+            var cacheKey = $"modelplan_{MachineCode}_{SelectedDate:yyyyMMdd}";
             if (_modelPlanCache.TryGetValue(cacheKey, out var cached)) return cached;
 
             int totalQuantityPlan = 0;
@@ -1218,61 +1299,38 @@ namespace MonitoringSystem.Pages.Performance
             TimeSpan shiftStart = new TimeSpan(7, 05, 0);
             TimeSpan shiftEnd = new TimeSpan(23, 15, 0);
 
-            try
+            var listRestTime = GetRestTime(DetermineTypeOfDay(SelectedDate.DayOfWeek));
+            double totalShiftMinutes = (shiftEnd - shiftStart).TotalMinutes;
+            double totalRestMinutes = 0;
+            foreach (var rest in listRestTime)
             {
-                using (SqlConnection connection = new SqlConnection(connectionString))
+                var overlapStart = new TimeSpan(Math.Max(shiftStart.Ticks, rest.StartTime.Ticks));
+                var overlapEnd = new TimeSpan(Math.Min(shiftEnd.Ticks, rest.EndTime.Ticks));
+                if (overlapEnd > overlapStart)
+                    totalRestMinutes += (overlapEnd - overlapStart).TotalMinutes;
+            }
+
+            if (SelectedDate.Date == DateTime.Today)
+            {
+                TimeSpan now = DateTime.Now.TimeOfDay;
+                TimeSpan effectiveEnd = now > shiftEnd ? shiftEnd : now;
+                if (effectiveEnd > shiftStart)
                 {
-                    connection.Open();
-
-                    var listRestTime = new List<(TimeSpan StartTime, TimeSpan EndTime)>();
-                    string restQuery = "SELECT StartTime, EndTime FROM RestTime WHERE DayType = @DayType;";
-                    using (SqlCommand cmd = new SqlCommand(restQuery, connection))
-                    {
-                        cmd.Parameters.AddWithValue("@DayType", DetermineTypeOfDay(SelectedDate.DayOfWeek));
-                        using (SqlDataReader reader = cmd.ExecuteReader())
+                    double elapsed = (effectiveEnd - shiftStart).TotalMinutes;
+                    double restElapsed = listRestTime
+                        .Where(r => r.StartTime < effectiveEnd)
+                        .Sum(r =>
                         {
-                            while (reader.Read())
-                                listRestTime.Add((reader.GetTimeSpan(0), reader.GetTimeSpan(1)));
-                        }
-                    }
-
-                    double totalShiftMinutes = (shiftEnd - shiftStart).TotalMinutes;
-                    double totalRestMinutes = 0;
-                    foreach (var rest in listRestTime)
-                    {
-                        var overlapStart = new TimeSpan(Math.Max(shiftStart.Ticks, rest.StartTime.Ticks));
-                        var overlapEnd = new TimeSpan(Math.Min(shiftEnd.Ticks, rest.EndTime.Ticks));
-                        if (overlapEnd > overlapStart)
-                            totalRestMinutes += (overlapEnd - overlapStart).TotalMinutes;
-                    }
-
-                    if (SelectedDate.Date == DateTime.Today)
-                    {
-                        TimeSpan now = DateTime.Now.TimeOfDay;
-                        TimeSpan effectiveEnd = now > shiftEnd ? shiftEnd : now;
-                        if (effectiveEnd > shiftStart)
-                        {
-                            double elapsed = (effectiveEnd - shiftStart).TotalMinutes;
-                            double restElapsed = listRestTime
-                                .Where(r => r.StartTime < effectiveEnd)
-                                .Sum(r =>
-                                {
-                                    var oStart = new TimeSpan(Math.Max(shiftStart.Ticks, r.StartTime.Ticks));
-                                    var oEnd = new TimeSpan(Math.Min(effectiveEnd.Ticks, r.EndTime.Ticks));
-                                    return oEnd > oStart ? (oEnd - oStart).TotalMinutes : 0;
-                                });
-                            totalMinutes = (int)Math.Max(0, elapsed - restElapsed);
-                        }
-                    }
-                    else
-                    {
-                        totalMinutes = (int)(totalShiftMinutes - totalRestMinutes);
-                    }
+                            var oStart = new TimeSpan(Math.Max(shiftStart.Ticks, r.StartTime.Ticks));
+                            var oEnd = new TimeSpan(Math.Min(effectiveEnd.Ticks, r.EndTime.Ticks));
+                            return oEnd > oStart ? (oEnd - oStart).TotalMinutes : 0;
+                        });
+                    totalMinutes = (int)Math.Max(0, elapsed - restElapsed);
                 }
             }
-            catch (Exception ex)
+            else
             {
-                Console.WriteLine("Error in GetWorkingTimeBySummaryLogic: " + ex.Message);
+                totalMinutes = (int)(totalShiftMinutes - totalRestMinutes);
             }
 
             return totalMinutes;
@@ -1344,9 +1402,14 @@ namespace MonitoringSystem.Pages.Performance
 
         private List<(TimeSpan Start, TimeSpan End)> GetAllBreakTimes(DateTime date)
         {
-            return _breakTimeService.GetBreakTimesForDateAsync(date).Result
+            if (_allBreakTimesCache != null)
+                return _allBreakTimesCache;
+
+            _allBreakTimesCache = _breakTimeService.GetBreakTimesForDateAsync(date)
+                .GetAwaiter().GetResult()
                 .Select(b => (b.StartTime, b.EndTime))
                 .ToList();
+            return _allBreakTimesCache;
         }
 
         public int GetCurrentSUT()

@@ -11,7 +11,7 @@
     var currentDate = DateTime.Now.Date;
     var currentDay = DateTime.Today.DayOfWeek;
     var startWorkingTime = new TimeSpan(7, 0, 0);
-    var endWorkingTime = Model.GetLastWorkingTime("MCH1-01");
+    var endWorkingTime = Model.GetLastWorkingTime(Model.MachineCode);
 
     var listRestTime = Model.GetRestTime(Model.DetermineTypeOfDay(currentDay));
 
@@ -20,8 +20,6 @@
     var totalDefect = Model.CachedDefect;
     var workingTime = Model.CachedWorkingTime;
     var totalLossTime = Model.CachedLossTime;
-
-    InitializeFirstAssemblyTime();
 
     var planProd = Model.CachedPlan;
 
@@ -106,20 +104,6 @@
 
         result.WorkingTime = result.TotalWorkingTime - result.TotalRestTime;
         return result;
-    }
-
-    private void InitializeFirstAssemblyTime()
-    {
-        if (Model.assemblyTimes.Count > 0)
-        {
-            Model.assemblyTimes.Add(new Performance.PerformanceModel.AssemblyTime
-                {
-                    Model = Model.assemblyTimes.First().Model,
-                    MachineCode = Model.MachineCode,
-                    SUT = Model.assemblyTimes.First().SUT,
-                    ProductionTime = new TimeSpan(7, 0, 0)
-                });
-        }
     }
 
     public List<int> CalculateAllHourlyPlansForCU()
@@ -224,7 +208,15 @@
     }
 }
 
+<script>
+    document.body.classList.add('performance-page');
+</script>
+
 <style>
+    body.performance-page .footer-copyright {
+        transform: translateY(clamp(4px, 0.44vh, 5px));
+    }
+
     .perf-label {
         color: rgba(255, 255, 255, 0.88);
     }
@@ -947,7 +939,7 @@
             const tickColor   = isLightMode ? '#1a1a2e'                : 'rgba(220,228,240,0.75)';
 
             const CYCLE_WINDOW_MINUTES = 120;
-            const CYCLE_SCALE_TICKS = [0, 10, 20, 30, 40, 50, 60, 100, 150, 200, 250];
+            const CYCLE_SCALE_TICKS = [0, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80];
             let cycleWindowEndMinute = null;
             let cycleWindowPinnedToLatest = true;
 
@@ -1319,52 +1311,110 @@
 
             updateCycleWindowControls();
 
-            async function autoRefreshPageViaHTML() {
+            let refreshInProgress = false;
+
+            function setMetricValue(id, value, suffix = '') {
+                const element = document.getElementById(id);
+                if (element) element.textContent = `${value}${suffix}`;
+            }
+
+            function renderHourlyRows(rows) {
+                const tbody = document.getElementById('hourlyTableBody');
+                if (!tbody) return;
+
+                const dataRows = Array.isArray(rows) ? rows : [];
+                if (!dataRows.length) {
+                    const row = document.createElement('tr');
+                    const cell = document.createElement('td');
+                    cell.colSpan = 4;
+                    cell.style.padding = '8px';
+                    cell.style.textAlign = 'center';
+                    cell.textContent = 'There is no actual data entered';
+                    row.appendChild(cell);
+                    tbody.replaceChildren(row);
+                    return;
+                }
+
+                const timeCounts = new Map();
+                dataRows.forEach(item => timeCounts.set(item.time, (timeCounts.get(item.time) || 0) + 1));
+
+                const fragment = document.createDocumentFragment();
+                let previousTime = null;
+                dataRows.forEach(item => {
+                    const row = document.createElement('tr');
+                    if (item.time !== previousTime) {
+                        const timeCell = document.createElement('td');
+                        timeCell.rowSpan = timeCounts.get(item.time) || 1;
+                        timeCell.className = 'fw-bold';
+                        timeCell.textContent = item.time || '00:00 - 00:00';
+                        row.appendChild(timeCell);
+                        previousTime = item.time;
+                    }
+
+                    [item.model || 'NULL', item.plan ?? 0, item.actual ?? 0].forEach(value => {
+                        const cell = document.createElement('td');
+                        cell.className = 'fw-bold';
+                        cell.textContent = value;
+                        row.appendChild(cell);
+                    });
+                    fragment.appendChild(row);
+                });
+                tbody.replaceChildren(fragment);
+            }
+
+            async function autoRefreshPerformanceData() {
+                if (refreshInProgress || document.hidden) return;
+                refreshInProgress = true;
                 try {
                     const machineCode  = document.getElementById('MachineCode').value;
                     const selectedDate = document.querySelector('input[name="SelectedDate"]').value;
-                    // Build the URL to fetch the full page
                     const currentUrl = window.location.pathname;
-                    const url = `${currentUrl}?MachineCode=${machineCode}&SelectedDate=${selectedDate}`;
+                    const query = new URLSearchParams({
+                        handler: 'UpdatedData',
+                        machineCode,
+                        selectedDate
+                    });
+                    const url = `${currentUrl}?${query.toString()}`;
                     
                     const response = await fetch(url);
                     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-                    
-                    const htmlText = await response.text();
-                    
-                    // Parse the HTML
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(htmlText, 'text/html');
+                    const data = await response.json();
 
-                    // 1. Update Metrics Table
-                    const oldMetrics = document.querySelector('.perf-card');
-                    const newMetrics = doc.querySelector('.perf-card');
-                    if(oldMetrics && newMetrics) {
-                        oldMetrics.innerHTML = newMetrics.innerHTML;
+                    setMetricValue('val-planProd', data.planProd ?? 0);
+                    setMetricValue('val-targetProd', data.targetProd ?? 0);
+                    setMetricValue('val-actualProd', data.actualProd ?? 0);
+                    setMetricValue('val-differenceProd', data.differenceProd ?? 0);
+                    document.getElementById('val-differenceProd')?.classList.toggle('text-danger', (data.differenceProd ?? 0) <= 0);
+                    setMetricValue('val-efficiencyValue', data.efficiencyValue ?? 0, ' %');
+                    setMetricValue('val-planTaktTime', data.planTaktTime ?? 0, ' s');
+                    setMetricValue('val-actTaktTime', data.actTaktTime ?? 0, ' s');
+                    setMetricValue('val-defectRatio', data.defectRatio ?? 100, ' %');
+                    setMetricValue('val-workingTime', data.workingTime ?? 0, ' min');
+                    setMetricValue('val-lossTime', data.lossTime ?? 0, ' min');
+                    renderHourlyRows(data.hourlyList);
+
+                    const formatCycleSummary = value => value === null || value === undefined ? '—' : `${formatCycleValue(value)} s`;
+                    const cycleSummary = document.querySelector('.perf-cycle-day-summary');
+                    if (cycleSummary) {
+                        cycleSummary.querySelector('.average-cycle strong').textContent = formatCycleSummary(data.dailyAverageCycleTime);
+                        cycleSummary.querySelector('.minimum strong').textContent = formatCycleSummary(data.dailyMinimumCycleTime);
+                        cycleSummary.querySelector('.maximum strong').textContent = formatCycleSummary(data.dailyMaximumCycleTime);
                     }
 
-                    // 2. Update Hourly Table
-                    const oldHourly = document.querySelector('.perf-hourly-table');
-                    const newHourly = doc.querySelector('.perf-hourly-table');
-                    if(oldHourly && newHourly) {
-                        oldHourly.innerHTML = newHourly.innerHTML;
-                    }
-
-                    const oldCycleSummary = document.querySelector('.perf-cycle-day-summary');
-                    const newCycleSummary = doc.querySelector('.perf-cycle-day-summary');
-                    if(oldCycleSummary && newCycleSummary) {
-                        oldCycleSummary.innerHTML = newCycleSummary.innerHTML;
-                    }
-
-                    // 3. Update Cycle Time Chart dari HTML terbaru.
-                    const cycleMatch = htmlText.match(/let cycleTimeData\s*=\s*(\[.*?\]);/);
-                    if (cycleMatch && cycleMatch[1]) {
-                        cycleTimeData = JSON.parse(cycleMatch[1]);
-                        updateCycleWindowChart();
-                    }
+                    cycleTimeData = Array.isArray(data.cycleTimeData)
+                        ? data.cycleTimeData.map(point => ({
+                            Label: point.Label ?? point.label,
+                            ModelProduk: point.ModelProduk ?? point.modelProduk,
+                            PlanCycleTime: point.PlanCycleTime ?? point.planCycleTime,
+                            ActualCycleTime: point.ActualCycleTime ?? point.actualCycleTime
+                        }))
+                        : [];
+                    updateCycleWindowChart();
 
                 } catch (error) {
-                    console.error("Auto-refresh via HTML failed:", error.message);
+                    console.error("Performance refresh failed:", error.message);
+                } finally {
+                    refreshInProgress = false;
                 }
             }
 
@@ -1372,13 +1422,13 @@
             async function refreshWithLatestCycleWindow() {
                 cycleWindowEndMinute = null;
                 cycleWindowPinnedToLatest = true;
-                await autoRefreshPageViaHTML();
+                await autoRefreshPerformanceData();
             }
 
             document.getElementById('MachineCode').addEventListener('change', refreshWithLatestCycleWindow);
             document.querySelector('input[name="SelectedDate"]').addEventListener('change', refreshWithLatestCycleWindow);
 
-            // Jalankan proses load setiap 5 detik
-            setInterval(autoRefreshPageViaHTML, 5000);
+            // JSON refresh lebih ringan dan tidak berjalan saat tab tidak terlihat.
+            setInterval(autoRefreshPerformanceData, 5000);
         </script>
 }

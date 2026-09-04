@@ -15,10 +15,14 @@
     <script src="~/lib/chartjs/chart.umd.min.js"></script>
     <script>
         // Keep the wallboard's 100% visual size when the browser is set to 80%.
+        // outerWidth/innerWidth isolates browser zoom more reliably than
+        // devicePixelRatio, which is also affected by Windows display scaling.
         (function () {
             const syncDashboardZoom = () => {
-                const isEightyPercent = window.devicePixelRatio >= 0.79
-                    && window.devicePixelRatio <= 0.81;
+                const zoomRatio = window.innerWidth > 0
+                    ? window.outerWidth / window.innerWidth
+                    : 1;
+                const isEightyPercent = zoomRatio >= 0.76 && zoomRatio <= 0.84;
                 document.documentElement.classList.toggle('dashboard-zoom-80', isEightyPercent);
             };
 

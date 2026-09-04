@@ -259,7 +259,7 @@
         border-radius: 12px;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
         height: 100% !important;
-        max-height: none !important;
+        max-height: 520px !important;
         min-height: unset !important;
     }
 
@@ -516,10 +516,12 @@
     #chartCategoryFilter {
         height: 30px;
         min-width: 190px;
-        padding: 0 32px 0 14px;
+        padding: 0 32px;
         font-size: 12px;
         font-weight: 600;
         line-height: 28px;
+        text-align: center;
+        text-align-last: center;
         border-radius: 999px;
         background-color: #1f2a44;
         border: 1px solid #5c7cfa;
@@ -533,6 +535,10 @@
         background-position: right 10px center;
         background-size: 10px 10px;
         transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    #chartCategoryFilter option {
+        text-align: center;
     }
 
     .loss-category-actions {
@@ -645,7 +651,7 @@
         caret-color: transparent;
     }
 
-    .date-range-menu input[type="date"]::-webkit-datetime-edit {
+    .date-range-menu .calendar-only-input::-webkit-datetime-edit {
         pointer-events: none;
     }
 
@@ -756,34 +762,45 @@
         color: #5c7cfa;
     }
 
-    /*
-     * Dashboard height follows the viewport. Browser zoom changes the CSS
-     * viewport size, so the two chart rows grow/shrink instead of leaving a
-     * fixed-height block and a large empty area underneath it.
-     */
+    /* FIX ZOOM BUG: canvas daily — ukuran eksplisit */
+    #dailyLossChart {
+        display: block !important;
+        width: 100% !important;
+        height: 320px !important;
+        min-height: 320px !important;
+        max-height: 320px !important;
+    }
+
+    /* FIX ZOOM BUG: card-body daily chart — kunci tinggi */
+    .col-12 .card-body {
+        padding: 8px !important;
+        overflow: hidden;
+        height: 360px !important;
+        min-height: 360px !important;
+        max-height: 360px !important;
+    }
+
+    /* Fill the available screen like the Performance and Quality dashboards. */
     .loss-dashboard {
-        --loss-dashboard-gap: 8px;
         display: grid;
-        grid-template-rows: auto minmax(350px, 1.15fr) minmax(260px, 0.85fr);
-        gap: var(--loss-dashboard-gap);
-        min-height: calc(100vh - 132px);
-        min-height: calc(100dvh - 132px);
+        height: calc(100dvh - 128px);
+        min-height: 740px;
+        grid-template-rows: auto minmax(0, 1.1fr) minmax(0, 0.9fr);
+        gap: 8px;
     }
 
     .loss-dashboard > .filter-area-with-lines {
-        margin-bottom: 0 !important;
+        margin-bottom: 0;
     }
 
     .loss-dashboard > .row.mt-2 {
+        min-height: 0;
         margin-top: 0 !important;
         margin-bottom: 0 !important;
     }
 
-    .loss-overview-row,
-    .loss-daily-row,
     .loss-overview-row > [class*="col-"],
     .loss-daily-row > [class*="col-"] {
-        height: 100%;
         min-height: 0;
     }
 
@@ -791,70 +808,80 @@
     .loss-dashboard .loss-detail-card,
     .loss-dashboard .loss-daily-card {
         display: flex;
-        flex-direction: column;
+        height: 100% !important;
         min-height: 0 !important;
         max-height: none !important;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .loss-dashboard .loss-chart-card {
+        overflow: visible;
+    }
+
+    .loss-dashboard .loss-chart-card > .card-header {
+        position: relative;
+        z-index: 20;
+    }
+
+    .loss-dashboard .date-range-menu {
+        z-index: 1080;
     }
 
     .loss-dashboard .loss-chart-card > .card-body,
     .loss-dashboard .loss-daily-card > .card-body {
+        position: relative;
         flex: 1 1 auto;
         height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: hidden;
+    }
+
+    .loss-dashboard #lossTimeChart,
+    .loss-dashboard #dailyLossChart {
+        position: absolute;
+        inset: 8px;
+        display: block !important;
+        width: calc(100% - 16px) !important;
+        height: calc(100% - 16px) !important;
         min-height: 0 !important;
         max-height: none !important;
     }
 
     .loss-dashboard .loss-detail-card > .card-body {
+        display: flex !important;
         flex: 1 1 auto;
         height: 0 !important;
         min-height: 0 !important;
         max-height: none !important;
+        flex-direction: column;
     }
 
     .loss-dashboard .loss-detail-card .table-responsive {
         min-height: 0 !important;
         max-height: none !important;
+        overflow-y: scroll !important;
+        scrollbar-gutter: stable;
+        overscroll-behavior: contain;
     }
 
-    #lossTimeChart,
-    #dailyLossChart {
-        display: block !important;
-        width: 100% !important;
-        height: 100% !important;
-        min-height: 0 !important;
-        max-height: none !important;
+    .loss-dashboard .loss-detail-card #lossTimeTable {
+        height: 100%;
     }
 
-    @@media (max-width: 1500px) {
-        .loss-category-header-row {
-            grid-template-columns: minmax(260px, 1fr) auto;
-            row-gap: 8px;
-        }
-
-        .loss-category-title {
-            grid-column: 1;
-            grid-row: 1;
-        }
-
-        .loss-category-actions {
-            grid-column: 2;
-            grid-row: 1;
-        }
-
-        .summary-header-legend {
-            grid-column: 1 / -1;
-            grid-row: 2;
-        }
+    .loss-dashboard .loss-detail-card #lossTimeTable.compact-filter-result {
+        height: auto;
     }
 
-    @@media (max-width: 991.98px) {
+    @@media (max-width: 767.98px) {
         .loss-dashboard {
             display: block;
+            height: auto;
             min-height: 0;
         }
 
         .loss-dashboard > .row.mt-2 {
-            height: auto;
             margin-top: 8px !important;
         }
 
@@ -876,35 +903,6 @@
 
         .loss-dashboard .loss-detail-card > .card-body {
             height: 420px !important;
-        }
-    }
-
-    @@media (max-width: 767.98px) {
-        .loss-category-header-row {
-            display: flex !important;
-            flex-direction: column;
-            align-items: stretch;
-        }
-
-        .loss-category-title,
-        .summary-header-legend,
-        .loss-category-actions {
-            transform: none;
-        }
-
-        .summary-header-legend {
-            flex-wrap: wrap;
-            justify-content: flex-start;
-            white-space: normal;
-        }
-
-        .loss-category-actions {
-            justify-content: space-between;
-        }
-
-        #chartCategoryFilter {
-            min-width: 0;
-            flex: 1 1 auto;
         }
     }
 
@@ -1043,6 +1041,11 @@
             }
 
             <input type="hidden" id="hiddenSelectedSource" name="SelectedSource" value="@Model.SelectedSource" />
+            @if (Model.HasActiveDateRange)
+            {
+                <input type="hidden" name="DateRangeStart" value="@Model.DateRangeStart!.Value.ToString("yyyy-MM-dd")" />
+                <input type="hidden" name="DateRangeEnd" value="@Model.DateRangeEnd!.Value.ToString("yyyy-MM-dd")" />
+            }
 
         </form>
     </div>
@@ -1124,7 +1127,7 @@
                                         @if (Model.HasActiveDateRange)
                                         {
                                             <button type="submit" class="btn btn-sm btn-outline-light" name="dateRangeAction" value="clear" formnovalidate>
-                                                All Month
+                                                This Month
                                             </button>
                                         }
                                         <button type="submit" class="btn btn-sm btn-primary" name="dateRangeAction" value="apply">
@@ -1192,7 +1195,7 @@
                                 </tr>
                             </thead>
                             <tbody id="lossTimeTableBody">
-                                @foreach (var item in Model.LossTimeData.Select((data, index) => new { Data = data, Index = index + 1 + (Model.CurrentPage - 1) * Model.PageSize }))
+                                @foreach (var item in Model.LossTimeData.Select((data, index) => new { Data = data, Index = index + 1 }))
                                 {
                                     bool isMTT = item.Data.Category == "Machine & Tools Trouble";
                                     <tr data-category="@item.Data.Category" class="@(isMTT ? "mtt-row" : "non-mtt-row")">
@@ -1286,58 +1289,23 @@
                 <div class="card-footer bg-transparent border-top border-secondary">
                     <div class="d-flex justify-content-between align-items-center text-white">
                         <div>
-                            <span class="fw-bold">Total: @Model.TotalRecords records</span>
+                            <span class="fw-bold" id="displayedRecordTotal" data-all-count="@Model.TotalRecords">
+                                Total: @Model.TotalRecords records
+                            </span>
                             <span id="mttCountBadge" style="display:none; font-size:10px; margin-left:6px;
                                        color:rgba(201,203,207,0.8);">
                                 (<span id="mttCountNum">0</span> M&amp;T Trouble)
                             </span>
                         </div>
-                        <nav aria-label="Page navigation" id="paginationNav">
+                        <nav aria-label="Scroll navigation" id="paginationNav"
+                             data-page-size="@Model.PageSize" data-total-pages="@Model.TotalPages">
                             <ul class="pagination mb-0">
-                                <li class="page-item @(Model.CurrentPage == 1 ? "disabled" : "")">
-                                    <form method="post" asp-page-handler="ChangePage">
-                                        <input type="hidden" name="pageNumber" value="@(Model.CurrentPage - 1)" />
-                                        <input type="hidden" name="pageSize" value="10" />
-                                        <input type="hidden" name="selectedMonth" value="@Model.SelectedMonth" />
-                                        <input type="hidden" name="selectedYear" value="@Model.SelectedYear" />
-                                        <input type="hidden" name="machineLine" value="@Model.MachineLine" />
-                                        <input type="hidden" name="selectedSource" value="@Model.SelectedSource" />
-                                        <input type="hidden" name="selectedMachineName" value="@Model.SelectedMachineName" />
-                                        @if (Model.HasActiveDateRange)
-                                        {
-                                            <input type="hidden" name="dateRangeStart" value="@Model.DateRangeStart!.Value.ToString("yyyy-MM-dd")" />
-                                            <input type="hidden" name="dateRangeEnd" value="@Model.DateRangeEnd!.Value.ToString("yyyy-MM-dd")" />
-                                        }
-                                        @foreach (var shift in Model.SelectedShifts)
-                                        {
-                                            <input type="hidden" name="selectedShifts" value="@shift" />
-                                        }
-
-                                        <button type="submit" class="page-link">&lsaquo;</button>
-                                    </form>
+                                <li class="page-item disabled" id="lossPrevPage">
+                                    <button type="button" class="page-link" data-scroll-page-step="-1" aria-label="Previous 10 records">&lsaquo;</button>
                                 </li>
-                                <li class="page-item active"><span class="page-link">@Model.CurrentPage</span></li>
-                                <li class="page-item @(Model.CurrentPage >= Model.TotalPages ? "disabled" : "")">
-                                    <form method="post" asp-page-handler="ChangePage">
-                                        <input type="hidden" name="pageNumber" value="@(Model.CurrentPage + 1)" />
-                                        <input type="hidden" name="pageSize" value="10" />
-                                        <input type="hidden" name="selectedMonth" value="@Model.SelectedMonth" />
-                                        <input type="hidden" name="selectedYear" value="@Model.SelectedYear" />
-                                        <input type="hidden" name="machineLine" value="@Model.MachineLine" />
-                                        <input type="hidden" name="selectedSource" value="@Model.SelectedSource" />
-                                        <input type="hidden" name="selectedMachineName" value="@Model.SelectedMachineName" />
-                                        @if (Model.HasActiveDateRange)
-                                        {
-                                            <input type="hidden" name="dateRangeStart" value="@Model.DateRangeStart!.Value.ToString("yyyy-MM-dd")" />
-                                            <input type="hidden" name="dateRangeEnd" value="@Model.DateRangeEnd!.Value.ToString("yyyy-MM-dd")" />
-                                        }
-                                        @foreach (var shift in Model.SelectedShifts)
-                                        {
-                                            <input type="hidden" name="selectedShifts" value="@shift" />
-                                        }
-
-                                        <button type="submit" class="page-link">&rsaquo;</button>
-                                    </form>
+                                <li class="page-item active"><span class="page-link" id="lossCurrentPage">1</span></li>
+                                <li class="page-item @(Model.TotalPages <= 1 ? "disabled" : "")" id="lossNextPage">
+                                    <button type="button" class="page-link" data-scroll-page-step="1" aria-label="Next 10 records">&rsaquo;</button>
                                 </li>
                             </ul>
                         </nav>
@@ -1371,7 +1339,6 @@
     </div>
 </div>
 </div>
-
 <!-- UPLOAD MODAL (Assembly only) -->
 <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -1751,16 +1718,96 @@
             const mttCountNum = document.getElementById('mttCountNum');
             if (mttCountBadge && mttCountNum) {
                 mttCountNum.textContent = visibleCount;
-                mttCountBadge.style.display = 'inline';
+                mttCountBadge.style.display = 'none';
             }
+            updateDisplayedRecordTotal(visibleCount);
         } else {
             if (paginatedBody) paginatedBody.style.display = '';
             if (mttAllBody) mttAllBody.style.display = 'none';
             if (paginationNav) paginationNav.style.display = '';
+            document.getElementById('lossTimeTable')?.classList.remove('compact-filter-result');
+            updateLossScrollNavigation(currentLossScrollPage);
 
             const mttCountBadge = document.getElementById('mttCountBadge');
             if (mttCountBadge) mttCountBadge.style.display = 'none';
+
+            const totalLabel = document.getElementById('displayedRecordTotal');
+            updateDisplayedRecordTotal(Number(totalLabel?.dataset.allCount) || getLossTableRows().length);
         }
+    }
+
+    function updateDisplayedRecordTotal(count) {
+        const totalLabel = document.getElementById('displayedRecordTotal');
+        if (totalLabel) totalLabel.textContent = `Total: ${count} records`;
+    }
+
+    let currentLossScrollPage = 1;
+
+    function getLossTableRows() {
+        return Array.from(document.querySelectorAll('#lossTimeTableBody > tr'))
+            .filter(row => row.style.display !== 'none');
+    }
+
+    function updateLossScrollNavigation(page) {
+        const pageSize = Number(document.getElementById('paginationNav')?.dataset.pageSize) || 10;
+        const totalPages = Math.max(1, Math.ceil(getLossTableRows().length / pageSize));
+        currentLossScrollPage = Math.min(Math.max(page, 1), totalPages);
+
+        const currentLabel = document.getElementById('lossCurrentPage');
+        const previousItem = document.getElementById('lossPrevPage');
+        const nextItem = document.getElementById('lossNextPage');
+        if (currentLabel) currentLabel.textContent = currentLossScrollPage;
+        previousItem?.classList.toggle('disabled', currentLossScrollPage <= 1);
+        nextItem?.classList.toggle('disabled', currentLossScrollPage >= totalPages);
+    }
+
+    function scrollLossTableToPage(page) {
+        const container = document.querySelector('.loss-detail-card .table-responsive');
+        const pageSize = Number(document.getElementById('paginationNav')?.dataset.pageSize) || 10;
+        const rows = getLossTableRows();
+        const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+        const targetPage = Math.min(Math.max(page, 1), totalPages);
+        const targetRow = rows[(targetPage - 1) * pageSize];
+        if (!container || !targetRow) return;
+
+        const headerHeight = document.querySelector('#lossTimeTable thead')?.offsetHeight || 0;
+        const targetTop = targetPage === 1
+            ? 0
+            : targetRow.getBoundingClientRect().top - container.getBoundingClientRect().top
+                + container.scrollTop - headerHeight;
+
+        updateLossScrollNavigation(targetPage);
+        container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+    }
+
+    function initializeLossScrollNavigation() {
+        const container = document.querySelector('.loss-detail-card .table-responsive');
+        if (!container || container.dataset.scrollNavigationReady === 'true') return;
+        container.dataset.scrollNavigationReady = 'true';
+        updateLossScrollNavigation(1);
+
+        document.querySelectorAll('[data-scroll-page-step]').forEach(button => {
+            button.addEventListener('click', function () {
+                if (this.closest('.page-item')?.classList.contains('disabled')) return;
+                scrollLossTableToPage(currentLossScrollPage + Number(this.dataset.scrollPageStep));
+            });
+        });
+
+        let scrollFrame = null;
+        container.addEventListener('scroll', function () {
+            if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
+            scrollFrame = requestAnimationFrame(() => {
+                const rows = getLossTableRows();
+                const pageSize = Number(document.getElementById('paginationNav')?.dataset.pageSize) || 10;
+                const headerBottom = container.getBoundingClientRect().top
+                    + (document.querySelector('#lossTimeTable thead')?.offsetHeight || 0);
+                const firstVisibleIndex = rows.findIndex(row => row.getBoundingClientRect().bottom > headerBottom + 1);
+                if (firstVisibleIndex >= 0) {
+                    updateLossScrollNavigation(Math.floor(firstVisibleIndex / pageSize) + 1);
+                }
+                scrollFrame = null;
+            });
+        }, { passive: true });
     }
 
     function applyMttSubCategoryFilterToTable(subCat) {
@@ -1769,6 +1816,10 @@
 
         const rows = mttAllBody.querySelectorAll('tr');
         const tableFilterBadge = document.getElementById('tableFilterBadge');
+        const lossTimeTable = document.getElementById('lossTimeTable');
+        if (lossTimeTable) {
+            lossTimeTable.classList.toggle('compact-filter-result', Boolean(subCat));
+        }
 
         if (!subCat) {
             rows.forEach(r => r.style.display = '');
@@ -1776,6 +1827,7 @@
                 tableFilterBadge.textContent = 'M&T Trouble';
                 tableFilterBadge.style.display = 'inline';
             }
+            updateDisplayedRecordTotal(rows.length);
             return;
         }
 
@@ -1795,6 +1847,7 @@
 
         const mttCountNum = document.getElementById('mttCountNum');
         if (mttCountNum) mttCountNum.textContent = visibleCount;
+        updateDisplayedRecordTotal(visibleCount);
     }
 
     function matchMttKeyword(detailedReasonLower, subCat) {
@@ -1845,6 +1898,7 @@
         }
 
         filterTableRows(currentCategoryFilter);
+        if (currentCategoryFilter === 'all') scrollLossTableToPage(1);
     }
 
     function showCustomToast(message, type = 'success') {
@@ -1891,7 +1945,7 @@
                     try {
                         this.showPicker();
                     } catch (_) {
-                        // The browser's native calendar icon remains available as fallback.
+                        // Native calendar icon remains available as a fallback.
                     }
                 }
             });
@@ -1899,10 +1953,11 @@
             input.addEventListener('keydown', function (event) {
                 if (event.key !== 'Tab' && event.key !== 'Escape') event.preventDefault();
             });
-
+            input.addEventListener('beforeinput', event => event.preventDefault());
             input.addEventListener('paste', event => event.preventDefault());
             input.addEventListener('drop', event => event.preventDefault());
         });
+
     });
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -2330,6 +2385,7 @@
                 initializeCharts();
                 initializeOtherFeatures();
                 onChartCategoryFilterChange(initialCategoryFilter);
+                initializeLossScrollNavigation();
             });
         });
     }

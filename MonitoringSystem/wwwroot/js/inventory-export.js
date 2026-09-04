@@ -12,38 +12,6 @@
     const header = document.querySelector('.inv-header-wrap');
     const footer = document.querySelector('.inv-footer-wrap');
 
-    // ── Snap tinggi area scroll body ke kelipatan pas tinggi 1 baris ──
-    // Supaya nggak ada baris terakhir yang "kepotong setengah" pas nyampe
-    // batas bawah, dan tabel Total nempel rapi tanpa keliatan ada gap.
-    function snapBodyHeight() {
-        if (!body) return;
-        const firstRow = document.querySelector('#inventory-table-body tr');
-        if (!firstRow) return;
-
-        const rowHeight = firstRow.getBoundingClientRect().height;
-        if (!rowHeight) return;
-
-        // Lepas dulu batas tinggi biar bisa baca batas maksimal "alami" dari CSS
-        body.style.maxHeight = '';
-        body.style.height = '';
-        const maxAllowed = body.getBoundingClientRect().height || body.clientHeight;
-        if (!maxAllowed) return;
-
-        const rows = Math.max(1, Math.floor(maxAllowed / rowHeight));
-        const snappedHeight = Math.round(rows * rowHeight);
-
-        body.style.maxHeight = snappedHeight + 'px';
-        body.style.height = snappedHeight + 'px';
-    }
-
-    snapBodyHeight();
-
-    let resizeTimeout;
-    window.addEventListener('resize', function () {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(snapBodyHeight, 150);
-    });
-
     // footer = pemilik scrollbar horizontal asli (muncul di paling bawah).
     // header & body cuma ikut posisi scrollLeft footer.
     // Wheel/drag di area manapun (header/body/footer) tetap menggerakkan semuanya.
