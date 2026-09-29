@@ -68,6 +68,10 @@
                 $this.addClass('active');
             }
         });
+
+        if (currentPath.startsWith('/acoee/')) {
+            $('#machineMenuBtn').addClass('active');
+        }
     }
 
     /**
@@ -121,6 +125,36 @@
                 }
             });
         }
+    }
+
+    /**
+     * Machine is a split navigation item: its main link opens the AC OEE
+     * dashboard, while its flyout exposes Dashboard and Production Data.
+     */
+    function initMachineMenu() {
+        const machineItem = document.getElementById('machineNavItem');
+        const machineBtn = document.getElementById('machineMenuBtn');
+        const machinePopup = document.getElementById('machineMenuPopup');
+
+        if (!machineItem || !machineBtn || !machinePopup) return;
+
+        const currentPath = window.location.pathname.toLowerCase().replace(/\/index$/, '');
+
+        machineBtn.addEventListener('click', function (e) {
+            if (currentPath !== '/acoee/dashboard') return;
+
+            e.preventDefault();
+            e.stopPropagation();
+            const isOpen = machineItem.classList.toggle('menu-open');
+            machineBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!machineItem.contains(e.target)) {
+                machineItem.classList.remove('menu-open');
+                machineBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
     }
 
     /**
@@ -210,6 +244,7 @@
         }
 
         initMoreMenu();
+        initMachineMenu();
         initThemeToggle();
         updateLogoAndJam();
 

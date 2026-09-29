@@ -80,10 +80,14 @@
             if (typeof flatpickr !== 'undefined') {
                 flatpickr(dateInput, {
                     dateFormat: "Y-m-d",
-                    onChange: window.fetchBreakTime
+                    onChange: function () {
+                        window.fetchBreakTime();
+                    }
                 });
             } else {
-                dateInput.addEventListener('change', window.fetchBreakTime);
+                dateInput.addEventListener('change', function () {
+                    window.fetchBreakTime();
+                });
             }
         }
 
@@ -174,4 +178,4 @@
         }
     });
 </script>
-
+

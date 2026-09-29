@@ -1,0 +1,510 @@
+@page "/previewsap"
+@using System.Globalization;
+@model MonitoringSystem.Pages.PreviewSap.IndexModel
+@{
+    ViewData["Title"] = "Preview SAP Plan";
+    var idCulture = CultureInfo.GetCultureInfo("id-ID");
+    var monthName = CultureInfo.GetCultureInfo("en-US").DateTimeFormat.GetMonthName(Model.SelectedMonth);
+    var totalNormal = Model.Rows.Sum(r => r.QtyNormal);
+    var totalOvertime = Model.Rows.Sum(r => r.QtyOvertime);
+    var modelCount = Model.Rows.Select(r => r.MachineCode + "|" + r.Model).Distinct().Count();
+
+    // Urutan line: CU (MCH1-01) lalu CS (MCH1-02); line lain (kalau ada) di belakang
+    var lineOrder = new List<string> { "MCH1-01", "MCH1-02" };
+    var lines = (Model.MachineLine == "All" ? lineOrder : new List<string> { Model.MachineLine })
+        .Concat(Model.Rows.Select(r => r.MachineCode).Distinct().Where(m => !lineOrder.Contains(m) && m != Model.MachineLine))
+        .ToList();
+    string L(string mc) => MonitoringSystem.Pages.PreviewSap.IndexModel.LineName(mc);
+
+    // Hari yang ditampilkan di rekap per tanggal: semua hari di bulan itu (atau 1 hari kalau difilter)
+    var days = Model.SelectedDay > 0
+        ? new List<int> { Model.SelectedDay }
+        : Enumerable.Range(1, Model.DaysInMonth).ToList();
+    var byDay = Model.Rows.GroupBy(r => r.Date.Date).OrderBy(g => g.Key).ToList();
+    var byDayLine = Model.Rows
+        .GroupBy(r => (r.Date.Day, r.MachineCode))
+        .ToDictionary(g => g.Key, g => (N: g.Sum(x => x.QtyNormal), O: g.Sum(x => x.QtyOvertime), C: g.Select(x => x.Model).Distinct().Count()));
+
+    var byModel = Model.Rows
+        .GroupBy(r => new { r.MachineCode, r.Model })
+        .Select(g => new { g.Key.MachineCode, g.Key.Model, Normal = g.Sum(x => x.QtyNormal), Overtime = g.Sum(x => x.QtyOvertime), Days = g.Select(x => x.Date.Date).Distinct().Count() })
+        .ToList();
+
+    bool IsWeekend(DateTime d) => d.DayOfWeek == DayOfWeek.Saturday || d.DayOfWeek == DayOfWeek.Sunday;
+    string Z(int v) => v == 0 ? "zero" : "";
+}
+
+<style>
+    .sap-preview { color: #e2e8f0; }
+    .sap-preview .sap-title { font-size: 18px; font-weight: 600; margin: 0; }
+    .sap-preview .sap-sub { font-size: 12px; opacity: .7; margin: 2px 0 0; }
+
+    .sap-filter {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+        padding: 10px 14px; margin: 12px 0;
+        background: rgba(15, 23, 42, .55); border: 1px solid rgba(255,255,255,.12); border-radius: 10px;
+    }
+    .sap-filter label { font-size: 12px; margin: 0 6px 0 0; }
+    .sap-filter .form-select, .sap-filter .form-control { font-size: 12px; }
+
+    .sap-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 12px; }
+    .sap-card {
+        padding: 10px 14px; border-radius: 10px;
+        background: rgba(15, 23, 42, .55); border: 1px solid rgba(255,255,255,.12);
+    }
+    .sap-card .k { font-size: 11px; opacity: .75; display: flex; align-items: center; gap: 6px; }
+    .sap-card .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .sap-card .s { font-size: 11px; opacity: .7; font-variant-numeric: tabular-nums; }
+    .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+    .sw-normal { background: #3cb9fc; }
+    .sw-ovt { background: #1a3a6b; border: 1px solid #3b6fb8; }
+
+    .sap-tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+    .sap-tabs button {
+        font-size: 12px; padding: 5px 14px; border-radius: 6px; cursor: pointer;
+        background: transparent; color: inherit; border: 1px solid rgba(255,255,255,.25);
+    }
+    .sap-tabs button.active { background: #3cb9fc; border-color: #3cb9fc; color: #0f172a; font-weight: 600; }
+
+    .sap-table-wrap {
+        max-height: calc(100vh - 340px); min-height: 250px; overflow: auto;
+        border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: rgba(15, 23, 42, .55);
+    }
+    .sap-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .sap-table th, .sap-table td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,.08); white-space: nowrap; }
+    .sap-table thead { position: sticky; top: 0; z-index: 2; }
+    .sap-table thead th { background: #1e3a5f; font-weight: 600; text-align: left; }
+    .sap-table thead th.grp { text-align: center; border-left: 2px solid rgba(255,255,255,.2); }
+    .sap-table .bl { border-left: 2px solid rgba(255,255,255,.2); }
+    .sap-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .sap-table tbody tr:hover td { background: rgba(60, 185, 252, .08); }
+    .sap-table tr.line-sub td { background: rgba(60, 185, 252, .07); font-weight: 600; font-style: italic; }
+    .sap-table tr.day-sub td { background: rgba(60, 185, 252, .16); font-weight: 700; }
+    .sap-table tr.line-head td { background: rgba(255,255,255,.06); font-weight: 700; letter-spacing: .5px; }
+    .sap-table tr.weekend td.date-cell { color: #f87171; }
+    .sap-table tr.no-data td { opacity: .45; }
+    .sap-table tfoot { position: sticky; bottom: 0; z-index: 2; }
+    .sap-table tfoot td { background: #1e3a5f; font-weight: 700; }
+    .sap-table td.tot { font-weight: 700; }
+    .badge-line { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+    .line-MCH1-01 { background: rgba(250, 204, 21, .22); }
+    .line-MCH1-02 { background: rgba(167, 139, 250, .25); }
+    .badge-shift { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(60,185,252,.2); }
+    .zero { opacity: .35; }
+    .sap-empty { padding: 40px; text-align: center; opacity: .7; }
+
+    /* Light mode */
+    body.light-mode .sap-preview { color: #1e293b; }
+    body.light-mode .sap-filter, body.light-mode .sap-card, body.light-mode .sap-table-wrap {
+        background: rgba(255,255,255,.85); border-color: rgba(0,0,0,.1);
+    }
+    body.light-mode .sap-table th, body.light-mode .sap-table td { border-bottom-color: rgba(0,0,0,.07); }
+    body.light-mode .sap-table thead th, body.light-mode .sap-table tfoot td { background: #dbeafe; }
+    body.light-mode .sap-table .bl, body.light-mode .sap-table thead th.grp { border-left-color: rgba(0,0,0,.15); }
+    body.light-mode .sap-table tr.line-head td { background: rgba(0,0,0,.05); }
+    body.light-mode .sap-tabs button { border-color: rgba(0,0,0,.2); }
+    body.light-mode .sap-table tr.weekend td.date-cell { color: #dc2626; }
+</style>
+
+<div class="sap-preview">
+    <div class="d-flex justify-content-between align-items-end flex-wrap gap-2">
+        <div>
+            <h1 class="sap-title"><i class="fa-solid fa-table-list me-2"></i>Preview SAP Plan</h1>
+            <p class="sap-sub">Data bar biru (SAP Plan Normal &amp; SAP Plan Overtime) di Production Achievement — @monthName @Model.SelectedYear</p>
+        </div>
+        <a href="/ProductionReport/index?SelectedMonth=@Model.SelectedMonth&SelectedYear=@Model.SelectedYear&MachineLine=@Model.MachineLine"
+           class="btn btn-sm btn-outline-info"><i class="fa-solid fa-chart-column me-1"></i>Production Achievement</a>
+    </div>
+
+    <form method="get" class="sap-filter" id="sapFilterForm">
+        <div class="d-flex align-items-center">
+            <label for="MachineLine">Line</label>
+            <select class="form-select form-select-sm" style="width:80px" name="MachineLine" id="MachineLine">
+                <option value="All" selected="@(Model.MachineLine == "All")">All</option>
+                <option value="MCH1-01" selected="@(Model.MachineLine == "MCH1-01")">CU</option>
+                <option value="MCH1-02" selected="@(Model.MachineLine == "MCH1-02")">CS</option>
+            </select>
+        </div>
+        <div class="d-flex align-items-center">
+            <label for="SelectedMonth">Month</label>
+            <select class="form-select form-select-sm" style="width:115px" name="SelectedMonth" id="SelectedMonth">
+                @for (int i = 1; i <= 12; i++)
+                {
+                    <option value="@i" selected="@(Model.SelectedMonth == i)">@CultureInfo.GetCultureInfo("en-US").DateTimeFormat.GetMonthName(i)</option>
+                }
+            </select>
+        </div>
+        <div class="d-flex align-items-center">
+            <label for="SelectedYear">Year</label>
+            <select class="form-select form-select-sm" style="width:85px" name="SelectedYear" id="SelectedYear">
+                @for (int i = DateTime.Now.Year + 1; i >= 2020; i--)
+                {
+                    <option value="@i" selected="@(Model.SelectedYear == i)">@i</option>
+                }
+            </select>
+        </div>
+        <div class="d-flex align-items-center">
+            <label for="SelectedDay">Date</label>
+            <select class="form-select form-select-sm" style="width:80px" name="SelectedDay" id="SelectedDay">
+                <option value="0" selected="@(Model.SelectedDay == 0)">All</option>
+                @for (int d = 1; d <= Model.DaysInMonth; d++)
+                {
+                    <option value="@d" selected="@(Model.SelectedDay == d)">@d</option>
+                }
+            </select>
+        </div>
+        <div class="d-flex align-items-center">
+            <label for="Shift">Shift</label>
+            <select class="form-select form-select-sm" style="width:80px" name="Shift" id="Shift">
+                <option value="All" selected="@(Model.Shift == "All")">All</option>
+                @foreach (var s in Model.AvailableShifts)
+                {
+                    <option value="@s" selected="@(Model.Shift == s)">@s</option>
+                }
+            </select>
+        </div>
+        <div class="d-flex align-items-center ms-auto">
+            <input type="search" id="modelSearch" class="form-control form-control-sm" style="width:200px" placeholder="Cari model..." />
+        </div>
+    </form>
+
+    @if (Model.ErrorMessage != null)
+    {
+        <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+    }
+
+    <div class="sap-cards">
+        @foreach (var mc in lines)
+        {
+            var lr = Model.Rows.Where(r => r.MachineCode == mc).ToList();
+            <div class="sap-card">
+                <div class="k"><span class="badge-line line-@mc">@L(mc)</span>Total SAP Plan @L(mc)</div>
+                <div class="v">@lr.Sum(r => r.Total).ToString("N0")</div>
+                <div class="s"><span class="swatch sw-normal"></span> @lr.Sum(r => r.QtyNormal).ToString("N0") &nbsp; <span class="swatch sw-ovt"></span> @lr.Sum(r => r.QtyOvertime).ToString("N0") &nbsp;·&nbsp; @lr.Select(r => r.Model).Distinct().Count() model</div>
+            </div>
+        }
+        <div class="sap-card">
+            <div class="k">Grand Total SAP Plan</div>
+            <div class="v">@((totalNormal + totalOvertime).ToString("N0"))</div>
+            <div class="s"><span class="swatch sw-normal"></span> @totalNormal.ToString("N0") &nbsp; <span class="swatch sw-ovt"></span> @totalOvertime.ToString("N0") &nbsp;·&nbsp; @modelCount model</div>
+        </div>
+    </div>
+
+    <div class="sap-tabs">
+        <button type="button" class="active" data-view="date">Rekap per Tanggal (CU / CS)</button>
+        <button type="button" data-view="detail">Detail Model per Tanggal</button>
+        <button type="button" data-view="model">Rekap per Model</button>
+    </div>
+
+    @if (!Model.Rows.Any())
+    {
+        <div class="sap-table-wrap"><div class="sap-empty">Tidak ada data SAP Plan untuk filter ini.</div></div>
+    }
+    else
+    {
+        <!-- ================= REKAP PER TANGGAL: CU vs CS ================= -->
+        <div class="sap-table-wrap" id="view-date">
+            <table class="sap-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2">Tanggal</th>
+                        @foreach (var mc in lines)
+                        {
+                            <th colspan="4" class="grp"><span class="badge-line line-@mc">@L(mc)</span></th>
+                        }
+                        <th colspan="3" class="grp">Total @string.Join(" + ", lines.Select(L))</th>
+                    </tr>
+                    <tr>
+                        @foreach (var mc in lines)
+                        {
+                            <th class="num bl">Model</th>
+                            <th class="num"><span class="swatch sw-normal me-1"></span>Qty Shift</th>
+                            <th class="num"><span class="swatch sw-ovt me-1"></span>Qty OVT</th>
+                            <th class="num">Total</th>
+                        }
+                        <th class="num bl"><span class="swatch sw-normal me-1"></span>Qty Shift</th>
+                        <th class="num"><span class="swatch sw-ovt me-1"></span>Qty OVT</th>
+                        <th class="num">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in days)
+                    {
+                        var date = new DateTime(Model.SelectedYear, Model.SelectedMonth, d);
+                        bool hasData = lines.Any(mc => byDayLine.ContainsKey((d, mc)));
+                        int dn = 0, dov = 0;
+                        <tr class="pivot-row @(IsWeekend(date) ? "weekend" : "") @(hasData ? "" : "no-data")" data-day="@d">
+                            <td class="date-cell">@date.ToString("ddd, dd MMM", idCulture)</td>
+                            @foreach (var mc in lines)
+                            {
+                                var v = byDayLine.TryGetValue((d, mc), out var x) ? x : (N: 0, O: 0, C: 0);
+                                dn += v.N; dov += v.O;
+                                <td class="num bl @Z(v.C)" data-cell="@mc|c">@v.C</td>
+                                <td class="num @Z(v.N)" data-cell="@mc|n">@v.N.ToString("N0")</td>
+                                <td class="num @Z(v.O)" data-cell="@mc|o">@v.O.ToString("N0")</td>
+                                <td class="num tot @Z(v.N + v.O)" data-cell="@mc|t">@((v.N + v.O).ToString("N0"))</td>
+                            }
+                            <td class="num bl @Z(dn)" data-cell="all|n">@dn.ToString("N0")</td>
+                            <td class="num @Z(dov)" data-cell="all|o">@dov.ToString("N0")</td>
+                            <td class="num tot @Z(dn + dov)" data-cell="all|t">@((dn + dov).ToString("N0"))</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr class="pivot-foot">
+                        <td>Grand Total</td>
+                        @foreach (var mc in lines)
+                        {
+                            var lr = Model.Rows.Where(r => r.MachineCode == mc).ToList();
+                            <td class="num bl" data-cell="@mc|c">@lr.Select(r => r.Model).Distinct().Count()</td>
+                            <td class="num" data-cell="@mc|n">@lr.Sum(r => r.QtyNormal).ToString("N0")</td>
+                            <td class="num" data-cell="@mc|o">@lr.Sum(r => r.QtyOvertime).ToString("N0")</td>
+                            <td class="num" data-cell="@mc|t">@lr.Sum(r => r.Total).ToString("N0")</td>
+                        }
+                        <td class="num bl" data-cell="all|n">@totalNormal.ToString("N0")</td>
+                        <td class="num" data-cell="all|o">@totalOvertime.ToString("N0")</td>
+                        <td class="num" data-cell="all|t">@((totalNormal + totalOvertime).ToString("N0"))</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- ================= DETAIL MODEL PER TANGGAL, DIPISAH CU / CS ================= -->
+        <div class="sap-table-wrap" id="view-detail" style="display:none">
+            <table class="sap-table">
+                <thead>
+                    <tr>
+                        <th class="num">No</th>
+                        <th>Tanggal</th>
+                        <th>Line</th>
+                        <th>Model</th>
+                        <th>Shift</th>
+                        <th class="num"><span class="swatch sw-normal me-1"></span>Qty Shift (Normal)</th>
+                        <th class="num"><span class="swatch sw-ovt me-1"></span>Qty OVT</th>
+                        <th class="num">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var day in byDay)
+                    {
+                        bool weekend = IsWeekend(day.Key);
+                        foreach (var mc in lines)
+                        {
+                            var lineRows = day.Where(r => r.MachineCode == mc).OrderBy(r => r.Shift).ThenBy(r => r.Model).ToList();
+                            if (!lineRows.Any()) { continue; }
+                            int no = 0;
+                            foreach (var r in lineRows)
+                            {
+                                no++;
+                                <tr class="data-row @(weekend ? "weekend" : "")" data-day="@day.Key.Day" data-line="@mc" data-model="@r.Model.ToLowerInvariant()" data-normal="@r.QtyNormal" data-ovt="@r.QtyOvertime">
+                                    <td class="num row-no">@no</td>
+                                    <td class="date-cell">@day.Key.ToString("ddd, dd MMM yyyy", idCulture)</td>
+                                    <td><span class="badge-line line-@mc">@L(mc)</span></td>
+                                    <td>@r.Model</td>
+                                    <td><span class="badge-shift">@r.Shift</span></td>
+                                    <td class="num @Z(r.QtyNormal)">@r.QtyNormal.ToString("N0")</td>
+                                    <td class="num @Z(r.QtyOvertime)">@r.QtyOvertime.ToString("N0")</td>
+                                    <td class="num">@r.Total.ToString("N0")</td>
+                                </tr>
+                            }
+                            <tr class="line-sub sub-row" data-sub-day="@day.Key.Day" data-sub-line="@mc">
+                                <td></td>
+                                <td colspan="4">Subtotal <span class="badge-line line-@mc">@L(mc)</span> — <span class="sub-count">@lineRows.Select(x => x.Model).Distinct().Count()</span> model</td>
+                                <td class="num sub-normal">@lineRows.Sum(x => x.QtyNormal).ToString("N0")</td>
+                                <td class="num sub-ovt">@lineRows.Sum(x => x.QtyOvertime).ToString("N0")</td>
+                                <td class="num sub-total">@lineRows.Sum(x => x.Total).ToString("N0")</td>
+                            </tr>
+                        }
+                        <tr class="day-sub sub-row" data-sub-day="@day.Key.Day" data-sub-line="">
+                            <td></td>
+                            <td colspan="4">Total @day.Key.ToString("dd MMM yyyy", idCulture) (@string.Join(" + ", lines.Where(mc => day.Any(r => r.MachineCode == mc)).Select(L)))</td>
+                            <td class="num sub-normal">@day.Sum(x => x.QtyNormal).ToString("N0")</td>
+                            <td class="num sub-ovt">@day.Sum(x => x.QtyOvertime).ToString("N0")</td>
+                            <td class="num sub-total">@day.Sum(x => x.Total).ToString("N0")</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td></td>
+                        <td colspan="4">Grand Total</td>
+                        <td class="num" id="gt-normal">@totalNormal.ToString("N0")</td>
+                        <td class="num" id="gt-ovt">@totalOvertime.ToString("N0")</td>
+                        <td class="num" id="gt-total">@((totalNormal + totalOvertime).ToString("N0"))</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- ================= REKAP PER MODEL, DIPISAH CU / CS ================= -->
+        <div class="sap-table-wrap" id="view-model" style="display:none">
+            <table class="sap-table">
+                <thead>
+                    <tr>
+                        <th class="num">No</th>
+                        <th>Line</th>
+                        <th>Model</th>
+                        <th class="num">Jml Hari</th>
+                        <th class="num"><span class="swatch sw-normal me-1"></span>Qty Shift (Normal)</th>
+                        <th class="num"><span class="swatch sw-ovt me-1"></span>Qty OVT</th>
+                        <th class="num">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var mc in lines)
+                    {
+                        var models = byModel.Where(m => m.MachineCode == mc).OrderByDescending(m => m.Normal + m.Overtime).ToList();
+                        if (!models.Any()) { continue; }
+                        <tr class="line-head" data-head-line="@mc"><td colspan="7"><span class="badge-line line-@mc">@L(mc)</span> &nbsp;<span class="head-count">@models.Count</span> model</td></tr>
+                        int mNo = 0;
+                        foreach (var m in models)
+                        {
+                            mNo++;
+                            <tr class="model-row" data-line="@mc" data-model="@m.Model.ToLowerInvariant()" data-normal="@m.Normal" data-ovt="@m.Overtime">
+                                <td class="num row-no">@mNo</td>
+                                <td><span class="badge-line line-@mc">@L(mc)</span></td>
+                                <td>@m.Model</td>
+                                <td class="num">@m.Days</td>
+                                <td class="num @Z(m.Normal)">@m.Normal.ToString("N0")</td>
+                                <td class="num @Z(m.Overtime)">@m.Overtime.ToString("N0")</td>
+                                <td class="num">@((m.Normal + m.Overtime).ToString("N0"))</td>
+                            </tr>
+                        }
+                        <tr class="line-sub model-sub" data-sub-line="@mc">
+                            <td></td>
+                            <td colspan="3">Subtotal <span class="badge-line line-@mc">@L(mc)</span></td>
+                            <td class="num sub-normal">@models.Sum(m => m.Normal).ToString("N0")</td>
+                            <td class="num sub-ovt">@models.Sum(m => m.Overtime).ToString("N0")</td>
+                            <td class="num sub-total">@models.Sum(m => m.Normal + m.Overtime).ToString("N0")</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td></td>
+                        <td colspan="3">Grand Total</td>
+                        <td class="num" id="gm-normal">@totalNormal.ToString("N0")</td>
+                        <td class="num" id="gm-ovt">@totalOvertime.ToString("N0")</td>
+                        <td class="num" id="gm-total">@((totalNormal + totalOvertime).ToString("N0"))</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    }
+</div>
+
+<script>
+    (function () {
+        // Filter dropdown langsung submit
+        document.querySelectorAll('#sapFilterForm select').forEach(function (el) {
+            el.addEventListener('change', function () {
+                // Ganti bulan/tahun -> reset pilihan tanggal supaya tidak keluar dari range bulan
+                if (el.id === 'SelectedMonth' || el.id === 'SelectedYear') document.getElementById('SelectedDay').value = '0';
+                document.getElementById('sapFilterForm').submit();
+            });
+        });
+
+        // Tab
+        var views = { date: 'view-date', detail: 'view-detail', model: 'view-model' };
+        function showView(v) {
+            document.querySelectorAll('.sap-tabs button').forEach(function (b) { b.classList.toggle('active', b.dataset.view === v); });
+            Object.keys(views).forEach(function (k) {
+                var el = document.getElementById(views[k]);
+                if (el) el.style.display = k === v ? '' : 'none';
+            });
+            try { sessionStorage.setItem('previewSapView', v); } catch (e) { }
+        }
+        document.querySelectorAll('.sap-tabs button').forEach(function (btn) {
+            btn.addEventListener('click', function () { showView(btn.dataset.view); });
+        });
+        try { var saved = sessionStorage.getItem('previewSapView'); if (saved && views[saved]) showView(saved); } catch (e) { }
+
+        // Cari model (client-side): filter baris & hitung ulang semua subtotal/total
+        var fmt = function (n) { return n.toLocaleString('en-US'); };
+        function setNum(el, v) { if (!el) return; el.textContent = fmt(v); el.classList.toggle('zero', v === 0); }
+        function setSub(tr, s) {
+            setNum(tr.querySelector('.sub-normal'), s.n);
+            setNum(tr.querySelector('.sub-ovt'), s.o);
+            setNum(tr.querySelector('.sub-total'), s.n + s.o);
+        }
+
+        var search = document.getElementById('modelSearch');
+        search && search.addEventListener('input', function () {
+            var q = search.value.trim().toLowerCase();
+            var match = function (tr) { return !q || tr.dataset.model.indexOf(q) >= 0; };
+
+            // --- Detail per tanggal ---
+            var sums = {}, models = {}, gN = 0, gO = 0, counters = {};
+            var add = function (key, n, o, model) {
+                sums[key] = sums[key] || { n: 0, o: 0 }; sums[key].n += n; sums[key].o += o;
+                models[key] = models[key] || {}; models[key][model] = 1;
+            };
+            document.querySelectorAll('#view-detail tr.data-row').forEach(function (tr) {
+                var show = match(tr);
+                tr.style.display = show ? '' : 'none';
+                if (!show) return;
+                var d = tr.dataset.day, l = tr.dataset.line, n = +tr.dataset.normal, o = +tr.dataset.ovt;
+                add(d + '|' + l, n, o, tr.dataset.model);
+                add(d + '|', n, o, tr.dataset.model);
+                add('all|' + l, n, o, tr.dataset.model);
+                add('all|', n, o, tr.dataset.model);
+                gN += n; gO += o;
+                counters[d + '|' + l] = (counters[d + '|' + l] || 0) + 1;
+                tr.querySelector('.row-no').textContent = counters[d + '|' + l];
+            });
+            document.querySelectorAll('#view-detail tr.sub-row').forEach(function (tr) {
+                var key = tr.dataset.subDay + '|' + tr.dataset.subLine, s = sums[key];
+                tr.style.display = s ? '' : 'none';
+                if (!s) return;
+                setSub(tr, s);
+                var c = tr.querySelector('.sub-count');
+                if (c) c.textContent = Object.keys(models[key]).length;
+            });
+            setNum(document.getElementById('gt-normal'), gN);
+            setNum(document.getElementById('gt-ovt'), gO);
+            setNum(document.getElementById('gt-total'), gN + gO);
+
+            // --- Rekap per tanggal (pivot CU / CS) ---
+            var updatePivotRow = function (tr, day) {
+                tr.querySelectorAll('[data-cell]').forEach(function (td) {
+                    var p = td.dataset.cell.split('|'), line = p[0] === 'all' ? '' : p[0], key = day + '|' + line;
+                    var s = sums[key] || { n: 0, o: 0 };
+                    if (p[1] === 'c') { var c = models[key] ? Object.keys(models[key]).length : 0; td.textContent = c; td.classList.toggle('zero', c === 0); }
+                    else setNum(td, p[1] === 'n' ? s.n : p[1] === 'o' ? s.o : s.n + s.o);
+                });
+            };
+            document.querySelectorAll('#view-date tr.pivot-row').forEach(function (tr) {
+                updatePivotRow(tr, tr.dataset.day);
+                tr.classList.toggle('no-data', !sums[tr.dataset.day + '|']);
+            });
+            var pf = document.querySelector('#view-date tr.pivot-foot');
+            if (pf) updatePivotRow(pf, 'all');
+
+            // --- Rekap per model ---
+            var mSums = {}, mN = 0, mO = 0, mCounters = {};
+            document.querySelectorAll('#view-model tr.model-row').forEach(function (tr) {
+                var show = match(tr);
+                tr.style.display = show ? '' : 'none';
+                if (!show) return;
+                var l = tr.dataset.line, n = +tr.dataset.normal, o = +tr.dataset.ovt;
+                mSums[l] = mSums[l] || { n: 0, o: 0 }; mSums[l].n += n; mSums[l].o += o;
+                mN += n; mO += o;
+                mCounters[l] = (mCounters[l] || 0) + 1;
+                tr.querySelector('.row-no').textContent = mCounters[l];
+            });
+            document.querySelectorAll('#view-model tr.model-sub').forEach(function (tr) {
+                var s = mSums[tr.dataset.subLine];
+                tr.style.display = s ? '' : 'none';
+                if (s) setSub(tr, s);
+            });
+            document.querySelectorAll('#view-model tr.line-head').forEach(function (tr) {
+                var c = mCounters[tr.dataset.headLine] || 0;
+                tr.style.display = c ? '' : 'none';
+                tr.querySelector('.head-count').textContent = c;
+            });
+            setNum(document.getElementById('gm-normal'), mN);
+            setNum(document.getElementById('gm-ovt'), mO);
+            setNum(document.getElementById('gm-total'), mN + mO);
+        });
+    })();
+</script>

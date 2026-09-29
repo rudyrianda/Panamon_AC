@@ -10,35 +10,13 @@
     var currentTime = DateTime.Now.TimeOfDay;
     var currentDate = DateTime.Now.Date;
     var currentDay = DateTime.Today.DayOfWeek;
-    var startWorkingTime = new TimeSpan(7, 0, 0);
-    var endWorkingTime = Model.GetLastWorkingTime(Model.MachineCode);
-
     var listRestTime = Model.GetRestTime(Model.DetermineTypeOfDay(currentDay));
-
-    var workingTimeData = CalculateWorkingTime(Model.SelectedDate, currentTime, startWorkingTime, endWorkingTime, listRestTime);
 
     var totalDefect = Model.CachedDefect;
     var workingTime = Model.CachedWorkingTime;
     var totalLossTime = Model.CachedLossTime;
 
     var planProd = Model.CachedPlan;
-
-    // ✅ OPTIMASI: Hitung sekali, simpan ke variabel, reuse — jangan panggil ulang
-    var hourlyPlansCU = CalculateAllHourlyPlansForCU();
-    var hourlyPlansCS = CalculateAllHourlyPlansForCS();
-    var totalPlanForCU = hourlyPlansCU.Sum();
-    var totalPlanForCS = hourlyPlansCS.Sum();
-
-    // ✅ OPTIMASI: Gabungkan ke satu list untuk keperluan lain
-    var hourlyPlans = hourlyPlansCU.Concat(hourlyPlansCS).ToList();
-
-    // ✅ OPTIMASI: SavePlanToDatabase hanya dipanggil jika hari ini
-    // (method sudah ada guard SelectedDate != Today di backend, ini double-check di view)
-    if (Model.SelectedDate == currentDate)
-    {
-        Model.SavePlanToDatabase(totalPlanForCU, "MCH1-01");
-        Model.SavePlanToDatabase(totalPlanForCS, "MCH1-02");
-    }
 
     var targetProd = Model.CachedTarget;
     var actualProd = Model.CachedActual;
@@ -104,52 +82,6 @@
 
         result.WorkingTime = result.TotalWorkingTime - result.TotalRestTime;
         return result;
-    }
-
-    public List<int> CalculateAllHourlyPlansForCU()
-    {
-        var hourlyPlans = new List<int>();
-        var previousModel = "";
-        var currentTime = DateTime.Now.TimeOfDay;
-        var currentDate = DateTime.Now.Date;
-        var listRestTime = Model.GetRestTime(Model.DetermineTypeOfDay(DateTime.Today.DayOfWeek));
-
-        foreach (var achievement in Model.listProdAchieve
-                    .Where(a => a.MachineCode == "MCH1-01")
-                    .OrderByDescending(item => item.Time)
-                    .ToList())
-        {
-            hourlyPlans.Add(CalculatePlanPerHour(
-                achievement.Model, previousModel,
-                achievement.StartTime, achievement.EndTime,
-                currentTime, currentDate, achievement.SUT, listRestTime));
-            previousModel = achievement.Model;
-        }
-
-        return hourlyPlans;
-    }
-
-    public List<int> CalculateAllHourlyPlansForCS()
-    {
-        var hourlyPlans = new List<int>();
-        var previousModel = "";
-        var currentTime = DateTime.Now.TimeOfDay;
-        var currentDate = DateTime.Now.Date;
-        var listRestTime = Model.GetRestTime(Model.DetermineTypeOfDay(DateTime.Today.DayOfWeek));
-
-        foreach (var achievement in Model.listProdAchieve
-                    .Where(a => a.MachineCode == "MCH1-02")
-                    .OrderByDescending(item => item.Time)
-                    .ToList())
-        {
-            hourlyPlans.Add(CalculatePlanPerHour(
-                achievement.Model, previousModel,
-                achievement.StartTime, achievement.EndTime,
-                currentTime, currentDate, achievement.SUT, listRestTime));
-            previousModel = achievement.Model;
-        }
-
-        return hourlyPlans;
     }
 
     private EfficiencyMetrics CalculateEfficiencyMetrics(int workingTime, double totalLossTime, int planTaktTime, int actualProd)
@@ -751,7 +683,7 @@
 </style>
 
 <div class="row mx-3 perf-page-shell">
-    <form method="post" asp-page-handler="OnPost" class="w-100 mb-3">
+    <form method="get" class="w-100 mb-3">
         <div class="row">
             <div class="col-5 d-flex gap-2 align-items-center">
                 <label class="fw-bold fs-5 perf-label">LINE</label>
@@ -1428,7 +1360,8 @@
             document.getElementById('MachineCode').addEventListener('change', refreshWithLatestCycleWindow);
             document.querySelector('input[name="SelectedDate"]').addEventListener('change', refreshWithLatestCycleWindow);
 
-            // JSON refresh lebih ringan dan tidak berjalan saat tab tidak terlihat.
-            setInterval(autoRefreshPerformanceData, 5000);
+            // Data awal sudah lengkap dari server. Refresh berikutnya dibuat
+            // lebih longgar agar query berat tidak terus membebani SQL Server.
+            setInterval(autoRefreshPerformanceData, 15000);
         </script>
 }

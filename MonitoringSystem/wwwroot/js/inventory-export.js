@@ -16,6 +16,22 @@
     // header & body cuma ikut posisi scrollLeft footer.
     // Wheel/drag di area manapun (header/body/footer) tetap menggerakkan semuanya.
     if (container && body && footer) {
+        // Samakan lebar tabel terpisah berdasarkan ruang scrollbar vertikal yang
+        // benar-benar terpakai. Scrollbar overlay bernilai 0; scrollbar klasik
+        // memakai selisih offsetWidth dan clientWidth.
+        const syncBodyScrollbarWidth = () => {
+            const scrollbarWidth = Math.max(0, Math.round(body.offsetWidth - body.clientWidth));
+            container.style.setProperty('--inv-body-scrollbar-w', `${scrollbarWidth}px`);
+        };
+
+        syncBodyScrollbarWidth();
+        window.addEventListener('resize', syncBodyScrollbarWidth);
+
+        if (window.ResizeObserver) {
+            const bodyResizeObserver = new ResizeObserver(syncBodyScrollbarWidth);
+            bodyResizeObserver.observe(body);
+        }
+
         let lockedAxis = null;   // 'x' | 'y' | null
         let axisTimeout = null;
 

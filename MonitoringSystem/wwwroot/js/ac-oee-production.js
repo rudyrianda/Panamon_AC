@@ -1,22 +1,73 @@
 (function () {
     'use strict';
 
-    var dateElement = document.getElementById('productionDate');
     var datePicker = document.getElementById('productionDatePicker');
-    var timeElement = document.getElementById('productionTime');
     var machineTitle = document.getElementById('productionMachineTitle');
     var modelName = document.getElementById('productionModelName');
     var productionPlanValue = document.getElementById('productionPlanValue');
+    var planBySutValue = document.getElementById('planBySutValue');
     var productionActualValue = document.getElementById('productionActualValue');
     var productionDifference = document.getElementById('productionDifference');
     var productionDifferenceValue = document.getElementById('productionDifferenceValue');
+    var productionRemainingValue = document.getElementById('productionRemainingValue');
     var machineTabsList = document.getElementById('productionMachineTabs');
     var machineTabs = document.querySelectorAll('.machine-tab');
     var machineTabsControls = document.querySelector('.machine-tabs-controls');
     var previousMachinesButton = document.querySelector('.machine-tabs-previous');
     var nextMachinesButton = document.querySelector('.machine-tabs-next');
-    var selectedDate = null;
     var machineDataRequest = 0;
+    var productionOeeGauge = document.getElementById('productionOeeGauge');
+    var productionOeeValue = document.getElementById('productionOeeValue');
+    var productionOeeLegend = document.getElementById('productionOeeLegend');
+    var productionAbilityLegend = document.getElementById('productionAbilityLegend');
+    var productionOperatingLegend = document.getElementById('productionOperatingLegend');
+    var productionQualityLegend = document.getElementById('productionQualityLegend');
+    var defaultOeeMetrics = { oee: 128, ability: 180.1, operating: 71.1, quality: 100 };
+
+    function formatPercent(value, keepDecimal) {
+        var formatted = Number(value).toFixed(1);
+        if (!keepDecimal) {
+            formatted = formatted.replace(/\.0$/, '');
+        }
+        return formatted;
+    }
+
+    function setRingValue(ringId, value) {
+        var ring = document.getElementById(ringId);
+        if (!ring) {
+            return;
+        }
+
+        var boundedValue = Math.max(0, Math.min(100, Number(value) || 0));
+        ring.style.strokeDasharray = boundedValue + ' ' + (100 - boundedValue);
+    }
+
+    function updateOeeMetrics(metrics) {
+        var oee = Number(metrics.oee) || 0;
+        var ability = Number(metrics.ability) || 0;
+        var operating = Number(metrics.operating) || 0;
+        var quality = Number(metrics.quality) || 0;
+        var oeeText = formatPercent(oee, false) + '%';
+        var abilityText = formatPercent(ability, true) + '%';
+        var operatingText = formatPercent(operating, false) + '%';
+        var qualityText = formatPercent(quality, false) + '%';
+
+        setRingValue('productionOeeRing', oee);
+        setRingValue('productionOperatingRing', operating);
+        setRingValue('productionAbilityRing', ability);
+        setRingValue('productionQualityRing', quality);
+
+        productionOeeValue.textContent = oeeText;
+        productionOeeLegend.textContent = 'OEE : ' + oeeText;
+        productionAbilityLegend.textContent = 'Ability : ' + abilityText;
+        productionOperatingLegend.textContent = 'Operating : ' + operatingText;
+        productionQualityLegend.textContent = 'Quality : ' + qualityText;
+        productionOeeGauge.setAttribute('aria-label', 'OEE ' + oeeText + ' percent');
+    }
+
+    function resetOeeMetrics() {
+        updateOeeMetrics(defaultOeeMetrics);
+    }
 
     function updateMachineTabControls() {
         var maximumScroll = Math.max(0, machineTabsList.scrollWidth - machineTabsList.clientWidth);
@@ -52,43 +103,59 @@
         return year + '-' + month + '-' + day;
     }
 
-    function openDatePicker() {
-        if (typeof datePicker.showPicker === 'function') {
-            datePicker.showPicker();
-        } else {
-            datePicker.focus();
-        }
-    }
-
-    function updateClock() {
-        var now = new Date();
-        var displayDate = selectedDate || now;
-        var date = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'long' }).format(displayDate);
-        var weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'long' }).format(displayDate);
-        var parts = new Intl.DateTimeFormat('en-GB', {
-            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-        }).formatToParts(now);
-        var values = {};
-        parts.forEach(function (part) { values[part.type] = part.value; });
-        dateElement.innerHTML = date + ',<br />' + weekday;
-        timeElement.textContent = values.hour + ' : ' + values.minute + ' : ' + values.second;
-    }
-
     function formatQuantity(value) {
         return Number(value || 0).toLocaleString('id-ID');
     }
 
+    function showEvaporatorMetrics(data) {
+        var productionPlan = Number(data.productionPlan || 0);
+        var planBySut = 1170;
+        var actual = Number(data.actual || 0);
+        var difference = actual - productionPlan;
+        var remaining = productionPlan - actual;
+
+        productionPlanValue.textContent = formatQuantity(productionPlan);
+        planBySutValue.textContent = formatQuantity(planBySut);
+        productionActualValue.textContent = formatQuantity(actual);
+        productionDifferenceValue.textContent = formatQuantity(difference);
+        productionDifference.classList.toggle('negative', difference < 0);
+        productionRemainingValue.querySelector('output').textContent = formatQuantity(remaining);
+        productionRemainingValue.classList.toggle('negative', remaining < 0);
+    }
+
+    function showOtherMachineMetrics(data) {
+        var productionPlan = Number(data.productionPlan || 0);
+        var actual = Number(data.actual || 0);
+        var difference = productionPlan - actual;
+
+        productionPlanValue.textContent = formatQuantity(productionPlan);
+        planBySutValue.textContent = '1170';
+        productionActualValue.textContent = formatQuantity(actual);
+        productionDifferenceValue.textContent = formatQuantity(difference);
+        productionDifference.classList.toggle('negative', difference < 0);
+        productionRemainingValue.querySelector('output').textContent = '-2106';
+        productionRemainingValue.classList.add('negative');
+    }
+
     async function loadMachineData(tab) {
+        var requestNumber = ++machineDataRequest;
+        var isEvaporator = tab.dataset.machine === 'Evaporator';
+        if (!isEvaporator) {
+            resetOeeMetrics();
+        }
+
         if (tab.dataset.usesDatabaseModel !== 'true') {
             modelName.textContent = 'BC-MetalPiece1/1';
             productionPlanValue.textContent = '0';
+            planBySutValue.textContent = '1170';
             productionActualValue.textContent = '2106';
             productionDifferenceValue.textContent = '-2106';
             productionDifference.classList.add('negative');
+            productionRemainingValue.querySelector('output').textContent = '-2106';
+            productionRemainingValue.classList.add('negative');
             return;
         }
 
-        var requestNumber = ++machineDataRequest;
         var requestedDate = datePicker.value || toInputDate(new Date());
         modelName.textContent = tab.dataset.model || '-';
         productionPlanValue.textContent = '...';
@@ -117,11 +184,17 @@
 
             tab.dataset.model = data.model || '';
             modelName.textContent = data.model || '-';
-            productionPlanValue.textContent = formatQuantity(data.productionPlan);
-            productionActualValue.textContent = formatQuantity(data.actual);
-            var difference = Number(data.productionPlan || 0) - Number(data.actual || 0);
-            productionDifferenceValue.textContent = formatQuantity(difference);
-            productionDifference.classList.toggle('negative', difference < 0);
+            if (isEvaporator) {
+                showEvaporatorMetrics(data);
+            } else {
+                showOtherMachineMetrics(data);
+            }
+
+            if (data.oeeMetrics) {
+                updateOeeMetrics(data.oeeMetrics);
+            } else {
+                resetOeeMetrics();
+            }
         } catch (error) {
             if (requestNumber !== machineDataRequest || !tab.classList.contains('active')) {
                 return;
@@ -132,33 +205,17 @@
             productionActualValue.textContent = '-';
             productionDifferenceValue.textContent = '-';
             productionDifference.classList.remove('negative');
+            productionRemainingValue.querySelector('output').textContent = '-';
+            productionRemainingValue.classList.remove('negative');
+            resetOeeMetrics();
         }
     }
 
-    datePicker.value = toInputDate(new Date());
-    datePicker.addEventListener('click', function () {
-        openDatePicker();
-    });
-    dateElement.addEventListener('keydown', function (event) {
-        if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            openDatePicker();
-        }
-    });
-    datePicker.addEventListener('change', function () {
-        if (!datePicker.value) {
-            selectedDate = null;
-        } else {
-            var parts = datePicker.value.split('-').map(Number);
-            selectedDate = new Date(parts[0], parts[1] - 1, parts[2]);
-        }
-        updateClock();
-
-        var activeTab = document.querySelector('.machine-tab.active');
-        if (activeTab) {
-            loadMachineData(activeTab);
-        }
-    });
+    var initialProductionDate = new Date();
+    if (initialProductionDate.getHours() < 7) {
+        initialProductionDate.setDate(initialProductionDate.getDate() - 1);
+    }
+    datePicker.value = toInputDate(initialProductionDate);
 
     machineTabs.forEach(function (tab) {
         tab.addEventListener('click', function () {
@@ -177,12 +234,10 @@
     machineTabsList.addEventListener('scroll', updateMachineTabControls, { passive: true });
     window.addEventListener('resize', updateMachineTabControls);
 
-    updateClock();
     var initialActiveTab = document.querySelector('.machine-tab.active');
     if (initialActiveTab) {
         machineTitle.textContent = initialActiveTab.dataset.machine.toUpperCase();
         loadMachineData(initialActiveTab);
     }
     window.requestAnimationFrame(updateMachineTabControls);
-    window.setInterval(updateClock, 1000);
 }());

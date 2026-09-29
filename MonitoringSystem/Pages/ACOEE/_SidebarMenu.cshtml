@@ -1,0 +1,65 @@
+@{
+    var currentPath = (Context.Request.Path.Value ?? string.Empty).TrimEnd('/').ToLowerInvariant();
+
+    string ActiveWhen(string path)
+    {
+        return currentPath == path.ToLowerInvariant() ? "active" : string.Empty;
+    }
+}
+
+<ul class="mynav nav nav-pills flex-column">
+    <li class="nav-item">
+        <a href="/ACOEE/dashboard" class="@ActiveWhen("/acoee/dashboard")">
+            <i class="fa-solid fa-gauge-high"></i>
+            <span class="nav-label">Dashboard</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a href="/ACOEE/ProductionData" class="@ActiveWhen("/acoee/productiondata")">
+            <i class="fa-solid fa-database"></i>
+            <span class="nav-label">Production<br>Data</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a href="/ACOEE/ProductionReport" class="@ActiveWhen("/acoee/productionreport")">
+            <i class="fa-solid fa-industry"></i>
+            <span class="nav-label">Production<br>Achievement</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a href="/ACOEE/LossTimeReport" class="@ActiveWhen("/acoee/losstimereport")">
+            <i class="fa-solid fa-arrow-trend-down"></i>
+            <span class="nav-label">Trend Loss<br>Time</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a href="/ACOEE/LossTime" class="@ActiveWhen("/acoee/losstime")">
+            <i class="fa-solid fa-file-lines"></i>
+            <span class="nav-label">Detail Loss<br>Time</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a href="/ACOEE/Perfomance" class="@ActiveWhen("/acoee/perfomance")">
+            <i class="fa-solid fa-chart-line"></i>
+            <span class="nav-label">Performance</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a href="/ACOEE/Quality" class="@ActiveWhen("/acoee/quality")">
+            <i class="fa-solid fa-check-circle"></i>
+            <span class="nav-label">Quality</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a href="/ACOEE/Inventory" class="@ActiveWhen("/acoee/inventory")">
+            <i class="fa-solid fa-boxes-stacked"></i>
+            <span class="nav-label">Inventory</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a href="/ProductionReport/index">
+            <i class="fa-solid fa-layer-group"></i>
+            <span class="nav-label">Assembly</span>
+        </a>
+    </li>
+</ul>

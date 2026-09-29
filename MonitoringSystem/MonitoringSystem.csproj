@@ -53,4 +53,23 @@
     <Folder Include="Services\" />
   </ItemGroup>
 
+  <!-- PLC ROHIB (..\PLC_ROHIB\Plclogger) ikut di-build & publish ke subfolder "PlcRohib",
+       lalu dijalankan otomatis oleh Services\PlcRohibLauncher saat Panamon start. -->
+  <PropertyGroup>
+    <PlcRohibProject>$(MSBuildProjectDirectory)\..\PLC_ROHIB\Plclogger\Plclogger.csproj</PlcRohibProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PlcRohibSource Include="..\PLC_ROHIB\Plclogger\**\*" Exclude="..\PLC_ROHIB\Plclogger\bin\**;..\PLC_ROHIB\Plclogger\obj\**;..\PLC_ROHIB\Plclogger\publish\**" />
+  </ItemGroup>
+
+  <Target Name="BuildPlcRohib" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true' And Exists('$(PlcRohibProject)')"
+          Inputs="@(PlcRohibSource)" Outputs="$(OutDir)PlcRohib\Plclogger.dll">
+    <Exec Command="dotnet publish &quot;$(PlcRohibProject)&quot; -c $(Configuration) -o &quot;$(OutDir)PlcRohib&quot; --nologo -v q" />
+  </Target>
+
+  <Target Name="PublishPlcRohib" AfterTargets="Publish" Condition="Exists('$(PlcRohibProject)')">
+    <Exec Command="dotnet publish &quot;$(PlcRohibProject)&quot; -c $(Configuration) -o &quot;$(PublishDir)PlcRohib&quot; --nologo -v q" />
+  </Target>
+
 </Project>

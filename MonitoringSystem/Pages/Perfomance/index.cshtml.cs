@@ -4,6 +4,8 @@ using Microsoft.Data.SqlClient;
 using MonitoringSystem.Data;
 using MonitoringSystem.Models;
 using MonitoringSystem.Services;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using static MonitoringSystem.Pages.Summary.SummaryModel;
 
 namespace MonitoringSystem.Pages.Performance
@@ -15,6 +17,7 @@ namespace MonitoringSystem.Pages.Performance
 
         private readonly ApplicationDbContext _context;
         private readonly IServiceProvider _serviceProvider;
+        private readonly ILogger<PerformanceModel> _logger;
         public List<PlanQty> plansQty = new List<PlanQty>();
 
         // ✅ CACHE: Hindari query DB berulang untuk data yang sama
@@ -33,16 +36,22 @@ namespace MonitoringSystem.Pages.Performance
 
         // ✅ FLAG: Pastikan LoadBreakTimes hanya dipanggil sekali per request
         private bool _breakTimesLoaded = false;
+        private bool _cycleBreakTimesLoaded = false;
 
         private readonly MonitoringSystem.Services.BreakTimeService _breakTimeService;
         private List<BreakTimeInfo> _cycleBreakTimes = new();
         private List<(TimeSpan Start, TimeSpan End)>? _allBreakTimesCache;
 
-        public PerformanceModel(ApplicationDbContext context, IServiceProvider serviceProvider, MonitoringSystem.Services.BreakTimeService breakTimeService)
+        public PerformanceModel(
+            ApplicationDbContext context,
+            IServiceProvider serviceProvider,
+            MonitoringSystem.Services.BreakTimeService breakTimeService,
+            ILogger<PerformanceModel> logger)
         {
             _context = context;
             _serviceProvider = serviceProvider;
             _breakTimeService = breakTimeService;
+            _logger = logger;
         }
 
         public int TotalPlanForSummaryCU { get; set; }
@@ -68,27 +77,81 @@ namespace MonitoringSystem.Pages.Performance
         public int? DailyMinimumCycleTime { get; private set; }
         public int? DailyMaximumCycleTime { get; private set; }
         public double? DailyAverageCycleTime { get; private set; }
-
         public List<ProductionAchievement> listProdAchieve = new List<ProductionAchievement>();
         public List<AssemblyTime> assemblyTimes = new List<AssemblyTime>();
 
         public int Plan { get; set; }
         public int Actual { get; set; }
 
-        // ✅ OPTIMASI: Semua data diload sekali di sini, tidak ada query duplikat
+        // Query independen berjalan bersamaan. Setiap durasi dicatat agar query
+        // termahal terlihat langsung pada log aplikasi tanpa menambah query lain.
         private void LoadAllData()
         {
-            LoadBreakTimesFromDb(); // Aman: sudah di-comment isinya, return langsung
-            GetHourlyAchievement();
-            LoadCycleTimeMonitoring();
+            var totalStopwatch = Stopwatch.StartNew();
+            var timings = new ConcurrentDictionary<string, long>();
 
-            CachedPlan = GetProductionPlan();
-            LoadOeesnMetrics();
-            CachedWorkingTime = GetWorkingTimeBySummaryLogic();
-            CachedLossTime = GetLossTimeBySummaryLogic();
+            MeasureOperation(timings, "BreakTimes", () =>
+            {
+                LoadBreakTimesFromDb();
+                LoadCycleBreakTimes();
+            });
+
+            Parallel.Invoke(
+                () => MeasureOperation(timings, "OEESN dashboard", () => LoadOeesnDashboardData()),
+                () => CachedPlan = MeasureOperation(timings, "Production plan", GetProductionPlan),
+                () => CachedLossTime = MeasureOperation(timings, "Loss time", GetLossTimeBySummaryLogic));
+
+            CachedWorkingTime = MeasureOperation(timings, "Working time", GetWorkingTimeBySummaryLogic);
+
+            // Razor menghitung plan per jam. Isi cache dari query plan yang sudah
+            // selesai agar render tidak mengulang aggregate ProductionRecords.
+            _modelPlanCache[$"modelplan_{MachineCode}_{SelectedDate:yyyyMMdd}"] = CachedPlan;
 
             Plan = CachedPlan;
             Actual = CachedActual;
+
+            totalStopwatch.Stop();
+            _logger.LogInformation(
+                "PANAMON Performance loaded for {MachineCode} {SelectedDate:yyyy-MM-dd} in {TotalMs} ms. Query timings: {@QueryTimings}",
+                MachineCode,
+                SelectedDate,
+                totalStopwatch.ElapsedMilliseconds,
+                timings.OrderByDescending(item => item.Value)
+                    .ToDictionary(item => item.Key, item => item.Value));
+        }
+
+        private static void MeasureOperation(
+            ConcurrentDictionary<string, long> timings,
+            string name,
+            Action action)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                action();
+            }
+            finally
+            {
+                stopwatch.Stop();
+                timings[name] = stopwatch.ElapsedMilliseconds;
+            }
+        }
+
+        private static T MeasureOperation<T>(
+            ConcurrentDictionary<string, long> timings,
+            string name,
+            Func<T> action)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                return action();
+            }
+            finally
+            {
+                stopwatch.Stop();
+                timings[name] = stopwatch.ElapsedMilliseconds;
+            }
         }
 
         public void OnGet()
@@ -235,6 +298,239 @@ namespace MonitoringSystem.Pages.Performance
             catch (Exception ex)
             {
                 Console.WriteLine("Error in LoadOeesnMetrics: " + ex.Message);
+            }
+        }
+
+        private void LoadOeesnDashboardData()
+        {
+            const int maximumCycleMultiplier = 3;
+
+            var dayStart = SelectedDate.Date;
+            var dayEnd = dayStart.AddDays(1);
+            var shiftStart = dayStart.AddHours(7);
+            var shiftEnd = shiftStart.AddDays(1);
+            var dailySummaryEnd = dayStart.AddHours(16);
+            var rows = new List<OeesnDashboardRow>();
+            var masterData = new Dictionary<string, OeesnMasterData>(StringComparer.OrdinalIgnoreCase);
+
+            listProdAchieve.Clear();
+            CycleTimeChartPoints.Clear();
+            DailyMinimumCycleTime = null;
+            DailyMaximumCycleTime = null;
+            DailyAverageCycleTime = null;
+
+            try
+            {
+                using var connection = new SqlConnection(connectionString);
+                connection.Open();
+
+                // Satu batch menggantikan scan terpisah untuk hourly achievement,
+                // cycle time, actual/target/efficiency, plan takt time, dan defect.
+                const string query = @"
+                SET NOCOUNT ON;
+
+                SELECT ID, ISNULL(Product_Id, ''), SDate, SN_GOOD
+                FROM dbo.OEESN
+                WHERE MachineCode = @MachineCode
+                  AND SDate >= @DayStart
+                  AND SDate < @ShiftEnd
+                ORDER BY SDate, ID;
+
+                SELECT Product_Id, ProductName, ISNULL(SUT, 0), ISNULL(QtyHour, 0)
+                FROM dbo.MasterData
+                WHERE MachineCode = @MachineCode;
+
+                SELECT TOP (1)
+                    ISNULL(TargetUnit, 0),
+                    ISNULL(Performance, 0)
+                FROM dbo.OEESN
+                WHERE MachineCode = @MachineCode
+                ORDER BY SDate DESC;
+
+                SELECT COUNT(*)
+                FROM dbo.NG_RPTS
+                WHERE MachineCode = @MachineCode
+                  AND SDate >= @DayStart
+                  AND SDate < @DayEnd;";
+
+                using var command = new SqlCommand(query, connection);
+                command.Parameters.Add("@MachineCode", System.Data.SqlDbType.VarChar, 30).Value = MachineCode;
+                command.Parameters.Add("@DayStart", System.Data.SqlDbType.DateTime2).Value = dayStart;
+                command.Parameters.Add("@DayEnd", System.Data.SqlDbType.DateTime2).Value = dayEnd;
+                command.Parameters.Add("@ShiftEnd", System.Data.SqlDbType.DateTime2).Value = shiftEnd;
+
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    rows.Add(new OeesnDashboardRow
+                    {
+                        Id = reader.IsDBNull(0) ? 0 : reader.GetInt32(0),
+                        ProductId = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                        SDate = reader.GetDateTime(2),
+                        SerialNumber = reader.IsDBNull(3) ? null : reader.GetString(3)
+                    });
+                }
+
+                if (reader.NextResult())
+                {
+                    while (reader.Read())
+                    {
+                        if (reader.IsDBNull(0))
+                            continue;
+
+                        var productId = reader.GetString(0);
+                        if (string.IsNullOrWhiteSpace(productId) || masterData.ContainsKey(productId))
+                            continue;
+
+                        masterData[productId] = new OeesnMasterData
+                        {
+                            ProductName = reader.IsDBNull(1) ? productId : reader.GetString(1),
+                            Sut = reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
+                            QtyHour = reader.IsDBNull(3) ? 0 : reader.GetInt32(3)
+                        };
+                    }
+                }
+
+                if (reader.NextResult() && reader.Read())
+                {
+                    CachedTarget = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader.GetValue(0));
+                    CachedEfficiency = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader.GetValue(1));
+                }
+
+                if (reader.NextResult() && reader.Read())
+                    CachedDefect = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader.GetValue(0));
+
+                CachedActual = rows.Count(row => row.SDate >= shiftStart && row.SDate < shiftEnd);
+
+                var latestPlanRow = rows
+                    .Where(row => row.SDate >= dayStart
+                        && row.SDate < dayEnd
+                        && masterData.ContainsKey(row.ProductId))
+                    .OrderByDescending(row => row.SDate)
+                    .FirstOrDefault();
+                CachedPlanTaktTime = latestPlanRow == null
+                    ? 0
+                    : masterData[latestPlanRow.ProductId].Sut;
+
+                var hourlyGroups = rows
+                    .Where(row => row.SDate >= dayStart
+                        && row.SDate < dayEnd
+                        && masterData.ContainsKey(row.ProductId))
+                    .Select(row => new { Row = row, Master = masterData[row.ProductId] })
+                    .GroupBy(item => new
+                    {
+                        HourStart = new DateTime(
+                            item.Row.SDate.Year,
+                            item.Row.SDate.Month,
+                            item.Row.SDate.Day,
+                            item.Row.SDate.Hour,
+                            0,
+                            0),
+                        item.Master.ProductName,
+                        item.Master.QtyHour,
+                        item.Master.Sut
+                    })
+                    .OrderBy(group => group.Min(item => item.Row.SDate));
+
+                var latestWorkingTime = TimeSpan.Zero;
+                foreach (var group in hourlyGroups)
+                {
+                    var firstTime = group.Min(item => item.Row.SDate);
+                    var lastTime = group.Max(item => item.Row.SDate);
+                    var startTime = group.Key.HourStart.TimeOfDay;
+                    var endTime = group.Key.HourStart.AddHours(1).TimeOfDay;
+                    var model = group.Key.ProductName;
+
+                    listProdAchieve.Add(new ProductionAchievement
+                    {
+                        MachineCode = MachineCode,
+                        FirstTime = firstTime,
+                        StartTime = startTime,
+                        EndTime = endTime,
+                        Time = $"{startTime:hh\\:mm} - {endTime:hh\\:mm}",
+                        Model = model,
+                        Plan = group.Key.QtyHour,
+                        SUT = group.Key.Sut,
+                        Actual = group.Count()
+                    });
+
+                    _firstTimeCache[$"first_{model}_{startTime}_{endTime}_{SelectedDate:yyyyMMdd}"] = firstTime.TimeOfDay;
+                    _lastTimeCache[$"last_{model}_{startTime}_{endTime}_{SelectedDate:yyyyMMdd}"] = lastTime.TimeOfDay;
+                    if (lastTime.TimeOfDay > latestWorkingTime)
+                        latestWorkingTime = lastTime.TimeOfDay;
+                }
+
+                _lastWorkingTimeCache[MachineCode] = latestWorkingTime;
+
+                OeesnDashboardRow? previousScan = null;
+                var scans = new List<CycleTimeScan>();
+                foreach (var row in rows.Where(row =>
+                    row.SDate >= shiftStart
+                    && row.SDate < shiftEnd
+                    && !string.IsNullOrWhiteSpace(row.SerialNumber)))
+                {
+                    masterData.TryGetValue(row.ProductId, out var master);
+                    var sameProduct = previousScan != null
+                        && string.Equals(previousScan.ProductId, row.ProductId, StringComparison.OrdinalIgnoreCase);
+
+                    scans.Add(new CycleTimeScan
+                    {
+                        ProductId = row.ProductId,
+                        ModelProduk = master?.ProductName ?? row.ProductId,
+                        PlanCycleTime = master?.Sut ?? 0,
+                        WaktuScan = row.SDate,
+                        WaktuScanSebelumnya = previousScan?.SDate,
+                        CycleTime = sameProduct
+                            ? (int)(row.SDate - previousScan!.SDate).TotalSeconds
+                            : null
+                    });
+                    previousScan = row;
+                }
+
+                var validCycles = scans
+                    .Select(scan => new
+                    {
+                        Scan = scan,
+                        ActualCycleTime = GetCycleTimeWithoutBreak(scan)
+                    })
+                    .Where(item =>
+                        item.ActualCycleTime.HasValue
+                        && item.Scan.PlanCycleTime > 0
+                        && item.ActualCycleTime.Value <= (long)item.Scan.PlanCycleTime * maximumCycleMultiplier)
+                    .Select(item => new
+                    {
+                        item.Scan,
+                        ActualCycleTime = item.ActualCycleTime!.Value
+                    })
+                    .ToList();
+
+                CycleTimeChartPoints = validCycles
+                    .Select(item => new CycleTimeChartPoint
+                    {
+                        Label = item.Scan.WaktuScan.ToString("HH:mm:ss"),
+                        ModelProduk = item.Scan.ModelProduk,
+                        PlanCycleTime = item.Scan.PlanCycleTime,
+                        ActualCycleTime = item.ActualCycleTime
+                    })
+                    .ToList();
+
+                var dailyCycles = validCycles
+                    .Where(item => item.Scan.WaktuScan >= shiftStart && item.Scan.WaktuScan < dailySummaryEnd)
+                    .ToList();
+                if (dailyCycles.Count > 0)
+                {
+                    DailyMinimumCycleTime = dailyCycles.Min(item => item.ActualCycleTime);
+                    DailyMaximumCycleTime = dailyCycles.Max(item => item.ActualCycleTime);
+                    DailyAverageCycleTime = Math.Round(dailyCycles.Average(item => item.ActualCycleTime), 1);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to load consolidated PANAMON Performance data for {MachineCode} {SelectedDate:yyyy-MM-dd}",
+                    MachineCode,
+                    SelectedDate);
             }
         }
 
@@ -645,58 +941,55 @@ namespace MonitoringSystem.Pages.Performance
             int productionRecordsOt = 0;
             int sapPlanNormal = 0;
             int sapPlanOt = 0;
+            var dayStart = SelectedDate.Date;
+            var dayEnd = dayStart.AddDays(1);
 
             try
             {
-                using (SqlConnection connection = new SqlConnection(connectionString))
+                using var connection = new SqlConnection(connectionString);
+                connection.Open();
+
+                const string query = @"
+                SELECT
+                    ISNULL(production.TotalPlanQuantity, 0),
+                    ISNULL(production.TotalPlanOvertime, 0),
+                    ISNULL(sap.TotalSapNormal, 0),
+                    ISNULL(sap.TotalSapOvertime, 0)
+                FROM (VALUES (1)) AS seed(Value)
+                OUTER APPLY
+                (
+                    SELECT
+                        SUM(ISNULL(pr.Quantity, 0)) AS TotalPlanQuantity,
+                        SUM(ISNULL(pr.Overtime, 0)) AS TotalPlanOvertime
+                    FROM dbo.ProductionPlan pp
+                    INNER JOIN dbo.ProductionRecords pr ON pp.Id = pr.PlanId
+                    WHERE pp.CurrentDate >= @DayStart
+                      AND pp.CurrentDate < @DayEnd
+                      AND pr.MachineCode = @MachineCode
+                ) AS production
+                OUTER APPLY
+                (
+                    SELECT
+                        SUM(ISNULL(sp.SapPlanNormal, 0)) AS TotalSapNormal,
+                        SUM(ISNULL(sp.SapPlanOvertime, 0)) AS TotalSapOvertime
+                        FROM dbo.ProductionPlan pp
+                        INNER JOIN dbo.SapPlan sp ON pp.Id = sp.PlanId
+                        WHERE pp.CurrentDate >= @DayStart
+                          AND pp.CurrentDate < @DayEnd
+                          AND sp.MachineCode = @MachineCode
+                ) AS sap;";
+
+                using var command = new SqlCommand(query, connection);
+                command.Parameters.Add("@DayStart", System.Data.SqlDbType.DateTime2).Value = dayStart;
+                command.Parameters.Add("@DayEnd", System.Data.SqlDbType.DateTime2).Value = dayEnd;
+                command.Parameters.Add("@MachineCode", System.Data.SqlDbType.VarChar, 30).Value = MachineCode;
+                using var reader = command.ExecuteReader();
+                if (reader.Read())
                 {
-                    connection.Open();
-
-                    string planSql = @"
-                        SELECT
-                            SUM(ISNULL(pr.Quantity, 0))  AS TotalPlanQuantity,
-                            SUM(ISNULL(pr.Overtime, 0))  AS TotalPlanOvertime
-                        FROM ProductionPlan pp
-                        INNER JOIN ProductionRecords pr ON pp.Id = pr.PlanId
-                        WHERE CAST(pp.CurrentDate AS DATE) = @SelectedDate
-                          AND pr.MachineCode = @MachineCode;";
-
-                    using (SqlCommand cmd = new SqlCommand(planSql, connection))
-                    {
-                        cmd.Parameters.AddWithValue("@SelectedDate", SelectedDate.Date);
-                        cmd.Parameters.AddWithValue("@MachineCode", MachineCode);
-                        using (SqlDataReader reader = cmd.ExecuteReader())
-                        {
-                            if (reader.Read())
-                            {
-                                productionRecordsPlan = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader[0]);
-                                productionRecordsOt = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader[1]);
-                            }
-                        }
-                    }
-
-                    string sapSql = @"
-                        SELECT
-                            SUM(ISNULL(sp.SapPlanNormal,   0)) AS TotalSapNormal,
-                            SUM(ISNULL(sp.SapPlanOvertime, 0)) AS TotalSapOvertime
-                        FROM ProductionPlan pp
-                        INNER JOIN SapPlan sp ON pp.Id = sp.PlanId
-                        WHERE CAST(pp.CurrentDate AS DATE) = @SelectedDate
-                          AND sp.MachineCode = @MachineCode;";
-
-                    using (SqlCommand cmd = new SqlCommand(sapSql, connection))
-                    {
-                        cmd.Parameters.AddWithValue("@SelectedDate", SelectedDate.Date);
-                        cmd.Parameters.AddWithValue("@MachineCode", MachineCode);
-                        using (SqlDataReader reader = cmd.ExecuteReader())
-                        {
-                            if (reader.Read())
-                            {
-                                sapPlanNormal = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader[0]);
-                                sapPlanOt = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader[1]);
-                            }
-                        }
-                    }
+                    productionRecordsPlan = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader.GetValue(0));
+                    productionRecordsOt = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader.GetValue(1));
+                    sapPlanNormal = reader.IsDBNull(2) ? 0 : Convert.ToInt32(reader.GetValue(2));
+                    sapPlanOt = reader.IsDBNull(3) ? 0 : Convert.ToInt32(reader.GetValue(3));
                 }
             }
             catch (Exception ex)
@@ -985,6 +1278,10 @@ namespace MonitoringSystem.Pages.Performance
 
         private void LoadCycleBreakTimes()
         {
+            if (_cycleBreakTimesLoaded)
+                return;
+
+            _cycleBreakTimesLoaded = true;
             var breakTimes = new List<BreakTimeInfo>();
 
             try
@@ -1000,6 +1297,8 @@ namespace MonitoringSystem.Pages.Performance
             {
                 Console.WriteLine("Error loading cycle additional break time: " + ex.Message);
             }
+
+            _allBreakTimesCache ??= new List<(TimeSpan Start, TimeSpan End)>();
 
             breakTimes.AddRange(GetRestTime(DetermineTypeOfDay(SelectedDate.DayOfWeek))
                 .Select(rest => new BreakTimeInfo
@@ -1339,6 +1638,8 @@ namespace MonitoringSystem.Pages.Performance
         public double GetLossTimeBySummaryLogic()
         {
             double totalLossMinutes = 0;
+            var dayStart = SelectedDate.Date;
+            var dayEnd = dayStart.AddDays(1);
 
             try
             {
@@ -1347,14 +1648,17 @@ namespace MonitoringSystem.Pages.Performance
                 {
                     connection.Open();
 
-                    string lossQuery = @"SELECT CAST(Time AS TIME) AS StartTime, CAST(EndDateTime AS TIME) AS EndTime, LossTime 
+                    string lossQuery = @"SELECT CAST(Time AS TIME) AS StartTime, CAST(EndDateTime AS TIME) AS EndTime, LossTime
                                  FROM AssemblyLossTime
-                                 WHERE CAST(Date AS DATE) = @SelectedDate AND MachineCode = @MachineCode;";
+                                 WHERE [Date] >= @DayStart
+                                   AND [Date] < @DayEnd
+                                   AND MachineCode = @MachineCode;";
 
                     using (SqlCommand cmd = new SqlCommand(lossQuery, connection))
                     {
-                        cmd.Parameters.AddWithValue("@SelectedDate", SelectedDate);
-                        cmd.Parameters.AddWithValue("@MachineCode", MachineCode);
+                        cmd.Parameters.Add("@DayStart", System.Data.SqlDbType.DateTime2).Value = dayStart;
+                        cmd.Parameters.Add("@DayEnd", System.Data.SqlDbType.DateTime2).Value = dayEnd;
+                        cmd.Parameters.Add("@MachineCode", System.Data.SqlDbType.VarChar, 30).Value = MachineCode;
                         using (SqlDataReader reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
@@ -1730,6 +2034,21 @@ namespace MonitoringSystem.Pages.Performance
             public DateTime WaktuScan { get; init; }
             public DateTime? WaktuScanSebelumnya { get; init; }
             public int? CycleTime { get; init; }
+        }
+
+        private sealed class OeesnDashboardRow
+        {
+            public int Id { get; init; }
+            public string ProductId { get; init; } = string.Empty;
+            public DateTime SDate { get; init; }
+            public string? SerialNumber { get; init; }
+        }
+
+        private sealed class OeesnMasterData
+        {
+            public string ProductName { get; init; } = string.Empty;
+            public int Sut { get; init; }
+            public int QtyHour { get; init; }
         }
 
         public sealed class CycleTimeChartPoint

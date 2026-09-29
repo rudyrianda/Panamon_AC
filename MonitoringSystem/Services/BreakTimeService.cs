@@ -5,6 +5,7 @@ using MonitoringSystem.Data;
 using MonitoringSystem.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -21,11 +22,16 @@ namespace MonitoringSystem.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<BreakTimeService> _logger;
 
-        public BreakTimeService(ApplicationDbContext context, IConfiguration configuration)
+        public BreakTimeService(
+            ApplicationDbContext context,
+            IConfiguration configuration,
+            ILogger<BreakTimeService> logger)
         {
             _context = context;
             _configuration = configuration;
+            _logger = logger;
         }
 
         public async Task<List<BreakTimeInfo>> GetBreakTimesForDateAsync(DateTime date)
@@ -33,10 +39,12 @@ namespace MonitoringSystem.Services
             var dateOnly = DateOnly.FromDateTime(date);
 
             // 1. Check if user saved custom break times in DB
+            var customBreakStopwatch = Stopwatch.StartNew();
             var dbBreakTimes = await _context.Set<AdditionalBreakTime>()
                 .Where(b => b.Date == dateOnly)
                 .OrderBy(b => b.StartTime)
                 .ToListAsync();
+            customBreakStopwatch.Stop();
 
             // Ignore placeholder rows left by the old break-time structure so
             // production-based defaults can still be generated for the date.
@@ -46,6 +54,10 @@ namespace MonitoringSystem.Services
 
             if (validDbBreakTimes.Any())
             {
+                _logger.LogInformation(
+                    "Break-time data for {Date:yyyy-MM-dd}: custom query {CustomBreakMs} ms; custom schedule used",
+                    date,
+                    customBreakStopwatch.ElapsedMilliseconds);
                 return validDbBreakTimes.Select(b => new BreakTimeInfo {
                     StartTime = b.StartTime.ToTimeSpan(), 
                     EndTime = b.EndTime.ToTimeSpan(), 
@@ -56,6 +68,7 @@ namespace MonitoringSystem.Services
             // 2. Generate hardcoded times based on active shifts
             var generated = new List<BreakTimeInfo>();
             var shiftModes = new List<string>();
+            var shiftModeStopwatch = Stopwatch.StartNew();
 
             try
             {
@@ -66,9 +79,9 @@ namespace MonitoringSystem.Services
                     var sql = @"
                         SELECT DISTINCT UPPER(LTRIM(RTRIM(ShiftMode)))
                         FROM [OEESN]
-                        WHERE [Date] >= @date
-                          AND [Date] < DATEADD(DAY, 1, @date)
-                          AND MachineCode IN ('MCH1-01', 'MCH1-02')
+                        WHERE MachineCode IN ('MCH1-01', 'MCH1-02')
+                          AND SDate >= @date
+                          AND SDate < DATEADD(DAY, 1, @date)
                           AND SN_GOOD IS NOT NULL
                           AND LTRIM(RTRIM(SN_GOOD)) <> ''
                           AND ShiftMode IS NOT NULL";
@@ -87,7 +100,16 @@ namespace MonitoringSystem.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error reading active shifts: " + ex.Message);
+                _logger.LogError(ex, "Error reading active shifts for {Date:yyyy-MM-dd}", date);
+            }
+            finally
+            {
+                shiftModeStopwatch.Stop();
+                _logger.LogInformation(
+                    "Break-time data for {Date:yyyy-MM-dd}: custom query {CustomBreakMs} ms; shift query {ShiftModeMs} ms",
+                    date,
+                    customBreakStopwatch.ElapsedMilliseconds,
+                    shiftModeStopwatch.ElapsedMilliseconds);
             }
 
             bool hasShift1 = shiftModes.Any(s => s.Contains("SHIFT 1"));
