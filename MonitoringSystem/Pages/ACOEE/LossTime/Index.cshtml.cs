@@ -188,6 +188,10 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
             LoadData();
         }
 
+        // Nama Expander Kyoshin 6.35 sesuai tabel MachineList
+        private string DefaultMachineName() =>
+            MachineNameList.FirstOrDefault(n => n.Trim() is "Expander Kyoshin 6.35" or "Expander Kyoshin 635") ?? "Expander Kyoshin 6.35";
+
         public void SetDatesFromMonthYear()
         {
             StartSelectedDate = new DateTime(SelectedYear, SelectedMonth, 1);
@@ -366,7 +370,6 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
             IsFiltering = false;
             CurrentPage = 1;
             SelectedSource = "Assembly";
-            SelectedMachineName = "All";
             DateRangeStart = null;
             DateRangeEnd = null;
             LoadMachineNameList();
@@ -374,7 +377,17 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
             return Page();
         }
 
+        // Detail Loss Time AC OEE hanya untuk Expander Kyoshin 6.35: dropdown berisi mesin itu saja dan filter selalu ke mesin itu
         private void LoadMachineNameList()
+        {
+            LoadAllMachineNames();
+            var kyoshin = DefaultMachineName();
+            MachineNameList.Clear();
+            MachineNameList.Add(kyoshin);
+            SelectedMachineName = kyoshin;
+        }
+
+        private void LoadAllMachineNames()
         {
             MachineNameList.Clear();
             try
@@ -1258,7 +1271,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
 
         public IActionResult OnPostExportExcel()
         {
-
+            LoadMachineNameList(); // export juga hanya Expander Kyoshin 6.35
             SetDatesFromMonthYear();
             NormalizeDateRange();
             List<LossTimeRecord> exportData;

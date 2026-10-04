@@ -10,9 +10,12 @@ public class IndexModel : PageModel
 {
     private readonly string _connectionString;
     private readonly ILogger<IndexModel> _logger;
+    private readonly MonitoringSystem.Services.BreakTimeService _breakTimeService;
 
-    public IndexModel(IConfiguration configuration, ILogger<IndexModel> logger)
+    public IndexModel(IConfiguration configuration, ILogger<IndexModel> logger,
+        MonitoringSystem.Services.BreakTimeService breakTimeService)
     {
+        _breakTimeService = breakTimeService;
         var panamonConnection = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("DefaultConnection is not configured.");
 
@@ -82,6 +85,32 @@ public class IndexModel : PageModel
         catch (Exception exception)
         {
             _logger.LogError(exception, "Failed to load the latest Evaporator and Condenser models from COBADAQ.");
+        }
+    }
+
+    // Jadwal istirahat (BreakTimeService, sama dengan halaman lain) untuk tanggal produksi:
+    // dipakai timeline sebagai segmen hitam (break).
+    public async Task<IActionResult> OnGetBreakTimesAsync(DateTime productionDate)
+    {
+        if (productionDate.Year is < 2000 or > 2100)
+        {
+            return BadRequest(new { message = "Production date is invalid." });
+        }
+
+        try
+        {
+            var breaks = await _breakTimeService.GetBreakTimesForDateAsync(productionDate.Date);
+            return new JsonResult(breaks.Select(b => new
+            {
+                start = b.StartTime.ToString(@"hh\:mm\:ss"),
+                end = b.EndTime.ToString(@"hh\:mm\:ss"),
+                reason = b.Reason
+            }));
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to load break times for {Date:yyyy-MM-dd}.", productionDate);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Break times could not be loaded." });
         }
     }
 

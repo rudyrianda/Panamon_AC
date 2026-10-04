@@ -43,6 +43,25 @@ namespace MonitoringSystem.Services.SapPlanImport
         public long FileSize { get; set; }
         public string? CycleError { get; set; }
         public List<SapPlanUnitResult> Units { get; set; } = new();
+        public List<PsiWeeklyUnitResult> WeeklyUnits { get; set; } = new();
+    }
+
+    /// <summary>Hasil list mingguan (dbo.PsiWeeklyPlan) untuk satu bulan + satu mesin.</summary>
+    public class PsiWeeklyUnitResult
+    {
+        public string Month { get; set; } = string.Empty;
+        public string Sheet { get; set; } = string.Empty;
+        public string MachineCode { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;         // DryRun | Committed | Skipped | Failed
+        public string? Message { get; set; }
+        public int Weeks { get; set; }
+        public int Rows { get; set; }
+        public int Qty { get; set; }
+        public int MergedRows { get; set; }
+        public int DbRowsBefore { get; set; }
+        public int DbQtyBefore { get; set; }
+        public List<string> Ignored { get; set; } = new();
+        public List<string> Errors { get; set; } = new();
     }
 
     internal class SapPlanUnitState
@@ -147,6 +166,26 @@ namespace MonitoringSystem.Services.SapPlanImport
                 var calculator = new SapPlanCalculator(sut, aliases);
                 var state = LoadState(stateFolder);
 
+                // List mingguan: file prioritas dibaca sekali. Gagal baca = hanya list mingguan yang gagal, SAP Plan tetap jalan.
+                var weekly = opt.PsiWeekly;
+                var weeklyDryRun = dryRunOverride ?? weekly.DryRun ?? opt.DryRun;
+                PsiPriorityList? priority = null;
+                string? priorityError = null, weeklyHash = null;
+                if (weekly.Enabled)
+                {
+                    try
+                    {
+                        var prioPath = Path.Combine(_env.ContentRootPath, weekly.PriorityFile);
+                        priority = PsiPriorityList.Load(prioPath);
+                        var masterModels = await PsiWeeklyStore.LoadMasterProductModelsAsync(connStr, ct);
+                        priority.RestrictTo(masterModels);
+                        // Hash = file Excel + file prioritas + Master Data Produk: salah satu berubah -> list dihitung ulang
+                        weeklyHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+                            cycle.FileHash + "|" + File.ReadAllText(prioPath) + "|" + string.Join(",", masterModels.OrderBy(m => m, StringComparer.OrdinalIgnoreCase)))));
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException) { priorityError = "Persiapan list mingguan (file prioritas / Master Data Produk): " + ex.Message; }
+                }
+
                 foreach (var month in months)
                 {
                     var parsed = DailyPlanWorkbookReader.Parse(snapshot, month, opt.CuMachineCode, opt.CsMachineCode);
@@ -156,6 +195,14 @@ namespace MonitoringSystem.Services.SapPlanImport
                         var unit = await ProcessUnitAsync(opt, connStr, calculator, parsed, month, machine, cycle.DryRun, cycle.FileHash!, state, stateFolder, ct);
                         cycle.Units.Add(unit);
                         AppendAudit(stateFolder, cycle, unit);
+                    }
+
+                    if (weekly.Enabled)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        var wunit = await ProcessWeeklyUnitAsync(connStr, parsed, month, opt.CuMachineCode, priority, priorityError, weeklyDryRun, cycle.FileHash!, weeklyHash, state, stateFolder, ct);
+                        cycle.WeeklyUnits.Add(wunit);
+                        AppendWeeklyAudit(stateFolder, cycle, wunit, weeklyDryRun);
                     }
                 }
                 SaveState(stateFolder, state);
@@ -178,7 +225,91 @@ namespace MonitoringSystem.Services.SapPlanImport
                 _logger.LogInformation("SapPlanImport {Month} {Machine}: {Status} - {Records} record, Qty {Qty} = Normal {Normal} + OVT {Ovt}{Err}",
                     u.Month, u.MachineCode, u.Status, u.Records, u.QtySource, u.Normal, u.Overtime,
                     u.Errors.Count > 0 ? $" | {u.Errors.Count} error, contoh: {u.Errors[0]}" : "");
+            foreach (var w in cycle.WeeklyUnits)
+                _logger.LogInformation("PsiWeekly {Month} {Machine}: {Status} - {Weeks} minggu, {Rows} baris, Qty {Qty}, {Merged} gabungan{Err}",
+                    w.Month, w.MachineCode, w.Status, w.Weeks, w.Rows, w.Qty, w.MergedRows,
+                    w.Errors.Count > 0 ? $" | {w.Errors.Count} error, contoh: {w.Errors[0]}" : "");
             return cycle;
+        }
+
+        /// <summary>
+        /// List mingguan (Senin-Minggu) satu bulan untuk satu mesin -> dbo.PsiWeeklyPlan.
+        /// Model yang tidak ada di file prioritas diabaikan (dicatat, bukan error).
+        /// </summary>
+        private async Task<PsiWeeklyUnitResult> ProcessWeeklyUnitAsync(string connStr, ParsedPlanSheet parsed, DateTime month, string machine,
+            PsiPriorityList? priority, string? priorityError, bool dryRun, string fileHash, string? hash,
+            Dictionary<string, SapPlanUnitState> state, string stateFolder, CancellationToken ct)
+        {
+            var unit = new PsiWeeklyUnitResult { Month = month.ToString("yyyy-MM"), Sheet = parsed.SheetName, MachineCode = machine };
+            var stateKey = $"weekly|{unit.Month}|{machine}";
+            try
+            {
+                if (priority == null || hash == null) throw new InvalidOperationException(priorityError ?? "File prioritas list mingguan tidak terbaca.");
+                unit.Errors.AddRange(parsed.ErrorsFor(machine));
+
+                if (!dryRun && state.TryGetValue(stateKey, out var st) && st.Status == "Committed" && st.Hash == hash)
+                {
+                    unit.Status = "Skipped";
+                    unit.Message = "File Excel & file prioritas tidak berubah sejak commit terakhir.";
+                    return unit;
+                }
+
+                var cells = parsed.Cells.Where(c => c.MachineCode == machine).ToList();
+                var (rows, ignored) = PsiWeeklyPlanner.Build(cells, month, priority);
+                unit.Ignored = ignored;
+                unit.Rows = rows.Count;
+                unit.Qty = rows.Sum(r => r.Qty);
+                unit.Weeks = rows.Select(r => r.WeekStart).Distinct().Count();
+                unit.MergedRows = rows.Count(r => r.IsMerged);
+
+                var expected = cells.Where(c => priority.Resolve(c.Model) != null).Sum(c => c.Qty);
+                if (expected != unit.Qty) unit.Errors.Add($"Total Qty list {unit.Qty} tidak sama dengan Qty sumber model berprioritas {expected}.");
+
+                (unit.DbRowsBefore, unit.DbQtyBefore) = await PsiWeeklyStore.CountMonthAsync(connStr, month, machine, ct);
+
+                if (!parsed.SheetFound || rows.Count == 0)
+                {
+                    if (unit.Errors.Count == 0 && unit.DbRowsBefore == 0) { unit.Status = "Skipped"; unit.Message = "Tidak ada list mingguan di file maupun di database."; return unit; }
+                    if (rows.Count == 0 && parsed.SheetFound) unit.Errors.Add("File tidak berisi quantity model berprioritas, sedangkan database berisi list. Tidak dihapus demi keamanan.");
+                }
+
+                WriteWeeklyCsv(stateFolder, unit, rows, dryRun);
+
+                if (unit.Errors.Count > 0)
+                {
+                    unit.Status = "Failed";
+                    unit.Message = "Tidak ada perubahan list mingguan untuk bulan/mesin ini.";
+                    state[stateKey] = new SapPlanUnitState { Hash = hash, Status = "Failed", At = DateTime.Now, Records = unit.Rows, QtySource = unit.Qty };
+                    return unit;
+                }
+
+                if (dryRun)
+                {
+                    unit.Status = "DryRun";
+                    unit.Message = "Dry-run: database tidak diubah.";
+                    return unit;
+                }
+
+                await PsiWeeklyStore.ReplaceMonthAsync(connStr, month, machine, rows, fileHash, ct);
+                unit.Status = "Committed";
+                unit.Message = $"List mingguan {unit.Month} {machine} diganti ({unit.Rows} baris, {unit.Weeks} minggu).";
+                state[stateKey] = new SapPlanUnitState { Hash = hash, Status = "Committed", At = DateTime.Now, Records = unit.Rows, QtySource = unit.Qty };
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (SqlException ex) when (PsiWeeklyStore.IsMissingTable(ex))
+            {
+                unit.Status = "Failed";
+                unit.Errors.Add("Tabel dbo.PsiWeeklyPlan belum dibuat (jalankan database_psi_weekly_plan.sql).");
+                unit.Message = "Tidak ada perubahan list mingguan untuk bulan/mesin ini.";
+            }
+            catch (Exception ex)
+            {
+                unit.Status = "Failed";
+                unit.Errors.Add(ex.Message);
+                unit.Message = "Transaksi dibatalkan (rollback). Tidak ada perubahan list mingguan untuk bulan/mesin ini.";
+                _logger.LogError(ex, "PsiWeekly {Month} {Machine} gagal", unit.Month, machine);
+            }
+            return unit;
         }
 
         private async Task<SapPlanUnitResult> ProcessUnitAsync(SapPlanImportOptions opt, string connStr, SapPlanCalculator calculator,
@@ -476,6 +607,40 @@ namespace MonitoringSystem.Services.SapPlanImport
                 File.AppendAllText(Path.Combine(folder, $"audit-{DateTime.Now:yyyy-MM}.log"), JsonSerializer.Serialize(entry, JsonLine) + Environment.NewLine);
             }
             catch (Exception ex) { _logger.LogWarning(ex, "SapPlanImport: gagal menulis audit log."); }
+        }
+
+        private void AppendWeeklyAudit(string folder, SapPlanCycleResult cycle, PsiWeeklyUnitResult unit, bool dryRun)
+        {
+            try
+            {
+                var entry = new
+                {
+                    At = DateTime.Now,
+                    Kind = "PsiWeekly",
+                    DryRun = dryRun,
+                    File = Path.GetFileName(cycle.SourcePath),
+                    cycle.FileHash,
+                    cycle.FileLastWriteTime,
+                    Unit = new
+                    {
+                        unit.Month, unit.Sheet, unit.MachineCode, unit.Status, unit.Message, unit.Weeks, unit.Rows, unit.Qty, unit.MergedRows,
+                        unit.DbRowsBefore, unit.DbQtyBefore, unit.Ignored, unit.Errors
+                    }
+                };
+                File.AppendAllText(Path.Combine(folder, $"audit-{DateTime.Now:yyyy-MM}.log"), JsonSerializer.Serialize(entry, JsonLine) + Environment.NewLine);
+            }
+            catch (Exception ex) { _logger.LogWarning(ex, "PsiWeekly: gagal menulis audit log."); }
+        }
+
+        private static void WriteWeeklyCsv(string folder, PsiWeeklyUnitResult unit, List<PsiWeeklyRow> rows, bool dryRun)
+        {
+            var dir = Path.Combine(folder, dryRun ? "dryrun" : "import");
+            Directory.CreateDirectory(dir);
+            var sb = new StringBuilder("MingguMulai,MingguSelesai,Tanggal,UrutanMinggu,UrutanHari,Model,Qty,TanggalAsal,Gabungan,Alasan,Kategori,Keterangan\n");
+            foreach (var r in rows)
+                sb.Append($"{r.WeekStart:yyyy-MM-dd},{r.WeekEnd:yyyy-MM-dd},{r.PlanDate:yyyy-MM-dd},{r.SeqInWeek},{r.SeqInDay},\"{r.Model}\",{r.Qty}," +
+                          $"\"{string.Join(" ", r.SourceDates.Select(d => d.ToString("yyyy-MM-dd")))}\",{(r.IsMerged ? 1 : 0)},{r.MergeReason},\"{r.Category}\",\"{r.Via}\"\n");
+            File.WriteAllText(Path.Combine(dir, $"weekly_{unit.Month}_{unit.MachineCode}.csv"), sb.ToString(), Encoding.UTF8);
         }
 
         private static void WriteDetailCsv(string folder, SapPlanUnitResult unit, List<SapPlanRow> rows, bool dryRun)

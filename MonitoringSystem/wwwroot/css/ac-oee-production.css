@@ -327,16 +327,27 @@ body.machine-production-layout:not(.light-mode) .machine-title-panel {
 .machine-title-panel h1 { margin: 0; padding: 0 45px; font-size: clamp(25px, 1.45vw, 32px); font-weight: 700; letter-spacing: .5px; text-align: center; }
 .machine-title-panel i { position: absolute; right: 21px; color: var(--pd-blue); font-size: 23px; }
 
-.model-panel { padding: 20px 23px; }
-.model-panel h2 { margin: 0; font-size: 17px; font-weight: 500; }
+/* Isi panel model menyesuaikan tinggi panel: baris dibagi rata ke tinggi yang ada,
+   dan ukuran huruf ikut tinggi PANEL (cqh = % tinggi panel), supaya tidak keluar kotak di zoom browser berapa pun.
+   Baris pertama tiap aturan = cadangan (vh) untuk browser tanpa container query. */
+.model-panel { container-type: size; padding: clamp(10px, 1.7vh, 20px) 23px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.model-panel h2 { margin: 0; font-size: clamp(14px, 1.6vh, 17px); font-size: clamp(12px, 5.4cqh, 17px); font-weight: 500; }
 .chart-panel h2 { margin: 0; font-size: clamp(16px, .95vw, 18px); font-weight: 600; }
-.model-panel > strong { display: block; margin: 10px 0 25px; font-size: 27px; font-weight: 400; }
-.model-panel dl { margin: 0; }
-.model-panel dl > div { display: grid; grid-template-columns: 58% 1fr; margin: 0 0 9px; font-size: clamp(16px, .92vw, 19px); }
+.model-panel > strong {
+    display: block; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    margin: clamp(4px, .9vh, 10px) 0 clamp(8px, 1.8vh, 25px); margin: clamp(2px, 2cqh, 10px) 0 clamp(4px, 4cqh, 25px);
+    font-size: clamp(20px, 2.5vh, 27px); font-size: clamp(16px, 8.5cqh, 27px);
+}
+.model-panel dl { margin: 0; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 2px; }
+.model-panel dl > div {
+    display: grid; grid-template-columns: 58% 1fr; margin: 0; line-height: 1.2;
+    font-size: clamp(13px, min(.92vw, 1.75vh), 19px); font-size: clamp(11px, min(.92vw, 6.4cqh), 19px);
+}
 .model-panel dt, .model-panel dd { margin: 0; }
 .model-panel dd span { display: inline-block; width: 12px; }
 .model-panel dd.negative { color: #ff285d; }
 .model-panel .under-development-value { display: flex; align-items: center; }
+.model-panel [hidden] { display: none !important; } /* nilai khusus tab PLC (Total NG) */
 .under-development-value small { display: inline-flex; align-items: center; gap: 9px; color: #eef6ff; font-size: clamp(11px, .67vw, 13px); line-height: 1; white-space: nowrap; }
 .under-development-value small i { padding-right: 9px; border-right: 2px solid rgba(75, 128, 176, .6); color: #eef7ff; font-size: 16px; filter: drop-shadow(0 0 3px rgba(128, 190, 245, .35)); }
 .under-development-value small b { font-weight: 400; }
@@ -388,15 +399,16 @@ body.machine-production-layout:not(.light-mode) .machine-title-panel {
 
 .detail-grid { min-width: 0; min-height: 0; display: grid; grid-template-columns: clamp(307px, 18.3vw, 430px) minmax(0, 1fr); gap: clamp(18px, 1.15vw, 24px); }
 .shift-summary { min-height: 0; padding: 10px 15px 15px; display: grid; grid-template-rows: repeat(3, 1fr); }
-.shift-block { display: grid; grid-template-columns: 105px 1fr; align-content: center; align-items: start; padding: 10px 0 10px 8px; border-bottom: 1px solid rgba(117, 149, 181, .23); }
+.shift-block { display: grid; grid-template-columns: clamp(86px, 5.5vw, 105px) 1fr; align-content: center; align-items: start; padding: 10px 0 10px 8px; border-bottom: 1px solid rgba(117, 149, 181, .23); }
 .shift-block:last-child { border-bottom: 0; }
 .shift-block strong { font-size: clamp(16px, .88vw, 18px); font-weight: 500; line-height: 1.3; }
 .shift-block strong i { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: #3986ff; }
 .shift-two strong i { background: #28c3c8; }
 .shift-three strong i { background: var(--pd-orange); }
-.shift-block dl { margin: 0; }
-.shift-block dl div { display: grid; grid-template-columns: clamp(125px, 7vw, 150px) 1fr; margin-bottom: 6px; font-size: clamp(15px, .84vw, 17px); line-height: 1.25; }
-.shift-block dl div:last-child { margin-bottom: 0; }
+/* Kolom label mengikuti label terpanjang ("TOTAL LOSS TIME") supaya tidak turun baris & angka tetap sejajar */
+.shift-block dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; column-gap: 10px; row-gap: 6px; font-size: clamp(13px, .84vw, 17px); line-height: 1.25; }
+.shift-block dl div { display: contents; }
+.shift-block dt { white-space: nowrap; }
 .shift-block dt, .shift-block dd { margin: 0; }
 .shift-block dd { display: block; white-space: nowrap; }
 .shift-block dd b { margin-left: 4px; }

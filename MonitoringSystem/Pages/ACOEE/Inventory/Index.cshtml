@@ -56,10 +56,8 @@
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <label class="mb-0">Machine</label>
-                        <select class="form-select" style="width: 120px;" name="FilterMachineLine">
-                            <option value="" selected="@(string.IsNullOrEmpty(Model.FilterMachineLine))">All</option>
-                            <option value="Brazing" selected="@(Model.FilterMachineLine == "Brazing")">Brazing</option>
-                            <option value="Expander" selected="@(Model.FilterMachineLine == "Expander")">Expander</option>
+                        <select class="form-select" style="width: 200px;" name="FilterMachineLine">
+                            <option value="Expander" selected>Expander Kyoshin 635</option>
                         </select>
                     </div>
                     <button type="submit" class="btn btn-primary">Search</button>

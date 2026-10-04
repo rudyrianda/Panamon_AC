@@ -41,6 +41,52 @@ namespace Plclogger
         public decimal QtyPerHour { get; set; }
     }
 
+    // Satu baris isi editor Production Plan yang disimpan di tabel dbo.PlcRohibEditorRow
+    public class EditorDraftRow
+    {
+        public int RowNo { get; set; }
+        public string ModelName { get; set; } = string.Empty;
+        public int ProdPlan { get; set; }
+        public int Sut { get; set; }
+        public string? PlanDate { get; set; } // yyyy-MM-dd, tanggal plan dari list rencana (boleh kosong)
+    }
+
+    // Satu baris list mingguan dari tabel dbo.PsiWeeklyPlan (diisi worker SAP Plan di Panamon)
+    public class PsiWeeklyItem
+    {
+        public int SeqInWeek { get; set; }
+        public string PlanDate { get; set; } = string.Empty;
+        public int SeqInDay { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public int Qty { get; set; }
+        public bool IsMerged { get; set; }
+        public string SourceDates { get; set; } = string.Empty;
+        public string PriorityCategory { get; set; } = string.Empty;
+        public string WeekStart { get; set; } = string.Empty;
+        public string WeekEnd { get; set; } = string.Empty;
+    }
+
+    // Isi layar utama GOT (B-1) Expander Kyoshin 6.35 hasil baca PLC
+    public class PlcMainScreen
+    {
+        public bool Live { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore] public DateTime ReadAtTime { get; set; } = DateTime.Now;
+        public string ReadAt => ReadAtTime.ToString("HH:mm:ss");
+        public string? Model { get; set; }      // R10 (10 word ASCII)
+        public short ProdPlan { get; set; }     // R20 PROD. PLAN
+        public short Actual { get; set; }       // R22 ACTUAL
+        public short Plan { get; set; }         // R23 PLAN
+        public short Defect { get; set; }       // R24 DEFECT
+        public short LossTime { get; set; }     // R50 LOSS TIME/MIN
+        public short Difference { get; set; }   // D20 DIFFERENCE
+        public string? Source { get; set; }
+    }
+
+    public class EditorDraftRequest
+    {
+        public List<EditorDraftRow> Rows { get; set; } = new List<EditorDraftRow>();
+    }
+
     public class MachineListItem
     {
         public int IdMachine { get; set; }
@@ -671,8 +717,13 @@ namespace Plclogger
 
             OperateResult connectResult = plc.ConnectServer();
             bool isRealPlc = connectResult.IsSuccess;
+            _lastConnectOk = isRealPlc;
 
-            // Membaca semua baris di PlanRowMap (Plan Production 1 - 6 & 8)
+            // Baca semua register sekaligus per blok (beberapa request, bukan 600 read satu-satu).
+            // null = ada blok yang gagal -> jatuh kembali ke cara lama per alamat.
+            Dictionary<int, short>? words = isRealPlc ? ReadPlanWordBlocks(plc) : null;
+
+            // Membaca semua baris di PlanRowMap (Plan Production 1 - 15)
             foreach (var map in PlanRowMap)
             {
                 string mAddr = map.ModelNameAddress;
@@ -683,7 +734,15 @@ namespace Plclogger
 
                 var row = new PlcDispatchRow(map.RowNo, mAddr, pAddr, sAddr, actAddr, defAddr);
 
-                if (isRealPlc)
+                if (isRealPlc && words != null)
+                {
+                    row.ModelName = WordsToAscii(words, RegNo(mAddr), map.ModelNameLength);
+                    row.ProdPlan = words[RegNo(pAddr)];
+                    row.Sut = (short)(Math.Abs(words[RegNo(sAddr)]) % 1000);
+                    row.Actual = words[RegNo(actAddr)];
+                    row.Defect = (short)(Math.Abs(words[RegNo(defAddr)]) % 1000);
+                }
+                else if (isRealPlc)
                 {
                     OperateResult<string> resModel = plc.ReadString(mAddr, 10);
                     row.ModelName = resModel.IsSuccess ? resModel.Content.Trim().Replace("\0", "") : "-";
@@ -752,28 +811,362 @@ namespace Plclogger
             return result;
         }
 
-        private string _lastPlcDataHash = string.Empty;
-        private int _plcDataVersion = 0;
-        private readonly object _plcLock = new object();
+        // Status pembacaan PLC terakhir (dipakai Live Preview mirror PLC)
+        public bool LastReadLive { get; private set; } = false;
+        private volatile bool _lastConnectOk = false;
+        public DateTime LastReadAt { get; private set; } = DateTime.MinValue;
 
-        // Change Detection: Membandingkan snapshot PLC dengan versi sebelumnya
-        public (bool changed, int version, List<PlcDispatchRow> rows) ReadPlcRowsWithChangeDetection(int clientVersion, bool logToConsole = false)
+        private const int MaxWordsPerRead = 900; // batas aman MC protocol (maks 960 word per request)
+        private const int MaxGapWords = 64;      // celah kecil antar register ikut dibaca agar request lebih sedikit
+
+        // Nomor register dari alamat "R1234"; -1 jika bukan register R.
+        public static int RegNo(string addr) =>
+            addr.Length > 1 && (addr[0] == 'R' || addr[0] == 'r') && int.TryParse(addr.AsSpan(1), out int n) ? n : -1;
+
+        // Baca semua register R yang dipakai PlanRowMap dalam beberapa blok berurutan.
+        // Hasil: nomor register -> nilai word. null jika ada alamat bukan R atau ada blok yang gagal dibaca.
+        public static Dictionary<int, short>? ReadPlanWordBlocks(MelsecMcNet plc)
         {
-            var rows = ReadCurrentPlcRows(logToConsole);
-            
-            // Buat signature/hash dari nilai Model, Plan, Actual, Defect 9 baris
-            string currentHash = string.Join("|", rows.Select(r => $"{r.RowNo}:{r.ModelName}:{r.ProdPlan}:{r.Actual}:{r.Defect}"));
-
-            lock (_plcLock)
+            var needed = new SortedSet<int>();
+            foreach (var m in PlanRowMap)
             {
-                if (currentHash != _lastPlcDataHash)
+                int model = RegNo(m.ModelNameAddress);
+                int[] single = { RegNo(m.ProdPlanAddress), RegNo(m.SutAddress), RegNo(m.ActualAddress), RegNo(m.DefectAddress) };
+                if (model < 0 || single.Any(n => n < 0)) return null;
+                for (int k = 0; k < m.ModelNameLength; k++) needed.Add(model + k);
+                foreach (int n in single) needed.Add(n);
+            }
+
+            var list = needed.ToList();
+            var words = new Dictionary<int, short>();
+            int i = 0;
+            while (i < list.Count)
+            {
+                int blockStart = list[i], blockEnd = blockStart, j = i + 1;
+                while (j < list.Count && list[j] - blockEnd <= MaxGapWords && list[j] - blockStart < MaxWordsPerRead)
                 {
-                    _lastPlcDataHash = currentHash;
-                    _plcDataVersion++;
+                    blockEnd = list[j];
+                    j++;
                 }
 
+                int len = blockEnd - blockStart + 1;
+                OperateResult<short[]> res = plc.ReadInt16("R" + blockStart, (ushort)len);
+                if (!res.IsSuccess || res.Content == null || res.Content.Length != len) return null;
+                for (int k = 0; k < len; k++) words[blockStart + k] = res.Content[k];
+                i = j;
+            }
+            return words;
+        }
+
+        // Word PLC -> teks ASCII (byte rendah dulu), sama dengan plc.ReadString(addr, length).
+        public static string WordsToAscii(Dictionary<int, short> words, int start, int length)
+        {
+            var bytes = new byte[length * 2];
+            for (int k = 0; k < length; k++)
+            {
+                short w = words[start + k];
+                bytes[2 * k] = (byte)(w & 0xFF);
+                bytes[2 * k + 1] = (byte)((w >> 8) & 0xFF);
+            }
+            return System.Text.Encoding.ASCII.GetString(bytes).Trim().Replace("\0", "");
+        }
+
+        // =========================================================
+        // LAYAR UTAMA GOT (B-1) EXPANDER KYOSHIN 6.35, dipakai halaman AC OEE Production Data di Panamon
+        // MODEL R10 (10 word ASCII), PROD. PLAN R20, ACTUAL R22, PLAN R23, DEFECT R24, LOSS TIME R50, DIFFERENCE D20
+        // =========================================================
+        private readonly object _mainScreenLock = new object();
+        private PlcMainScreen? _lastMainScreen;
+        private DateTime _lastMainScreenAt = DateTime.MinValue;
+
+        public PlcMainScreen ReadMainScreen()
+        {
+            if (DateTime.Now - _lastMainScreenAt <= PlcReadCacheAge && _lastMainScreen != null) return _lastMainScreen;
+            if (!Monitor.TryEnter(_mainScreenLock)) return _lastMainScreen ?? new PlcMainScreen();
+            try
+            {
+                MelsecMcNet plc = new MelsecMcNet(PlcIp, PlcPort);
+                plc.ConnectTimeOut = 3000;
+                var result = new PlcMainScreen { ReadAtTime = DateTime.Now };
+                if (plc.ConnectServer().IsSuccess)
+                {
+                    var block = plc.ReadInt16("R10", 15);   // R10..R24
+                    var loss = plc.ReadInt16("R50");
+                    var diff = plc.ReadInt16("D20");
+                    plc.ConnectClose();
+                    if (block.IsSuccess && block.Content?.Length == 15 && loss.IsSuccess && diff.IsSuccess)
+                    {
+                        var words = new Dictionary<int, short>();
+                        for (int k = 0; k < 15; k++) words[10 + k] = block.Content![k];
+                        result.Live = true;
+                        result.Model = WordsToAscii(words, 10, 10);
+                        result.ProdPlan = words[20];
+                        result.Actual = words[22];
+                        result.Plan = words[23];
+                        result.Defect = words[24];
+                        result.LossTime = loss.Content;
+                        result.Difference = diff.Content;
+                        result.Source = $"{PlcIp}:{PlcPort}";
+                    }
+                }
+
+                _lastMainScreen = result;
+                _lastMainScreenAt = DateTime.Now;
+                return result;
+            }
+            finally
+            {
+                Monitor.Exit(_mainScreenLock);
+            }
+        }
+
+        // =========================================================
+        // RIWAYAT LAYAR UTAMA (tabel dbo.PlcKyoshinTrend): dicatat tiap menit oleh MainScreenTrendLogger,
+        // dipakai grafik Plan vs Actual di AC OEE (Plan = R23, Actual = R22).
+        // =========================================================
+        public const string TrendTable = "PlcKyoshinTrend";
+        public const string TrendMachineCode = "MCH1-01";
+
+        // Tanggal produksi: sebelum 07:00 masih hari sebelumnya. Shift: 1 = 07:00-15:45, 2 = 15:45-23:15, 3 = 23:15-07:00.
+        public static (DateTime productionDate, int shiftNo, DateTime shiftStart) ShiftOf(DateTime t)
+        {
+            var tod = t.TimeOfDay;
+            var productionDate = tod < new TimeSpan(7, 0, 0) ? t.Date.AddDays(-1) : t.Date;
+            if (tod >= new TimeSpan(7, 0, 0) && tod < new TimeSpan(15, 45, 0)) return (productionDate, 1, t.Date.AddHours(7));
+            if (tod >= new TimeSpan(15, 45, 0) && tod < new TimeSpan(23, 15, 0)) return (productionDate, 2, t.Date.Add(new TimeSpan(15, 45, 0)));
+            return (productionDate, 3, productionDate.Add(new TimeSpan(23, 15, 0)));
+        }
+
+        public void SaveTrendSample(PlcMainScreen s)
+        {
+            var at = s.ReadAtTime;
+            at = at.AddTicks(-(at.Ticks % TimeSpan.TicksPerSecond));
+            var (productionDate, shiftNo, _) = ShiftOf(at);
+            using var conn = new SqlConnection(DbConnectionString);
+            conn.Open();
+            using var cmd = new SqlCommand($@"
+                INSERT INTO dbo.{TrendTable} (MachineCode, SampleAt, ProductionDate, ShiftNo, Model, ProdPlan, PlanBySut, Actual, Difference, Defect, LossTime)
+                VALUES (@mc, @at, @pd, @shift, @model, @prodPlan, @plan, @actual, @diff, @defect, @loss)", conn);
+            cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+            cmd.Parameters.Add("@at", SqlDbType.DateTime2).Value = at;
+            cmd.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate;
+            cmd.Parameters.Add("@shift", SqlDbType.TinyInt).Value = shiftNo;
+            cmd.Parameters.Add("@model", SqlDbType.NVarChar, 50).Value = s.Model ?? string.Empty;
+            cmd.Parameters.Add("@prodPlan", SqlDbType.Int).Value = (int)s.ProdPlan;
+            cmd.Parameters.Add("@plan", SqlDbType.Int).Value = (int)s.Plan;
+            cmd.Parameters.Add("@actual", SqlDbType.Int).Value = (int)s.Actual;
+            cmd.Parameters.Add("@diff", SqlDbType.Int).Value = (int)s.Difference;
+            cmd.Parameters.Add("@defect", SqlDbType.Int).Value = (int)s.Defect;
+            cmd.Parameters.Add("@loss", SqlDbType.Int).Value = (int)s.LossTime;
+            cmd.ExecuteNonQuery();
+        }
+
+        // Riwayat satu shift (urut waktu) untuk grafik Plan vs Actual
+        public object GetShiftTrend(DateTime productionDate, int shiftNo)
+        {
+            if (shiftNo < 1 || shiftNo > 3) throw new ArgumentException("Shift harus 1, 2 atau 3.");
+            try
+            {
+                using var conn = new SqlConnection(DbConnectionString);
+                conn.Open();
+                using var cmd = new SqlCommand($@"
+                    SELECT SampleAt, PlanBySut, Actual FROM dbo.{TrendTable}
+                    WHERE MachineCode = @mc AND ProductionDate = @pd AND ShiftNo = @shift
+                    ORDER BY SampleAt", conn);
+                cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                cmd.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate.Date;
+                cmd.Parameters.Add("@shift", SqlDbType.TinyInt).Value = shiftNo;
+                var samples = new List<object>();
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                    samples.Add(new { At = r.GetDateTime(0).ToString("yyyy-MM-ddTHH:mm:ss"), Plan = r.GetInt32(1), Actual = r.GetInt32(2) });
+                return new { Success = true, ProductionDate = productionDate.ToString("yyyy-MM-dd"), ShiftNo = shiftNo, Samples = samples };
+            }
+            catch (SqlException ex) when (IsMissingTable(ex))
+            {
+                throw new InvalidOperationException("Tabel dbo.PlcKyoshinTrend belum dibuat (jalankan database_plc_kyoshin_trend.sql).");
+            }
+        }
+
+        // =========================================================
+        // CHANGE PLAN & ACTUAL HARIAN KYOSHIN (tabel dbo.PlcKyoshinChangePlan), dihitung dari riwayat PlcKyoshinTrend.
+        // Satu baris per kali jalan model (model sama yang jalan lagi setelah model lain = baris baru).
+        // Hari berjalan: ChangePlan = R20 model itu. Setelah lewat 07:00 besoknya: ChangePlan = akumulasi R23 di hari itu.
+        // Model yang lewat jam 07:00 dipotong: hari ini hanya menghitung kenaikan R22/R23 sejak sampel terakhir kemarin.
+        // =========================================================
+        public const string ChangePlanTable = "PlcKyoshinChangePlan";
+
+        public sealed class KyoshinRun
+        {
+            public string Model = "";
+            public DateTime StartAt, EndAt;
+            public int ProdPlan, PlanBySut, Actual;
+        }
+
+        // Pecah sampel satu hari produksi (urut waktu) menjadi kali jalan model.
+        // before = sampel terakhir sebelum hari ini (untuk model yang masih jalan lewat 07:00).
+        public static List<KyoshinRun> BuildKyoshinRuns(
+            IEnumerable<(DateTime At, string Model, int R20, int R23, int R22)> samples,
+            (string Model, int R23, int R22)? before)
+        {
+            var runs = new List<KyoshinRun>();
+            KyoshinRun? run = null;
+            int last23 = 0, last22 = 0;
+            foreach (var s in samples)
+            {
+                var model = (s.Model ?? "").Trim();
+                if (model.Length == 0) continue; // layar belum ada model
+                int r23 = Math.Max(0, s.R23), r22 = Math.Max(0, s.R22);
+
+                if (run == null || run.Model != model)
+                {
+                    // Model baru: R22/R23 dihitung dari 0. Kecuali model pertama hari ini yang sama dengan
+                    // model terakhir kemarin (masih jalan lewat 07:00): mulai dari nilai terakhir kemarin.
+                    bool continues = run == null && before?.Model == model;
+                    last23 = continues && r23 >= before!.Value.R23 ? before.Value.R23 : 0;
+                    last22 = continues && r22 >= before!.Value.R22 ? before.Value.R22 : 0;
+                    run = new KyoshinRun { Model = model, StartAt = s.At };
+                    runs.Add(run);
+                }
+
+                // Kenaikan sejak sampel sebelumnya; kalau nilainya turun berarti counter di-reset (hitung dari 0)
+                run.PlanBySut += r23 >= last23 ? r23 - last23 : r23;
+                run.Actual += r22 >= last22 ? r22 - last22 : r22;
+                last23 = r23;
+                last22 = r22;
+                run.ProdPlan = Math.Max(0, s.R20);
+                run.EndAt = s.At;
+            }
+            return runs;
+        }
+
+        // Hitung ulang hari yang sedang berjalan dan setiap hari yang belum final (mis. Plclogger sempat mati saat 07:00).
+        public void RefreshKyoshinChangePlan(DateTime now)
+        {
+            var (currentDate, _, _) = ShiftOf(now);
+            using var conn = new SqlConnection(DbConnectionString);
+            conn.Open();
+
+            var dates = new List<DateTime>();
+            using (var cmd = new SqlCommand($@"
+                SELECT DISTINCT t.ProductionDate FROM dbo.{TrendTable} t
+                WHERE t.MachineCode = @mc AND t.ProductionDate >= DATEADD(DAY, -45, @cur) AND t.ProductionDate <= @cur
+                  AND (t.ProductionDate = @cur OR NOT EXISTS (
+                        SELECT 1 FROM dbo.{ChangePlanTable} c
+                        WHERE c.MachineCode = t.MachineCode AND c.ProductionDate = t.ProductionDate AND c.IsFinal = 1))", conn))
+            {
+                cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                cmd.Parameters.Add("@cur", SqlDbType.Date).Value = currentDate;
+                using var r = cmd.ExecuteReader();
+                while (r.Read()) dates.Add(r.GetDateTime(0));
+            }
+
+            foreach (var date in dates)
+                RebuildKyoshinChangePlanDay(conn, date, now >= date.AddDays(1).AddHours(7));
+        }
+
+        private void RebuildKyoshinChangePlanDay(SqlConnection conn, DateTime productionDate, bool isFinal)
+        {
+            var dayStart = productionDate.Date.AddHours(7);
+
+            // Sampel terakhir sebelum hari ini dimulai: untuk memotong model yang masih jalan dari kemarin
+            (string Model, int R23, int R22)? before = null;
+            using (var cmd = new SqlCommand($@"
+                SELECT TOP 1 Model, PlanBySut, Actual FROM dbo.{TrendTable}
+                WHERE MachineCode = @mc AND SampleAt < @start AND LTRIM(RTRIM(Model)) <> ''
+                ORDER BY SampleAt DESC", conn))
+            {
+                cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                cmd.Parameters.Add("@start", SqlDbType.DateTime2).Value = dayStart;
+                using var r = cmd.ExecuteReader();
+                if (r.Read()) before = (r.GetString(0).Trim(), Math.Max(0, r.GetInt32(1)), Math.Max(0, r.GetInt32(2)));
+            }
+
+            var samples = new List<(DateTime At, string Model, int R20, int R23, int R22)>();
+            using (var cmd = new SqlCommand($@"
+                SELECT SampleAt, Model, ProdPlan, PlanBySut, Actual FROM dbo.{TrendTable}
+                WHERE MachineCode = @mc AND ProductionDate = @pd ORDER BY SampleAt", conn))
+            {
+                cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                cmd.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate.Date;
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                    samples.Add((r.GetDateTime(0), r.GetString(1), r.GetInt32(2), r.GetInt32(3), r.GetInt32(4)));
+            }
+            var runs = BuildKyoshinRuns(samples, before);
+
+            using var tx = conn.BeginTransaction();
+            using (var del = new SqlCommand($"DELETE FROM dbo.{ChangePlanTable} WHERE MachineCode = @mc AND ProductionDate = @pd", conn, tx))
+            {
+                del.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                del.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate.Date;
+                del.ExecuteNonQuery();
+            }
+            for (int i = 0; i < runs.Count; i++)
+            {
+                var x = runs[i];
+                using var ins = new SqlCommand($@"
+                    INSERT INTO dbo.{ChangePlanTable} (MachineCode, ProductionDate, RunNo, Model, StartAt, EndAt, ProdPlan, PlanBySut, Actual, ChangePlan, IsFinal, UpdatedAt)
+                    VALUES (@mc, @pd, @no, @model, @start, @end, @r20, @r23, @r22, @cp, @final, SYSDATETIME())", conn, tx);
+                ins.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                ins.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate.Date;
+                ins.Parameters.Add("@no", SqlDbType.Int).Value = i + 1;
+                ins.Parameters.Add("@model", SqlDbType.NVarChar, 50).Value = x.Model;
+                ins.Parameters.Add("@start", SqlDbType.DateTime2).Value = x.StartAt;
+                ins.Parameters.Add("@end", SqlDbType.DateTime2).Value = x.EndAt;
+                ins.Parameters.Add("@r20", SqlDbType.Int).Value = x.ProdPlan;
+                ins.Parameters.Add("@r23", SqlDbType.Int).Value = x.PlanBySut;
+                ins.Parameters.Add("@r22", SqlDbType.Int).Value = x.Actual;
+                ins.Parameters.Add("@cp", SqlDbType.Int).Value = isFinal ? x.PlanBySut : x.ProdPlan;
+                ins.Parameters.Add("@final", SqlDbType.Bit).Value = isFinal;
+                ins.ExecuteNonQuery();
+            }
+            tx.Commit();
+        }
+
+        private string _lastPlcDataHash = string.Empty;
+        private int _plcDataVersion = 0;
+        private readonly object _plcLock = new object();     // hanya satu pembacaan PLC berjalan pada satu waktu
+        private readonly object _snapshotLock = new object(); // melindungi snapshot terakhir
+        private List<PlcDispatchRow> _lastPlcRows = new List<PlcDispatchRow>();
+        private static readonly TimeSpan PlcReadCacheAge = TimeSpan.FromMilliseconds(1500);
+
+        // Change Detection: Membandingkan snapshot PLC dengan versi sebelumnya.
+        // Satu pembacaan PLC dipakai bersama oleh semua browser yang polling (cache 1,5 detik).
+        // Jika pembacaan lain sedang berjalan (mis. PLC lambat/offline), langsung kembalikan snapshot terakhir
+        // supaya request tidak menumpuk menunggu.
+        public (bool changed, int version, List<PlcDispatchRow> rows) ReadPlcRowsWithChangeDetection(int clientVersion, bool logToConsole = false)
+        {
+            if ((logToConsole || DateTime.Now - LastReadAt > PlcReadCacheAge) && Monitor.TryEnter(_plcLock))
+            {
+                try
+                {
+                    var rows = ReadCurrentPlcRows(logToConsole);
+
+                    // Signature dari semua nilai yang tampil di preview (+ status online) untuk 120 baris
+                    string currentHash = (_lastConnectOk ? "L|" : "O|") + string.Join("|", rows.Select(r => $"{r.RowNo}:{r.ModelName}:{r.ProdPlan}:{r.Sut}:{r.Actual}:{r.Defect}"));
+                    lock (_snapshotLock)
+                    {
+                        _lastPlcRows = rows;
+                        LastReadLive = _lastConnectOk;
+                        LastReadAt = DateTime.Now;
+                        if (currentHash != _lastPlcDataHash)
+                        {
+                            _lastPlcDataHash = currentHash;
+                            _plcDataVersion++;
+                        }
+                    }
+                }
+                finally
+                {
+                    Monitor.Exit(_plcLock);
+                }
+            }
+
+            lock (_snapshotLock)
+            {
                 bool hasChanged = (clientVersion != _plcDataVersion);
-                return (hasChanged, _plcDataVersion, rows);
+                return (hasChanged, _plcDataVersion, _lastPlcRows);
             }
         }
 
@@ -1221,6 +1614,162 @@ namespace Plclogger
         // SqlException 208 = "Invalid object name": tabel belum dibuat di database -> pakai data memori
         private static bool IsMissingTable(SqlException ex) => ex.Number == 208;
 
+        // =========================================================
+        // ISI EDITOR PRODUCTION PLAN (tabel dbo.PlcRohibEditorRow)
+        // Isi editor terakhir per mesin, supaya tidak hilang saat halaman di-refresh.
+        // Hanya baris yang terisi yang disimpan; setiap simpan menimpa seluruh isi mesin itu.
+        // =========================================================
+        public const string EditorDraftTable = "PlcRohibEditorRow";
+        private const string EditorDraftMissingMessage =
+            "Tabel dbo.PlcRohibEditorRow belum dibuat di database PROMOSYS (jalankan database_plc_rohib_editor.sql).";
+
+        private static string CheckDraftMachine(string? machine)
+        {
+            var m = (machine ?? "").Trim();
+            if (m.Length == 0 || m.Length > 20) throw new ArgumentException("Kode mesin wajib diisi (maks. 20 karakter).");
+            return m;
+        }
+
+        public (List<EditorDraftRow> rows, DateTime? updatedAt) GetEditorDraft(string? machine)
+        {
+            string m = CheckDraftMachine(machine);
+            try
+            {
+                using var conn = new SqlConnection(DbConnectionString);
+                conn.Open();
+                using var cmd = new SqlCommand(
+                    $"SELECT [RowNo], [ModelName], [ProdPlan], [Sut], [UpdatedAt], [PlanDate] FROM [dbo].[{EditorDraftTable}] WHERE [MachineCode] = @Machine ORDER BY [RowNo]", conn);
+                cmd.Parameters.AddWithValue("@Machine", m);
+
+                var rows = new List<EditorDraftRow>();
+                DateTime? updatedAt = null;
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    rows.Add(new EditorDraftRow
+                    {
+                        RowNo = r.GetInt32(0), ModelName = r.GetString(1), ProdPlan = r.GetInt32(2), Sut = r.GetInt32(3),
+                        PlanDate = r.IsDBNull(5) ? null : r.GetDateTime(5).ToString("yyyy-MM-dd")
+                    });
+                    var at = r.GetDateTime(4);
+                    if (updatedAt == null || at > updatedAt) updatedAt = at;
+                }
+                return (rows, updatedAt);
+            }
+            catch (SqlException ex) when (IsMissingTable(ex))
+            {
+                throw new InvalidOperationException(EditorDraftMissingMessage);
+            }
+        }
+
+        // List mingguan satu bulan penuh dari dbo.PsiWeeklyPlan: minggu demi minggu, urut SeqInWeek.
+        public List<PsiWeeklyItem> GetPsiWeeklyList(string? machine, string? month)
+        {
+            string m = CheckDraftMachine(machine);
+            if (!DateTime.TryParseExact(month, "yyyy-MM", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var monthStart))
+                throw new ArgumentException("Bulan harus format yyyy-MM.");
+            try
+            {
+                using var conn = new SqlConnection(DbConnectionString);
+                conn.Open();
+                using var cmd = new SqlCommand(@"
+                    SELECT SeqInWeek, PlanDate, SeqInDay, ProductName, Qty, IsMerged, SourceDates, PriorityCategory, WeekStart, WeekEnd
+                    FROM dbo.PsiWeeklyPlan
+                    WHERE MachineCode = @Machine AND WeekStart >= @From AND WeekStart < @To
+                    ORDER BY WeekStart, SeqInWeek", conn);
+                cmd.Parameters.Add("@Machine", SqlDbType.NVarChar, 20).Value = m;
+                cmd.Parameters.Add("@From", SqlDbType.Date).Value = monthStart;
+                cmd.Parameters.Add("@To", SqlDbType.Date).Value = monthStart.AddMonths(1);
+
+                var rows = new List<PsiWeeklyItem>();
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    rows.Add(new PsiWeeklyItem
+                    {
+                        SeqInWeek = r.GetInt32(0),
+                        PlanDate = r.GetDateTime(1).ToString("yyyy-MM-dd"),
+                        SeqInDay = r.GetInt32(2),
+                        ProductName = r.GetString(3),
+                        Qty = r.GetInt32(4),
+                        IsMerged = r.GetBoolean(5),
+                        SourceDates = r.GetString(6),
+                        PriorityCategory = r.GetString(7),
+                        WeekStart = r.GetDateTime(8).ToString("yyyy-MM-dd"),
+                        WeekEnd = r.GetDateTime(9).ToString("yyyy-MM-dd")
+                    });
+                }
+                return rows;
+            }
+            catch (SqlException ex) when (IsMissingTable(ex))
+            {
+                throw new InvalidOperationException("Tabel dbo.PsiWeeklyPlan belum ada di database PROMOSYS (dibuat oleh worker SAP Plan Panamon / database_psi_weekly_plan.sql).");
+            }
+        }
+
+        public DateTime SaveEditorDraft(string? machine, List<EditorDraftRow>? rows)
+        {
+            string m = CheckDraftMachine(machine);
+            var filled = new List<EditorDraftRow>();
+            foreach (var row in rows ?? new List<EditorDraftRow>())
+            {
+                row.ModelName = (row.ModelName ?? "").Trim();
+                if (row.RowNo < 1 || row.RowNo > TotalPlanRows) throw new ArgumentException($"Nomor baris {row.RowNo} di luar 1-{TotalPlanRows}.");
+                if (row.ModelName.Length > 50) throw new ArgumentException($"Row {row.RowNo}: nama model maksimal 50 karakter.");
+                if (row.ProdPlan < 0 || row.ProdPlan > short.MaxValue) throw new ArgumentException($"Row {row.RowNo}: Prod. Plan harus 0-{short.MaxValue}.");
+                if (row.Sut < 0 || row.Sut > 999) throw new ArgumentException($"Row {row.RowNo}: SUT harus 0-999 detik.");
+                row.PlanDate = string.IsNullOrWhiteSpace(row.PlanDate) ? null : row.PlanDate.Trim();
+                if (row.PlanDate != null && !DateTime.TryParseExact(row.PlanDate, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _))
+                    throw new ArgumentException($"Row {row.RowNo}: tanggal plan harus format yyyy-MM-dd.");
+                if (row.ModelName.Length > 0 || row.ProdPlan > 0 || row.Sut > 0) filled.Add(row);
+            }
+            if (filled.Select(x => x.RowNo).Distinct().Count() != filled.Count) throw new ArgumentException("Ada nomor baris yang dobel.");
+
+            var now = DateTime.Now;
+            now = now.AddTicks(-(now.Ticks % TimeSpan.TicksPerSecond)); // kolom DATETIME2(0): detik bulat, sama dengan yang ditampilkan
+            try
+            {
+                using var conn = new SqlConnection(DbConnectionString);
+                conn.Open();
+                using var tx = conn.BeginTransaction();
+
+                using (var del = new SqlCommand($"DELETE FROM [dbo].[{EditorDraftTable}] WHERE [MachineCode] = @Machine", conn, tx))
+                {
+                    del.Parameters.AddWithValue("@Machine", m);
+                    del.ExecuteNonQuery();
+                }
+
+                using (var ins = new SqlCommand(
+                    $@"INSERT INTO [dbo].[{EditorDraftTable}] ([MachineCode], [RowNo], [ModelName], [ProdPlan], [Sut], [PlanDate], [UpdatedAt])
+                       VALUES (@Machine, @RowNo, @ModelName, @ProdPlan, @Sut, @PlanDate, @UpdatedAt)", conn, tx))
+                {
+                    ins.Parameters.Add("@Machine", SqlDbType.NVarChar, 20).Value = m;
+                    var pRow = ins.Parameters.Add("@RowNo", SqlDbType.Int);
+                    var pModel = ins.Parameters.Add("@ModelName", SqlDbType.NVarChar, 50);
+                    var pPlan = ins.Parameters.Add("@ProdPlan", SqlDbType.Int);
+                    var pSut = ins.Parameters.Add("@Sut", SqlDbType.Int);
+                    var pDate = ins.Parameters.Add("@PlanDate", SqlDbType.Date);
+                    ins.Parameters.Add("@UpdatedAt", SqlDbType.DateTime2).Value = now;
+                    foreach (var row in filled)
+                    {
+                        pRow.Value = row.RowNo;
+                        pModel.Value = row.ModelName;
+                        pPlan.Value = row.ProdPlan;
+                        pSut.Value = row.Sut;
+                        pDate.Value = row.PlanDate == null ? DBNull.Value : DateTime.ParseExact(row.PlanDate, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                        ins.ExecuteNonQuery();
+                    }
+                }
+
+                tx.Commit();
+                return now;
+            }
+            catch (SqlException ex) when (IsMissingTable(ex))
+            {
+                throw new InvalidOperationException(EditorDraftMissingMessage);
+            }
+        }
+
         // Tabel MasterProduct hanya punya kolom Id, Model, Machine, Sut, CreatedAt
         // (NoOfOperator & QtyPerHour sudah dihapus). MasterMachine masih memakai keduanya.
         private static bool HasOpQtyColumns(string tbl) => tbl == MasterMachineTable;
@@ -1418,6 +1967,65 @@ namespace Plclogger
     // =========================================================================
     // BACKGROUND SERVICE: OTOMASI PENGIRIMAN PER SHIFT
     // =========================================================================
+    // Catat layar utama GOT (B-1) tiap pergantian menit ke dbo.PlcKyoshinTrend, hanya saat PLC terbaca.
+    // Hanya membaca PLC; tidak menulis apa pun ke PLC.
+    public class MainScreenTrendLogger : BackgroundService
+    {
+        private readonly FactoryDataService _svc;
+
+        public MainScreenTrendLogger(FactoryDataService svc) => _svc = svc;
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            bool missingTableReported = false, missingChangePlanReported = false;
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var now = DateTime.Now;
+                var nextMinute = now.Date.AddHours(now.Hour).AddMinutes(now.Minute + 1);
+                try { await Task.Delay(nextMinute - now, stoppingToken); }
+                catch (TaskCanceledException) { break; }
+
+                try
+                {
+                    var sample = await Task.Run(() => _svc.ReadMainScreen(), stoppingToken);
+                    if (sample.Live && (DateTime.Now - sample.ReadAtTime).TotalSeconds < 10)
+                    {
+                        sample.ReadAtTime = nextMinute; // dicatat tepat di menit itu (detik 00)
+                        _svc.SaveTrendSample(sample);
+                        missingTableReported = false;
+                    }
+                }
+                catch (SqlException ex) when (ex.Number == 208)
+                {
+                    if (!missingTableReported)
+                        Console.WriteLine("[TREND] Tabel dbo.PlcKyoshinTrend belum ada (jalankan database_plc_kyoshin_trend.sql). Riwayat belum dicatat.");
+                    missingTableReported = true;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    Console.WriteLine($"[TREND] Gagal mencatat riwayat layar utama: {ex.Message.Split('\n')[0]}");
+                }
+
+                // Change Plan & Actual harian dihitung ulang tiap menit, juga saat PLC offline (supaya hari kemarin tetap difinalkan jam 07:00)
+                try
+                {
+                    await Task.Run(() => _svc.RefreshKyoshinChangePlan(DateTime.Now), stoppingToken);
+                    missingChangePlanReported = false;
+                }
+                catch (SqlException ex) when (ex.Number == 208)
+                {
+                    if (!missingChangePlanReported)
+                        Console.WriteLine("[CHANGE PLAN] Tabel dbo.PlcKyoshinChangePlan belum ada (jalankan database_plc_kyoshin_change_plan.sql).");
+                    missingChangePlanReported = true;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    Console.WriteLine($"[CHANGE PLAN] Gagal menghitung change plan Kyoshin: {ex.Message.Split('\n')[0]}");
+                }
+            }
+        }
+    }
+
     public class ShiftSchedulerBackgroundService : BackgroundService
     {
         private readonly FactoryDataService _dataService;
@@ -1499,6 +2107,8 @@ namespace Plclogger
             builder.Services.AddSingleton<FactoryDataService>();
             // DINONAKTIFKAN TOTAL: Tidak ada background worker yang mengirim/menulis data liar ke PLC
             // builder.Services.AddHostedService<ShiftSchedulerBackgroundService>();
+            // Pencatat riwayat layar utama GOT (hanya baca PLC) untuk grafik Plan vs Actual AC OEE
+            builder.Services.AddHostedService<MainScreenTrendLogger>();
             builder.Services.AddSingleton<LossTimeService>();
             // builder.Services.AddHostedService<LossTimeBackgroundService>();
 
@@ -1595,6 +2205,9 @@ namespace Plclogger
                 });
             });
 
+            // 5b. Layar utama GOT (B-1): Model, Prod. Plan, Actual, Plan, Difference, Defect, Loss Time (hanya baca)
+            app.MapGet("/api/plc/main", (FactoryDataService svc) => Results.Ok(svc.ReadMainScreen()));
+
             // 6. Baca data saat ini dari PLC dengan Change Detection (Hanya kirim rows jika ada perubahan)
             app.MapGet("/api/plc/read", (FactoryDataService svc, HttpContext ctx) =>
             {
@@ -1615,7 +2228,9 @@ namespace Plclogger
                         Changed = false,
                         Version = version,
                         PlcStatus = svc.PlcStatusMessage,
-                        IsPlcLive = svc.IsPlcLive
+                        IsPlcLive = svc.IsPlcLive,
+                        ReadLive = svc.LastReadLive,
+                        ReadAt = svc.LastReadAt.ToString("HH:mm:ss")
                     });
                 }
 
@@ -1626,7 +2241,9 @@ namespace Plclogger
                     Version = version,
                     Rows = rows,
                     PlcStatus = svc.PlcStatusMessage,
-                    IsPlcLive = svc.IsPlcLive
+                    IsPlcLive = svc.IsPlcLive,
+                    ReadLive = svc.LastReadLive,
+                    ReadAt = svc.LastReadAt.ToString("HH:mm:ss")
                 });
             });
 
@@ -1887,6 +2504,34 @@ namespace Plclogger
                         return new { Success = true };
                     }));
             }
+
+            // Isi editor Production Plan per mesin (tabel dbo.PlcRohibEditorRow): dimuat saat halaman dibuka,
+            // disimpan otomatis oleh halaman setiap kali isi editor berubah.
+            app.MapGet("/api/editor-draft", (FactoryDataService svc, string? machine) =>
+                MasterResult(() =>
+                {
+                    var (rows, updatedAt) = svc.GetEditorDraft(machine);
+                    return new { Success = true, Rows = rows, UpdatedAt = updatedAt?.ToString("yyyy-MM-dd HH:mm:ss") };
+                }));
+
+            // Riwayat layar utama GOT per menit (dbo.PlcKyoshinTrend) untuk grafik Plan vs Actual.
+            // Tanpa parameter = shift yang sedang berjalan.
+            app.MapGet("/api/plc/trend", (FactoryDataService svc, string? date, int? shift) =>
+                MasterResult(() =>
+                {
+                    var (curDate, curShift, _) = FactoryDataService.ShiftOf(DateTime.Now);
+                    var day = curDate;
+                    if (!string.IsNullOrWhiteSpace(date) && !DateTime.TryParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out day))
+                        throw new ArgumentException("Tanggal harus format yyyy-MM-dd.");
+                    return svc.GetShiftTrend(day, shift ?? curShift);
+                }));
+
+            // List mingguan (dbo.PsiWeeklyPlan) untuk tombol "Isi dari Rencana Database"
+            app.MapGet("/api/psi-weekly", (FactoryDataService svc, string? machine, string? month) =>
+                MasterResult(() => new { Success = true, Month = month, Rows = svc.GetPsiWeeklyList(machine, month) }));
+
+            app.MapPut("/api/editor-draft",(FactoryDataService svc, string? machine, [Microsoft.AspNetCore.Mvc.FromBody] EditorDraftRequest? req) =>
+                MasterResult(() => new { Success = true, SavedAt = svc.SaveEditorDraft(machine, req?.Rows).ToString("HH:mm:ss") }));
 
             // -------------------------------------------------------------
             // 13. REST API: MachineList (17 Mesin Resmi dari MachineDB)

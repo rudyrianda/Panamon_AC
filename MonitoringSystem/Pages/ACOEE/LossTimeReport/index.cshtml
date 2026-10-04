@@ -516,11 +516,7 @@ main.pb-5 {
                 <div class="d-flex align-items-center gap-2">
                     <label class="mb-0 text-white small">Machine</label>
                     <select name="MachineLine" class="form-select form-select-sm" style="width: 200px;" asp-for="MachineLine">
-                        <option value="All">All</option>
-                        <option value="Brazing">Evaporator</option>
-                        <option value="Condenser">Condenser</option>
                         <option value="Expander">Expander Kyoshin 635</option>
-                        <option value="Expander Li-chin">Expander Li-chin</option>
                     </select>
                 </div>
 
@@ -569,7 +565,7 @@ main.pb-5 {
         <div class="chart-box">
             <div class="chart-box-header">
                 <span class="chart-box-title">
-                    Actual vs BP : @(Model.MachineLine == "All" ? "All Machines Combined" : Model.MachineLine)
+                    Actual vs BP : Expander Kyoshin 635
                     (Apr @Model.SelectedYear - Mar @(Model.SelectedYear + 1))
                 </span>
                 <div class="chart-box-line"></div>

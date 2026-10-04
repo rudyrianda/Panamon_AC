@@ -70,8 +70,17 @@ namespace MonitoringSystem.Pages.ACOEE.LossTimeReport
         [BindProperty(SupportsGet = true)]
         public int SelectedYear { get; set; } = DateTime.Today.Year;
 
+        // Trend Loss Time AC OEE hanya untuk Expander Kyoshin 635 (MachineLine "Expander"); nilai lain dari URL diabaikan
+        private const string OnlyMachineLine = "Expander";
+
         [BindProperty(SupportsGet = true)]
-        public string MachineLine { get; set; } = "All";
+        public string MachineLine { get; set; } = OnlyMachineLine;
+
+        public override void OnPageHandlerExecuting(Microsoft.AspNetCore.Mvc.Filters.PageHandlerExecutingContext context)
+        {
+            MachineLine = OnlyMachineLine;
+            base.OnPageHandlerExecuting(context);
+        }
 
         [BindProperty]
         public string UploadMachineLine { get; set; }

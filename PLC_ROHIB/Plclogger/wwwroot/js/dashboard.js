@@ -5,9 +5,9 @@
  * 1. Filter Tanggal Rencana (Hanya menampilkan model dari tanggal yang dipilih).
  * 2. Ceklist Shift Kerja Operator (Shift 1, Shift 2, Shift 3, Non-Shift).
  * 3. Dropdown Cerdas: Menampilkan status model (apakah sudah dipakai di baris/shift lain).
- * 4. Peringatan Model Duplikat: Muncul peringatan jelas jika model yang sama dipilih lebih dari 1 kali.
+ * 4. Model yang sama boleh dipilih di beberapa baris (tanpa peringatan duplikat).
  * 5. Auto-Fill Quantity (Prod. Plan) & SUT otomatis saat Model dipilih.
- * 6. Tombol Panah Adjust Urutan (Naik / Turun / Prioritas Row 1) untuk memudahkan operator mengatur urutan produksi.
+ * 6. Urutan Antrian: kotak urutan ditahan & digeser (drag & drop) untuk mengatur urutan produksi, plus tanggal plan.
  * 7. Live Preview Replika Layar HMI GOT (B-5 9 Baris + DEFECT R1014..R1174).
  * 8. Konfirmasi & Dispatch ke PLC Mitsubishi (192.168.1.30:5010 MC Protocol).
  */
@@ -204,7 +204,8 @@ document.addEventListener('DOMContentLoaded', () => {
   setupMachineFilters();
   setupActionButtons();
   loadMachineList();
-  buildEmptyRows();          // Editor selalu mulai kosong saat halaman dibuka
+  buildEmptyRows();          // Editor kosong dulu, lalu diisi dari database (tabel PlcRohibEditorRow)
+  startEditorDraftAutosave(); // Muat isi editor tersimpan + simpan otomatis setiap ada perubahan
   loadMasterSutMap();        // SUT per model dari Master Data Produk
   loadPlanData(selectedDate); // Rencana SapPlan hanya sebagai saran model
 
@@ -392,8 +393,19 @@ function setupMachineFilters() {
 function setupActionButtons() {
   const btnReset = document.getElementById('btnResetToDb');
   if (btnReset) {
-    // DINONAKTIFKAN SEMENTARA: tombol disembunyikan di index.html
-    // btnReset.addEventListener('click', () => populate9RowsFromDatabase());
+    btnReset.addEventListener('click', () => populate9RowsFromDatabase());
+  }
+
+  // Pilihan bulan list rencana: bulan ini + 3 bulan ke depan (sama dengan horizon worker SAP Plan)
+  const monthSel = document.getElementById('psiMonthSelect');
+  if (monthSel) {
+    const now = new Date();
+    for (let i = 0; i < 4; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+      monthSel.add(new Option(label, value));
+    }
   }
 
   const btnConfirmAll = document.getElementById('btnConfirmDispatchAll');
@@ -492,7 +504,8 @@ function getFilteredPlanItems() {
 }
 
 // Satu baris editor. Actual & Defect dipertahankan dari baris sebelumnya (milik register PLC, bukan model).
-function makeEditorRow(i, modelName, prodPlan, sut) {
+// planDate = tanggal plan dari list rencana (yyyy-MM-dd), hanya ditampilkan di kolom Urutan Antrian / Tanggal.
+function makeEditorRow(i, modelName, prodPlan, sut, planDate = '') {
   const reg = PLC_REGISTER_MAP[i] || {
     rowNo: i + 1,
     page: Math.floor(i / ROWS_PER_HMI_PAGE) + 1,
@@ -524,6 +537,7 @@ function makeEditorRow(i, modelName, prodPlan, sut) {
     modelName: modelName,
     prodPlan: prodPlan,
     sut: sut,
+    planDate: planDate || '',
     actual: prev ? prev.actual : 0,
     defect: prev ? prev.defect : 0
   };
@@ -538,34 +552,182 @@ function buildEmptyRows() {
   renderHmiPreview();
 }
 
-// Tombol "Isi dari Rencana Database": isi editor dari SapPlan tanggal & shift terpilih, SUT dari Master Data Produk
-function populate9RowsFromDatabase() {
-  const filtered = getFilteredPlanItems();
-  if (filtered.length === 0) {
+// =========================================================
+// ISI EDITOR TERSIMPAN DI DATABASE (tabel dbo.PlcRohibEditorRow, per mesin)
+// Dimuat saat halaman dibuka; disimpan otomatis ±1 detik setelah isi editor berhenti berubah.
+// Penyimpanan baru aktif setelah isi dari database berhasil dimuat, supaya editor kosong
+// (mis. saat DB offline) tidak menimpa isi yang sudah tersimpan.
+// =========================================================
+let _draftLoaded = false;
+let _draftSavedSig = null;   // isi terakhir yang sudah ada di database
+let _draftPendingSig = null; // isi yang sedang ditunggu stabil 1 detik
+let _draftBusy = false;
+let _draftRetryAt = 0;       // jeda sebelum mencoba lagi setelah gagal
+
+function editorDraftRows() {
+  return current9Rows
+    .map(r => ({ rowNo: r.rowNo, modelName: (r.modelName || '').trim(), prodPlan: parseInt(r.prodPlan) || 0, sut: parseInt(r.sut) || 0, planDate: r.planDate || null }))
+    .filter(r => r.modelName || r.prodPlan > 0 || r.sut > 0);
+}
+
+function setDraftStatus(state, text) {
+  const el = document.getElementById('draftSaveStatus');
+  if (!el) return;
+  const colors = { ok: '#166534', pending: '#92400e', error: '#b91c1c', wait: '#475569' };
+  el.style.color = colors[state] || colors.wait;
+  el.innerText = text;
+}
+
+async function draftApiError(res) {
+  const data = await res.json().catch(() => ({}));
+  return new Error(data.message || `HTTP ${res.status}`);
+}
+
+async function loadEditorDraft() {
+  _draftBusy = true;
+  setDraftStatus('wait', '⏳ Memuat isi editor dari DB...');
+  try {
+    const res = await fetch(`api/editor-draft?machine=${encodeURIComponent(currentMachine)}`);
+    if (!res.ok) throw await draftApiError(res);
+    const data = await res.json();
+
+    if (editorDraftRows().length > 0) {
+      // Operator sudah mengetik saat DB belum terhubung: isi layar dipertahankan dan akan disimpan ke DB.
+      _draftSavedSig = JSON.stringify((data.rows || []).map(r => ({ rowNo: r.rowNo, modelName: r.modelName, prodPlan: r.prodPlan, sut: r.sut, planDate: r.planDate || null })));
+      addLog('[DATABASE] DB terhubung kembali. Isi editor di layar dipakai dan disimpan ke database.', 'info');
+    } else {
+      const byRow = new Map((data.rows || []).map(r => [r.rowNo, r]));
+      current9Rows = PLC_REGISTER_MAP.map((reg, i) => {
+        const d = byRow.get(reg.rowNo);
+        return d ? makeEditorRow(i, d.modelName, d.prodPlan, d.sut, d.planDate) : makeEditorRow(i, '', 0, 0);
+      });
+      renderEditableTable();
+      _draftSavedSig = JSON.stringify(editorDraftRows());
+      if (byRow.size > 0) addLog(`[DATABASE] Isi editor dimuat dari database: ${byRow.size} baris (terakhir disimpan ${data.updatedAt}).`, 'info');
+    }
+
+    _draftLoaded = true;
+    setDraftStatus('ok', data.updatedAt ? `💾 Tersimpan di DB · ${data.updatedAt.slice(11)}` : '💾 Tersimpan di DB');
+  } catch (err) {
+    _draftRetryAt = Date.now() + 10000;
+    setDraftStatus('error', '⚠ DB tidak terhubung: isi editor belum tersimpan');
+    addLog(`[DATABASE] Gagal memuat isi editor tersimpan: ${err.message}`, 'error');
+  } finally {
+    _draftBusy = false;
+  }
+}
+
+async function saveEditorDraft(sig) {
+  _draftBusy = true;
+  try {
+    const res = await fetch(`api/editor-draft?machine=${encodeURIComponent(currentMachine)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: JSON.parse(sig) })
+    });
+    if (!res.ok) throw await draftApiError(res);
+    const data = await res.json();
+    _draftSavedSig = sig;
+    setDraftStatus('ok', `💾 Tersimpan di DB · ${data.savedAt}`);
+  } catch (err) {
+    _draftRetryAt = Date.now() + 10000;
+    setDraftStatus('error', '⚠ Gagal simpan ke DB, dicoba lagi...');
+    addLog(`[DATABASE] Gagal menyimpan isi editor: ${err.message}`, 'error');
+  } finally {
+    _draftBusy = false;
+  }
+}
+
+function startEditorDraftAutosave() {
+  loadEditorDraft();
+
+  setInterval(() => {
+    if (_draftBusy || Date.now() < _draftRetryAt) return;
+    if (!_draftLoaded) { loadEditorDraft(); return; }
+
+    const sig = JSON.stringify(editorDraftRows());
+    if (sig === _draftSavedSig) { _draftPendingSig = null; return; }
+    if (sig !== _draftPendingSig) {
+      // Masih berubah: tunggu 1 detik tanpa perubahan sebelum disimpan
+      _draftPendingSig = sig;
+      setDraftStatus('pending', '✏️ Menyimpan...');
+      return;
+    }
+    saveEditorDraft(sig);
+  }, 1000);
+
+  // Halaman ditutup/di-refresh sebelum sempat tersimpan: kirim sekali lagi di latar belakang
+  window.addEventListener('pagehide', () => {
+    if (!_draftLoaded) return;
+    const sig = JSON.stringify(editorDraftRows());
+    if (sig === _draftSavedSig) return;
+    fetch(`api/editor-draft?machine=${encodeURIComponent(currentMachine)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: JSON.parse(sig) }),
+      keepalive: true
+    });
+  });
+}
+
+// Tombol "Isi dari Rencana Database": isi editor dengan list rencana satu bulan penuh (semua minggu, tabel
+// dbo.PsiWeeklyPlan, diisi worker SAP Plan Panamon) sesuai urutan list, Plan = Qty list, SUT dari Master Data Produk.
+async function populate9RowsFromDatabase() {
+  const monthSel = document.getElementById('psiMonthSelect');
+  const month = monthSel && monthSel.value ? monthSel.value : getTodayLocalDate().slice(0, 7);
+  const monthLabel = monthSel && monthSel.selectedIndex >= 0 ? monthSel.options[monthSel.selectedIndex].text : month;
+  let data;
+  try {
+    const res = await fetch(`api/psi-weekly?machine=${encodeURIComponent(currentMachine)}&month=${month}`);
+    if (!res.ok) throw await draftApiError(res);
+    data = await res.json();
+  } catch (err) {
+    showAppModal({
+      type: 'error',
+      title: 'Gagal Mengambil List Mingguan',
+      message: `List mingguan tidak bisa diambil dari database: <strong>${escapeHtml(err.message)}</strong>`,
+      tip: 'Editor tidak diubah. Periksa koneksi database lalu coba lagi.',
+      buttonText: 'Tutup'
+    });
+    return;
+  }
+
+  const items = data.rows || [];
+  if (items.length === 0) {
     showAppModal({
       type: 'info',
       title: 'Tidak Ada Rencana',
-      message: `Tidak ada rencana produksi CU untuk tanggal <strong>${escapeHtml(selectedDate)}</strong>${currentShift !== 'ALL' ? ` shift <strong>${escapeHtml(currentShift)}</strong>` : ''}.`,
-      tip: 'Editor tidak diubah. Pilih tanggal/shift lain atau isi model secara manual.',
+      message: `Belum ada list rencana untuk bulan <strong>${escapeHtml(monthLabel)}</strong>.`,
+      tip: 'Editor tidak diubah. List dibuat otomatis oleh worker SAP Plan di Panamon (setiap 3 jam) dari file Daily prod plan.',
       buttonText: 'Mengerti'
     });
     return;
   }
 
-  const totalCount = Math.max(TOTAL_PLC_ROWS, filtered.length);
+  const filled = editorDraftRows().length;
+  const weeks = new Set(items.map(x => x.weekStart)).size;
+  if (filled > 0 && !confirm(`Editor berisi ${filled} baris. Ganti dengan list rencana ${monthLabel} (${weeks} minggu, ${items.length} model)?`)) {
+    return;
+  }
+
+  const totalCount = Math.max(TOTAL_PLC_ROWS, items.length);
   const rows = [];
   for (let i = 0; i < totalCount; i++) {
-    const dbItem = filtered[i] || null;
-    rows.push(dbItem
-      ? makeEditorRow(i, dbItem.productName, getProductPlanQuantity(dbItem), getMasterSut(dbItem.productName))
+    const item = items[i] || null;
+    rows.push(item
+      ? makeEditorRow(i, item.productName, item.qty, getMasterSut(item.productName), item.planDate)
       : makeEditorRow(i, '', 0, 0));
   }
   current9Rows = rows;
 
   renderEditableTable();
   renderHmiPreview();
+  updateAllDatalists();
 
-  addLog(`[DATABASE] Editor diisi ${filtered.length} model dari rencana tanggal ${selectedDate}.`, 'info');
+  addLog(`[DATABASE] Editor diisi ${items.length} model dari list rencana ${monthLabel} (${weeks} minggu, dbo.PsiWeeklyPlan). Belum dikirim ke PLC.`, 'info');
+  if (items.length > TOTAL_PLC_ROWS) {
+    addLog(`[PERINGATAN] List ${monthLabel} berisi ${items.length} model, lebih dari ${TOTAL_PLC_ROWS} baris HMI. Baris ${TOTAL_PLC_ROWS + 1} dst. tidak ikut dikirim ke PLC.`, 'error');
+  }
   const noSut = rows.filter(r => r.modelName && !r.sut).map(r => `Row ${r.rowNo} (${r.modelName})`);
   if (noSut.length > 0) {
     addLog(`[PERINGATAN] SUT belum ada di Master Data Produk untuk: ${noSut.join(', ')}. Isi SUT manual atau tambahkan modelnya di Master Data Produk.`, 'error');
@@ -578,17 +740,25 @@ function renderEditableTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
+  let lastWeekKey = null;
   current9Rows.forEach((row, idx) => {
-    // Divider antar Halaman GOT (setiap 8 baris masuk ke Plan Production berikutnya)
-    if (idx > 0 && idx % ROWS_PER_HMI_PAGE === 0 && idx <= TOTAL_PLC_ROWS) {
-      const pageNo = row.page;
-      const lastRow = current9Rows[Math.min(idx + ROWS_PER_HMI_PAGE, current9Rows.length) - 1];
+    // Pembatas minggu (Senin-Minggu, dipotong di batas bulan): muncul setiap kali tanggal plan masuk minggu lain.
+    // Baris tanpa tanggal (diisi manual / kosong) tidak memunculkan pembatas.
+    const week = planWeekOf(row.planDate);
+    if (week && week.key !== lastWeekKey) {
+      lastWeekKey = week.key;
       const divTr = document.createElement('tr');
-      divTr.innerHTML = idx < TOTAL_PLC_ROWS ? `
-        <td colspan="7" style="background:#f0f9ff; border-top:2px dashed #0284c7; border-bottom:2px dashed #0284c7; padding:8px 12px; text-align:center; font-weight:800; color:#0369a1; font-size:12px; letter-spacing:0.5px;">
-          ⬇️ HALAMAN ${pageNo}: PLAN PRODUCTION ${pageNo} (BARIS ${row.rowNo} S/D ${lastRow.rowNo} — REGISTER ${row.modelAddr} S/D ${lastRow.defAddr}) ⬇️
+      divTr.className = 'week-divider-row';
+      divTr.innerHTML = `
+        <td colspan="7" style="background:#f0fdf4; border-top:2px dashed #16a34a; border-bottom:2px dashed #16a34a; padding:7px 12px; text-align:center; font-weight:800; color:#166534; font-size:12px; letter-spacing:0.5px;">
+          📅 MINGGU KE-${week.no} ${week.monthLabel}: ${week.rangeLabel}
         </td>
-      ` : `
+      `;
+      tbody.appendChild(divTr);
+    }
+    if (idx === TOTAL_PLC_ROWS) {
+      const divTr = document.createElement('tr');
+      divTr.innerHTML = `
         <td colspan="7" style="background:#fef2f2; border-top:2px dashed #dc2626; border-bottom:2px dashed #dc2626; padding:8px 12px; text-align:center; font-weight:800; color:#b91c1c; font-size:12px; letter-spacing:0.5px;">
           ⚠️ BARIS ${idx + 1} DAN SETERUSNYA TIDAK DIKIRIM KE PLC (HMI HANYA ${TOTAL_PLC_ROWS} BARIS) ⚠️
         </td>
@@ -604,10 +774,7 @@ function renderEditableTable() {
     // Buat Datalist Khusus untuk Baris Ini (hanya model yang belum dipilih di baris lain)
     const datalistOptions = buildModelOptionsHtml(idx);
     const sutMissing = !!row.modelName && !(row.sut > 0);
-
-    // Cek apakah baris ini sendiri saat ini duplikat dengan baris lain
-    const isDuplicate = row.modelName && current9Rows.some((r, rIdx) => rIdx !== idx && r.modelName.trim().toUpperCase() === row.modelName.trim().toUpperCase());
-    const duplicateRowNo = isDuplicate ? (current9Rows.find((r, rIdx) => rIdx !== idx && r.modelName.trim().toUpperCase() === row.modelName.trim().toUpperCase()) || {}).rowNo : null;
+    // Model yang sama boleh muncul di beberapa baris (mis. list rencana satu bulan): tidak ada peringatan duplikat.
 
     tr.innerHTML = `
       <td>
@@ -616,14 +783,13 @@ function renderEditableTable() {
       </td>
       <td style="overflow: hidden; max-width: 220px;">
         <div style="position:relative;">
-          <input type="text" class="input-editable model-text-input ${isDuplicate ? 'input-duplicate-warn' : ''}" 
+          <input type="text" class="input-editable model-text-input"
                  id="inputModel_${idx}" 
                  value="${escapeHtml(row.modelName)}" maxlength="20" placeholder="Ketik / Pilih Model..." 
                  list="modelDatalist_${idx}" style="width:100%; min-width:0;">
           <datalist id="modelDatalist_${idx}">
             ${datalistOptions}
           </datalist>
-          ${isDuplicate ? `<div class="badge-duplicate-warn">&#9888;&#65039; Model ini sudah ada di Baris ${duplicateRowNo}!</div>` : ''}
         </div>
       </td>
       <td style="text-align:right;">
@@ -646,16 +812,19 @@ function renderEditableTable() {
         </span>
       </td>
       <td style="text-align:center;">
-        <!-- TOMBOL PANAH ADJUST URUTAN (▲ NAIK / ▼ TURUN / ★ PRIORITAS ROW 1) -->
-        <div class="adjust-btn-group">
-          <button class="btn-arrow" onclick="moveRowUp(${idx})" ${idx === 0 ? 'disabled' : ''} title="Geser Urutan Naik 1 Tingkat (Maju ke Depan)">&#9650; Naik</button>
-          <button class="btn-arrow" onclick="moveRowDown(${idx})" ${idx === current9Rows.length - 1 ? 'disabled' : ''} title="Geser Urutan Turun 1 Tingkat (Mundur ke Bawah)">&#9660; Turun</button>
-          <button class="btn-star-mini ${isP1 ? 'is-top' : ''}" onclick="setRowAsP1(${idx})" title="Jadikan Prioritas Utama (Langsung Pindah ke Baris 1)">&#9733; P1</button>
+        <!-- TANGGAL PLAN + URUTAN ANTRIAN (kotak ditahan & digeser) -->
+        <div class="queue-cell">
+          <span class="queue-date ${row.planDate ? '' : 'is-empty'}" id="queueDate_${idx}">${formatPlanDate(row.planDate)}</span>
+          <div class="queue-box ${row.modelName ? '' : 'is-empty'}" draggable="true" data-idx="${idx}"
+               title="Tahan & geser ke baris lain untuk memindah urutan model ini">
+            <span class="queue-grip">&#10303;</span><span>${idx + 1}</span>
+          </div>
         </div>
       </td>
     `;
 
     tbody.appendChild(tr);
+    attachRowDragHandlers(tr, idx);
 
     // Pasang Event Listeners
     const inputModel = tr.querySelector(`#inputModel_${idx}`);
@@ -677,50 +846,210 @@ function renderEditableTable() {
   });
 }
 
-// 5. FITUR PANAH ADJUST URUTAN PRODUKSI
-// Geser Baris ke Atas (Naik)
-window.moveRowUp = function(idx) {
-  if (idx <= 0) return;
-  swapRows(idx, idx - 1);
-  addLog(`[ADJUST URUTAN] Baris ${idx + 1} dinaikkan ke Baris ${idx}.`, 'info');
-};
+// 5. URUTAN ANTRIAN: tahan & geser kotak urutan untuk memindah isi baris (drag & drop)
+const PLAN_DAY_NAMES = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+const PLAN_MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const PLAN_MONTH_NAMES_LONG = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
-// Geser Baris ke Bawah (Turun)
-window.moveRowDown = function(idx) {
-  if (idx >= current9Rows.length - 1) return;
-  swapRows(idx, idx + 1);
-  addLog(`[ADJUST URUTAN] Baris ${idx + 1} diturunkan ke Baris ${idx + 2}.`, 'info');
-};
+// "2026-10-06" -> "Sel, 06 Okt 2026"
+function formatPlanDate(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+  if (!m) return '-';
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  return `${PLAN_DAY_NAMES[d.getDay()]}, ${m[3]} ${PLAN_MONTH_NAMES[d.getMonth()]} ${m[1]}`;
+}
 
-// Menetapkan Baris Menjadi Row 1 (Prioritas P1)
-window.setRowAsP1 = function(targetIdx) {
-  if (targetIdx === 0) return;
-  swapRows(targetIdx, 0);
-  addLog(`[PRIORITAS] "${current9Rows[0].modelName}" dinaikkan menjadi Prioritas Utama (Baris 1 -> ${current9Rows[0].modelAddr}).`, 'info');
-};
-
-// Fungsi Swap Isi Data Antara Dua Baris (Register PLC tetap di posisinya)
-// Actual & Defect TIDAK ikut ditukar: nilainya milik register baris tsb di PLC, bukan milik model
-function swapRows(idxA, idxB) {
-  const rowA = current9Rows[idxA];
-  const rowB = current9Rows[idxB];
-
-  const temp = {
-    modelName: rowA.modelName,
-    prodPlan: rowA.prodPlan,
-    sut: rowA.sut
+// Minggu (Senin-Minggu, dipotong di awal/akhir bulan) dari tanggal plan "yyyy-MM-dd", sama dengan list rencana.
+// null jika tanggal kosong.
+function planWeekOf(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+  if (!m) return null;
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  const fromMonday = (d.getDay() + 6) % 7;
+  const monthStart = new Date(d.getFullYear(), d.getMonth(), 1);
+  const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  let start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - fromMonday);
+  let end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  if (start < monthStart) start = monthStart;
+  if (end > monthEnd) end = monthEnd;
+  const firstOffset = (monthStart.getDay() + 6) % 7;
+  const no = Math.floor((d.getDate() - 1 + firstOffset) / 7) + 1;
+  const fmt = (x) => `${PLAN_DAY_NAMES[x.getDay()]}, ${String(x.getDate()).padStart(2, '0')} ${PLAN_MONTH_NAMES[x.getMonth()]}`;
+  const monthLabel = `${PLAN_MONTH_NAMES_LONG[d.getMonth()].toUpperCase()} ${d.getFullYear()}`;
+  return {
+    key: `${d.getFullYear()}-${d.getMonth()}-${no}`,
+    no,
+    monthLabel,
+    rangeLabel: `${fmt(start)} s/d ${fmt(end)} ${end.getFullYear()}`
   };
+}
 
-  rowA.modelName = rowB.modelName;
-  rowA.prodPlan = rowB.prodPlan;
-  rowA.sut = rowB.sut;
+let _dragFromIdx = null;
 
-  rowB.modelName = temp.modelName;
-  rowB.prodPlan = temp.prodPlan;
-  rowB.sut = temp.sut;
+// Gulir otomatis saat menggeser: kursor dekat tepi atas/bawah kotak tabel (atau di luarnya) -> tabel ikut bergulir,
+// makin dekat ke tepi makin cepat.
+const DRAG_SCROLL_ZONE = 70;   // px dari tepi kotak tabel
+const DRAG_SCROLL_MAX = 28;    // px per frame
+let _dragPointerY = null;
+let _dragScrollRaf = null;
+
+document.addEventListener('dragover', (e) => {
+  if (_dragFromIdx !== null) _dragPointerY = e.clientY;
+});
+
+function dragAutoScrollStep() {
+  if (_dragFromIdx === null) { _dragScrollRaf = null; return; }
+  const box = document.querySelector('.table-responsive-white');
+  if (box && _dragPointerY !== null) {
+    const rect = box.getBoundingClientRect();
+    let dy = 0;
+    if (_dragPointerY < rect.top + DRAG_SCROLL_ZONE) dy = -(rect.top + DRAG_SCROLL_ZONE - _dragPointerY);
+    else if (_dragPointerY > rect.bottom - DRAG_SCROLL_ZONE) dy = _dragPointerY - (rect.bottom - DRAG_SCROLL_ZONE);
+    if (dy !== 0) {
+      const step = Math.max(-DRAG_SCROLL_MAX, Math.min(DRAG_SCROLL_MAX, Math.round(dy / DRAG_SCROLL_ZONE * DRAG_SCROLL_MAX)));
+      box.scrollTop += step || Math.sign(dy);
+    }
+  }
+  _dragScrollRaf = requestAnimationFrame(dragAutoScrollStep);
+}
+
+function startDragAutoScroll() {
+  _dragPointerY = null;
+  if (_dragScrollRaf === null) _dragScrollRaf = requestAnimationFrame(dragAutoScrollStep);
+}
+
+function stopDragAutoScroll() {
+  if (_dragScrollRaf !== null) cancelAnimationFrame(_dragScrollRaf);
+  _dragScrollRaf = null;
+  _dragPointerY = null;
+}
+
+function clearDropMarkers() {
+  document.querySelectorAll('#editableTableBody tr.row-drop-above, #editableTableBody tr.row-drop-below')
+    .forEach(el => el.classList.remove('row-drop-above', 'row-drop-below'));
+}
+
+// Baris editor (yang punya kotak urutan) sesuai indeks
+function editorRowElements() {
+  return [...document.querySelectorAll('#editableTableBody tr')].filter(t => t.querySelector('.queue-box'));
+}
+
+// Animasi setelah dilepas: tiap baris meluncur dari posisi lamanya ke posisi baru, baris yang dipindah berkedip.
+function animateRowMove(from, to, oldTops) {
+  const rows = editorRowElements();
+  const lo = Math.min(from, to), hi = Math.max(from, to);
+  for (let j = lo; j <= hi; j++) {
+    // isi baris j sekarang berasal dari baris "src" sebelum dipindah
+    const src = j === to ? from : (from < to ? j + 1 : j - 1);
+    const tr = rows[j];
+    if (!tr || oldTops[src] === undefined) continue;
+    const dy = oldTops[src] - tr.getBoundingClientRect().top;
+    if (!dy) continue;
+    tr.style.transition = 'none';
+    tr.style.transform = `translateY(${dy}px)`;
+    tr.style.position = 'relative';
+    tr.style.zIndex = j === to ? '3' : '1';
+  }
+  // Paksa browser menghitung posisi awal (reflow), lalu lepaskan transform dengan transisi -> baris meluncur
+  if (rows[lo]) void rows[lo].offsetHeight;
+  for (let j = lo; j <= hi; j++) {
+    const tr = rows[j];
+    if (!tr) continue;
+    tr.style.transition = 'transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1)';
+    tr.style.transform = '';
+  }
+  if (rows[to]) rows[to].classList.add('row-just-moved');
+  setTimeout(() => {
+    for (let j = lo; j <= hi; j++) {
+      const tr = rows[j];
+      if (!tr) continue;
+      // Pengaman: transisi dipaksa selesai (mis. tab sempat tidak terlihat) agar baris tidak tertinggal di posisi geser
+      if (tr.getAnimations) tr.getAnimations().forEach(a => a.finish());
+      tr.style.transition = ''; tr.style.transform = ''; tr.style.position = ''; tr.style.zIndex = '';
+    }
+  }, 450);
+  setTimeout(() => { if (rows[to]) rows[to].classList.remove('row-just-moved'); }, 1700);
+}
+
+function attachRowDragHandlers(tr, idx) {
+  const box = tr.querySelector('.queue-box');
+  if (box) {
+    box.addEventListener('dragstart', (e) => {
+      _dragFromIdx = idx;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(idx));
+      // Label melayang: model yang sedang dibawa
+      const row = current9Rows[idx] || {};
+      const ghost = document.createElement('div');
+      ghost.className = 'drag-ghost';
+      ghost.textContent = `⠿ Urutan ${idx + 1} · ${row.modelName || '(kosong)'}${row.prodPlan ? ' · ' + row.prodPlan + ' pcs' : ''}${row.planDate ? ' · ' + formatPlanDate(row.planDate) : ''}`;
+      document.body.appendChild(ghost);
+      e.dataTransfer.setDragImage(ghost, 18, 16);
+      setTimeout(() => ghost.remove(), 0);
+      tr.classList.add('row-dragging');
+      startDragAutoScroll();
+    });
+    box.addEventListener('dragend', () => {
+      _dragFromIdx = null;
+      stopDragAutoScroll();
+      tr.classList.remove('row-dragging');
+      clearDropMarkers();
+    });
+  }
+
+  // Seluruh baris jadi area tujuan: garis biru di atas/bawah menunjukkan posisi sisipan
+  tr.addEventListener('dragover', (e) => {
+    if (_dragFromIdx === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = tr.getBoundingClientRect();
+    const below = e.clientY > rect.top + rect.height / 2;
+    let to = below ? idx + 1 : idx;
+    if (_dragFromIdx < to) to -= 1;
+    const cls = below ? 'row-drop-below' : 'row-drop-above';
+    const lastTd = tr.lastElementChild;
+    if (tr.classList.contains(cls) && lastTd && lastTd.dataset.dropTo === String(to)) return; // tidak berubah
+    clearDropMarkers();
+    if (to === _dragFromIdx) return; // posisi sama dengan asal: tidak ada perpindahan
+    tr.classList.add(cls);
+    if (lastTd) {
+      lastTd.dataset.dropTo = String(to);
+      lastTd.dataset.dropLabel = `Taruh di sini → urutan ${to + 1}`;
+    }
+  });
+  tr.addEventListener('drop', (e) => {
+    if (_dragFromIdx === null) return;
+    e.preventDefault();
+    const rect = tr.getBoundingClientRect();
+    const below = e.clientY > rect.top + rect.height / 2;
+    const from = _dragFromIdx;
+    let to = below ? idx + 1 : idx;
+    if (from < to) to -= 1; // setelah baris asal dikeluarkan, indeks di bawahnya bergeser naik
+    clearDropMarkers();
+    _dragFromIdx = null;
+    stopDragAutoScroll();
+    if (from === to) return;
+    const scrollBox = document.querySelector('.table-responsive-white');
+    const keepScroll = scrollBox ? scrollBox.scrollTop : 0;
+    const oldTops = editorRowElements().map(el => el.getBoundingClientRect().top);
+    moveEditorRow(from, to);
+    if (scrollBox) scrollBox.scrollTop = keepScroll; // tabel digambar ulang: posisi gulir dipertahankan
+    animateRowMove(from, to, oldTops);
+  });
+}
+
+// Pindahkan isi baris (Model, Plan, SUT, Tanggal) dari posisi "from" ke "to"; baris di antaranya ikut bergeser.
+// Register PLC, Actual & Defect tetap di barisnya (milik register PLC, bukan milik model).
+function moveEditorRow(from, to) {
+  if (from === to || from < 0 || to < 0 || from >= current9Rows.length || to >= current9Rows.length) return;
+  const contents = current9Rows.map(r => ({ modelName: r.modelName, prodPlan: r.prodPlan, sut: r.sut, planDate: r.planDate }));
+  const [moved] = contents.splice(from, 1);
+  contents.splice(to, 0, moved);
+  current9Rows.forEach((r, i) => Object.assign(r, contents[i]));
 
   renderEditableTable();
   renderHmiPreview();
+  addLog(`[URUTAN] "${moved.modelName || '(kosong)'}" dipindah dari urutan ${from + 1} ke urutan ${to + 1}.`, 'info');
 }
 
 // 6. HANDLER SAAT OPERATOR MENGETIK / MEMILIH NAMA MODEL
@@ -729,36 +1058,18 @@ window.onModelChange = function(idx, val) {
   const trimmed = val.trim();
   current9Rows[idx].modelName = trimmed;
 
-  // Update live preview teks HMI seketika
-  const hmiTextEl = document.getElementById(`hmiModelText_${idx}`);
-  if (hmiTextEl) {
-    hmiTextEl.innerText = trimmed || '-';
-    hmiTextEl.title = trimmed || '-';
-  }
-
   if (!trimmed) {
     current9Rows[idx].prodPlan = 0;
     current9Rows[idx].sut = 0;
+    current9Rows[idx].planDate = '';
+    const dateEl = document.getElementById(`queueDate_${idx}`);
+    if (dateEl) { dateEl.textContent = '-'; dateEl.classList.add('is-empty'); }
     const inputQty = document.getElementById(`inputQty_${idx}`);
     if (inputQty) inputQty.value = 0;
     setSutInput(idx, 0, false);
     renderHmiPreview();
     updateAllDatalists();
     return;
-  }
-
-  // Cek Peringatan Duplikat: Apakah model ini sudah terisi di baris lain?
-  const duplicateIdx = current9Rows.findIndex((r, rIdx) => rIdx !== idx && r.modelName.trim().toUpperCase() === trimmed.toUpperCase());
-  if (duplicateIdx !== -1) {
-    const dupRow = current9Rows[duplicateIdx];
-    addLog(`[PERINGATAN] Model "${trimmed}" sudah terisi pada Baris ${dupRow.rowNo} (${dupRow.modelAddr})!`, 'error');
-    showAppModal({
-      type: 'warning',
-      title: 'Model Sudah Dipilih Sebelumnya',
-      message: `Model <strong>"${trimmed}"</strong> sudah dipilih pada <strong>Baris ${dupRow.rowNo}</strong>.`,
-      tip: 'Setiap baris disarankan memiliki model yang berbeda. Jika ingin memindahkan urutan, gunakan tombol (<strong>▲ Naik</strong> / <strong>▼ Turun</strong>).',
-      buttonText: 'Saya Mengerti'
-    });
   }
 
   // Cari model HANYA di database tanggal yang dipilih
@@ -818,17 +1129,13 @@ function setSutInput(idx, sut, warnMissing) {
 // 2. Model CU di Master Data Produk yang tidak ada di rencana
 // Model yang sudah dipakai di baris lain tidak ditampilkan.
 function buildModelOptionsHtml(idx) {
-  const usedElsewhere = new Set(
-    current9Rows
-      .filter((r, rIdx) => rIdx !== idx && r.modelName)
-      .map(r => r.modelName.trim().toUpperCase())
-  );
+  // Semua model tetap ditawarkan walau sudah dipakai di baris lain (model yang sama boleh di beberapa baris)
   const seen = new Set();
   const options = [];
 
   getFilteredPlanItems().forEach(p => {
     const key = (p.productName || '').trim().toUpperCase();
-    if (!key || seen.has(key) || usedElsewhere.has(key)) return;
+    if (!key || seen.has(key)) return;
     seen.add(key);
     const sut = getMasterSut(p.productName);
     options.push(`<option value="${escapeHtml(p.productName)}">${escapeHtml(p.productName)} - Plan: ${getProductPlanQuantity(p)} pcs | SUT: ${sut > 0 ? sut + 's' : 'belum ada'} (Shift ${escapeHtml(p.shift)})</option>`);
@@ -836,7 +1143,7 @@ function buildModelOptionsHtml(idx) {
 
   masterModelList.forEach(m => {
     const key = m.model.toUpperCase();
-    if (!key.startsWith('CU') || seen.has(key) || usedElsewhere.has(key)) return;
+    if (!key.startsWith('CU') || seen.has(key)) return;
     seen.add(key);
     options.push(`<option value="${escapeHtml(m.model)}">${escapeHtml(m.model)} - Master Data | SUT: ${m.sut}s</option>`);
   });
@@ -844,7 +1151,7 @@ function buildModelOptionsHtml(idx) {
   return options.join('');
 }
 
-// Memperbarui opsi Datalist di semua baris agar status [SUDAH DIPILIH] selalu sinkron
+// Memperbarui opsi Datalist di semua baris (saran model dari rencana & Master Data Produk)
 function updateAllDatalists() {
   for (let idx = 0; idx < current9Rows.length; idx++) {
     const datalist = document.getElementById(`modelDatalist_${idx}`);
@@ -857,10 +1164,6 @@ window.onQtyChange = function(idx, val) {
   if (current9Rows[idx]) {
     const num = parseInt(val) || 0;
     current9Rows[idx].prodPlan = num;
-    const hmiQtyEl = document.getElementById(`hmiQtyText_${idx}`);
-    if (hmiQtyEl) {
-      hmiQtyEl.innerText = num;
-    }
   }
 };
 
@@ -871,10 +1174,6 @@ window.onSutChange = function(idx, val) {
     current9Rows[idx].sut = num;
     const inputSut = document.getElementById(`inputSut_${idx}`);
     if (inputSut) inputSut.classList.toggle('input-duplicate-warn', !!current9Rows[idx].modelName && num <= 0);
-    const hmiSutEl = document.getElementById(`hmiSutText_${idx}`);
-    if (hmiSutEl) {
-      hmiSutEl.innerText = num > 0 ? `${num} s` : '-';
-    }
   }
 };
 
@@ -889,6 +1188,33 @@ window.switchHmiPage = function(page) {
 };
 
 
+// Isi Live Preview = cermin (mirror) register PLC, BUKAN isi editor.
+// Diperbarui dari api/plc/read setiap 3 detik; saat PLC offline semua nilai tampil "-".
+let plcMirrorRows = [];
+let plcMirrorLive = null; // null = belum pernah terbaca, true = online, false = offline
+
+function getPlcMirrorRows() {
+  if (plcMirrorRows.length === 0) {
+    plcMirrorRows = PLC_REGISTER_MAP.map((reg, i) => ({ ...makeEditorRow(i, '', 0, 0), actual: 0, defect: 0 }));
+  }
+  return plcMirrorRows;
+}
+
+function setPlcMirrorStatus(state, readAt) {
+  const el = document.getElementById('hmiMirrorStatus');
+  if (!el) return;
+  const styles = {
+    live:    ['#dcfce7', '#166534', `● MIRROR PLC ONLINE — terbaca ${readAt || ''}`],
+    offline: ['#fee2e2', '#991b1b', `● PLC OFFLINE — preview tidak menampilkan data${readAt ? ' (cek ' + readAt + ')' : ''}`],
+    server:  ['#fef3c7', '#92400e', '● Server PLC Dispatcher tidak merespons'],
+    wait:    ['#e2e8f0', '#334155', '● Menghubungkan ke PLC...']
+  };
+  const [bg, fg, text] = styles[state] || styles.wait;
+  el.style.background = bg;
+  el.style.color = fg;
+  el.innerText = text;
+}
+
 // Render Live Preview Layar HMI GOT (8 baris per halaman: Plan Production 1 - 15)
 function renderHmiPreview() {
   const tbody = document.getElementById('hmiPreviewBody');
@@ -898,7 +1224,8 @@ function renderHmiPreview() {
   const pagePos = Math.max(0, HMI_PAGES.indexOf(currentHmiPage));
   const startIdx = pagePos * ROWS_PER_HMI_PAGE;
   const endIdx = startIdx + ROWS_PER_HMI_PAGE;
-  const displayRows = current9Rows.slice(startIdx, endIdx);
+  const live = plcMirrorLive === true;
+  const displayRows = getPlcMirrorRows().slice(startIdx, endIdx).map(r => live ? r : { ...r, modelName: '', prodPlan: '-', sut: 0, actual: '-', defect: '-' });
 
   displayRows.forEach((row, rowSubIdx) => {
     const idx = startIdx + rowSubIdx;
@@ -921,7 +1248,7 @@ function renderHmiPreview() {
       <td style="padding: 2px;">
         <div class="hmi-cell-lcd num-right">
           <span class="hmi-cell-lcd-tag">${row.pId || '10037'} ${row.planAddr}</span>
-          <span class="hmi-cell-lcd-val" id="hmiQtyText_${idx}">${row.prodPlan}</span>
+          <span class="hmi-cell-lcd-val" id="hmiQtyText_${idx}" title="Nilai PROD. PLAN di PLC">${row.prodPlan}</span>
         </div>
       </td>
       <td style="padding: 2px;">
@@ -939,7 +1266,7 @@ function renderHmiPreview() {
       <td style="padding: 2px;">
         <div class="hmi-cell-lcd num-right">
           <span class="hmi-cell-lcd-tag">${row.defId || '10072'} ${row.defAddr}</span>
-          <span class="hmi-cell-lcd-val" id="hmiDefText_${idx}" title="Nilai DEFECT ditarik dari PLC">${row.defect || 0}</span>
+          <span class="hmi-cell-lcd-val" id="hmiDefText_${idx}" title="Nilai DEFECT ditarik dari PLC">${row.defect ?? 0}</span>
         </div>
       </td>
     `;
@@ -974,44 +1301,51 @@ function renderHmiPreview() {
   }
 }
 
-// Tombol "Isi Dummy Berurutan": tiap baris diisi angka urut Model, Plan, SUT
-// (Row 1 = 1, 2, 3; Row 2 = 4, 5, 6; ...) untuk mengecek alamat register di layar GOT.
-window.fillDummySequentialRows = function() {
-  let n = 1;
-  current9Rows = PLC_REGISTER_MAP.map((reg, i) => {
-    const row = makeEditorRow(i, String(n), n + 1, n + 2);
-    n += 3;
-    return row;
-  });
-  renderEditableTable();
-  renderHmiPreview();
-  addLog(`[DUMMY] ${current9Rows.length} baris diisi angka berurutan (Model 1 s/d ${n - 3}, Plan, SUT). Belum dikirim ke PLC.`, 'info');
+// Tombol "Submit & Kirim ke PLC" (header): simpan isi editor ke database sekarang juga (tanpa menunggu simpan
+// otomatis), lalu kirim ke PLC dengan fungsi yang sama seperti tombol "KONFIRMASI & KIRIM KE PLC".
+window.submitAndDispatch = async function() {
+  const filled = editorDraftRows().length;
+  if (filled === 0) {
+    showAppModal({
+      type: 'info',
+      title: 'Editor Masih Kosong',
+      message: 'Belum ada baris yang diisi. Isi editor dulu (mis. lewat <strong>Isi dari Rencana Database</strong>).',
+      buttonText: 'Mengerti'
+    });
+    return;
+  }
+  if (!confirm(`Submit ${filled} baris ke database lalu kirim ke PLC (Plan 1 - ${LAST_HMI_PAGE})?`)) return;
+
+  const btn = document.getElementById('btnSubmitDispatch');
+  if (btn) btn.disabled = true;
+  try {
+    // 1. Simpan ke database (hanya jika ada perubahan yang belum tersimpan)
+    const sig = JSON.stringify(editorDraftRows());
+    if (_draftLoaded && sig !== _draftSavedSig) {
+      while (_draftBusy) await new Promise(r => setTimeout(r, 100));
+      await saveEditorDraft(sig);
+    }
+    if (!_draftLoaded || _draftSavedSig !== sig) {
+      addLog('[SUBMIT] Gagal menyimpan ke database. Pengiriman ke PLC dibatalkan.', 'error');
+      showAppModal({
+        type: 'error',
+        title: 'Gagal Menyimpan',
+        message: 'Isi editor tidak bisa disimpan ke database, jadi <strong>belum dikirim ke PLC</strong>.',
+        tip: 'Periksa koneksi database lalu klik Submit lagi. Tombol KONFIRMASI & KIRIM KE PLC di bawah tetap bisa mengirim tanpa database.',
+        buttonText: 'Tutup'
+      });
+      return;
+    }
+    addLog(`[SUBMIT] ${filled} baris tersimpan di database. Mengirim ke PLC...`, 'info');
+
+    // 2. Kirim ke PLC (sama dengan tombol KONFIRMASI & KIRIM KE PLC)
+    await dispatchToPlc(false);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 };
 
 // Fitur HOME (tulis D1000 = 0 ke PLC) DINONAKTIFKAN: tombol tetap tampil tapi disabled, endpoint backend sudah dihapus.
-
-// Tes Diagnostik Koneksi SQL Server 10.83.33.103 (User: sa, Database: PROMOSYS)
-window.testDbConnectionFull = async function() {
-  addLog('[DIAGNOSTIK] Memeriksa koneksi ke SQL Server 10.83.33.103 (User: sa, Database: PROMOSYS)...', 'info');
-  try {
-    const res = await fetch('api/db/diagnostics');
-    const data = await res.json();
-    if (data && data.IsConnected) {
-      const tblList = data.Tables || {};
-      const tblDetails = Object.entries(tblList).map(([k, v]) => `• ${k}: ${v.Exists ? `${v.RowCount} record` : `Tidak ditemukan (${v.Error})`}`).join('\n');
-      addLog(`[DB LIVE OK] Terhubung ke ${data.Server} (${data.Database}). Tabel: ${Object.keys(tblList).join(', ')}`, 'success');
-      showAppModal('success', 'Koneksi Database 10.83.33.103 Berhasil!', `Koneksi SQL Server Berhasil Aktif (Live)!\n\nServer: ${data.Server}\nDatabase: ${data.Database}\nUser: ${data.User}\n\nStatus Tabel:\n${tblDetails}`);
-      const dbStatusEl = document.getElementById('dbConnectionBadge');
-      if (dbStatusEl) dbStatusEl.innerText = 'DB: 10.83.33.103 Live';
-    } else {
-      addLog(`[DB OFFLINE] ${data.Message} (${data.Error || 'Jaringan tidak terjangkau'})`, 'warning');
-      showAppModal('warning', 'Database Menggunakan Cache Lokal', `${data.Message}\n\nCatatan:\nPastikan kabel LAN PC/Laptop terhubung ke switch/jaringan pabrik (IP Subnet 10.83.33.x).\nSaat ini sistem menggunakan Plan Cache agar pengujian dan simulasi tetap dapat berjalan lancar.`);
-    }
-  } catch (err) {
-    addLog(`[DB ERROR] Gagal melakukan tes database: ${err.message}`, 'error');
-    showAppModal('error', 'Gagal Menghubungi Server', `Terjadi error saat menghubungi endpoint diagnostik: ${err.message}`);
-  }
-};
 
 // Konfirmasi & Kirim ke PLC Mitsubishi MC Protocol (16 Baris: Plan 1 & Plan 2)
 async function dispatchToPlc(row1Only = false) {
@@ -1141,7 +1475,10 @@ async function readPlcRegisters(silent = false) {
     if (!silent) url += '&log=1';
 
     const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    if (!data.version) { setPlcMirrorStatus('wait'); return; } // server belum selesai membaca PLC pertama kali
+    setPlcMirrorStatus(data.readLive ? 'live' : 'offline', data.readAt);
 
     // JIKA TIDAK ADA PERUBAHAN DI PLC:
     if (data.changed === false) {
@@ -1151,6 +1488,20 @@ async function readPlcRegisters(silent = false) {
 
     // JIKA ADA PERUBAHAN DI PLC:
     _currentPlcDataVersion = data.version;
+
+    // Live Preview = cermin isi PLC (Model, Plan, SUT, Actual, Defect)
+    plcMirrorLive = !!data.readLive;
+    const mirror = getPlcMirrorRows();
+    (data.rows || []).forEach(r => {
+      const m = mirror.find(x => x.rowNo === r.rowNo);
+      if (!m) return;
+      m.modelName = (r.modelName || '').trim();
+      m.prodPlan = r.prodPlan || 0;
+      m.sut = r.sut || 0;
+      m.actual = r.actual || 0;
+      m.defect = r.defect || 0;
+    });
+    renderHmiPreview();
 
     if (data.rows && data.rows.length > 0) {
       let changeCount = 0;
@@ -1186,13 +1537,6 @@ async function readPlcRegisters(silent = false) {
               setTimeout(() => defBadge.classList.remove('badge-defect-flash'), 1000);
             }
           }
-
-          // Update cell di HMI preview
-          const hmiAct = document.getElementById(`hmiActText_${fIdx}`);
-          if (hmiAct) hmiAct.innerText = r.actual;
-
-          const hmiDef = document.getElementById(`hmiDefText_${fIdx}`);
-          if (hmiDef) hmiDef.innerText = r.defect || 0;
         }
       });
 
@@ -1213,6 +1557,7 @@ async function readPlcRegisters(silent = false) {
       }
     }
   } catch (err) {
+    setPlcMirrorStatus('server');
     if (!silent) addLog(`[PLC ERROR] Gagal membaca dari PLC: ${err.message}`, 'error');
   } finally {
     _isPollingPlc = false;

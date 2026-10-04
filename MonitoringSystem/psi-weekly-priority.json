@@ -1,0 +1,27 @@
+{
+  "_Keterangan": [
+    "Urutan prioritas list mingguan (Senin-Minggu) dari \"Daily prod plan\" bagian CU (MCH1-01).",
+    "Kategori dikerjakan berurutan dari atas ke bawah; di dalam kategori mengikuti urutan Models, lalu Similar.",
+    "Model hanya dimasukkan jika namanya persis ada di sini DAN di Master Data Produk PLC ROHIB (dbo.MasterProduct). Tidak ada pencocokan -P / -E atau nama mirip otomatis.",
+    "Similar = model tambahan (nama persis) yang ikut kategori tersebut, ditaruh setelah Models; tetap harus ada di Master Data Produk.",
+    "Model lain (mis. CU-PN5AKJ-E, CU-DN5CKJ-S, KIOS) diabaikan dan hanya dicatat di audit log.",
+    "Perubahan file ini berlaku pada siklus worker berikutnya tanpa restart."
+  ],
+  "SmallQtyThreshold": 100,
+  "Categories": [
+    { "Category": "No. 1",  "Models": [ "CU-YN5AKJ", "CU-QN5AKJ", "CU-UN5AKJ", "CU-PN5AKJ", "CU-LN5AKJ" ], "Similar": [] },
+    { "Category": "No. 2",  "Models": [ "CU-YN7AKJ", "CU-QN7AKJ", "CU-UN7AKJ", "CU-PN7AKJ", "CU-LN7AKJ" ], "Similar": [] },
+    { "Category": "No. 3",  "Models": [ "CU-YN9AKJ", "CU-QN9AKJ", "CU-UN9AKJ", "CU-PN9AKJ", "CU-LN9AKJ", "CU-PN9AKH" ], "Similar": [] },
+    { "Category": "No. 4",  "Models": [ "CU-YN12AKJ", "CU-QN12AKJ", "CU-UN12AKJ", "CU-PN12AKJ", "CU-LN12AKJ" ], "Similar": [] },
+    { "Category": "No. 5",  "Models": [ "CU-YN18AKJ", "CU-QN18AKJ", "CU-UN18AKJ", "CU-PN18AKJ", "CU-PU18AKJ", "CU-QU18AKJ", "CU-RU18AKJ", "CU-PN18AKH", "CU-N18AKH-8" ], "Similar": [] },
+    { "Category": "No. 6",  "Models": [ "CU-YN24AKJ", "CU-QN24AKJ", "CU-UN24AKJ", "CU-QU24AKJ", "CU-PN24AKJ", "CU-PU24AKJ", "CU-RU24AKJ", "CU-PN24AKH", "CU-N24AKH-8", "CU-HU18CKJ", "CU-HU24CKJ" ], "Similar": [] },
+    { "Category": "No. 7",  "Models": [ "CU-PU12AKJ", "CU-QU12AKJ", "CU-RU12AKJ" ], "Similar": [] },
+    { "Category": "No. 8",  "Models": [ "CU-N9AKH-8", "CU-N9ZKH-8", "CU-QN9ZKH-8" ], "Similar": [] },
+    { "Category": "No. 9",  "Models": [ "CU-HU10CKJ" ], "Similar": [] },
+    { "Category": "No. 10", "Models": [ "CU-HU13CKJ" ], "Similar": [] },
+    { "Category": "No. 11", "Models": [ "CU-EU18UGM-1", "CU-SN18UGM-1" ], "Similar": [] },
+    { "Category": "No. 17", "Models": [ "CU-PU5AKJ", "CU-PU7AKJ", "CU-PU9AKJ", "CU-QU5AKJ", "CU-QU7AKJ", "CU-QU9AKJ", "CU-RU5AKJ", "CU-RU7AKJ", "CU-RU9AKJ" ], "Similar": [] },
+    { "Category": "No. 18", "Models": [ "CU-N12AKH-8", "CU-PN12AKH" ], "Similar": [] },
+    { "Category": "No. 19", "Models": [ "CU-YU5BKJ", "CU-YU7BKJ", "CU-YU9BKJ" ], "Similar": [] }
+  ]
+}

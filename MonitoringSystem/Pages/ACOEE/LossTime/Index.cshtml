@@ -12,9 +12,9 @@
             OriginalIndex = originalIndex,
             Priority = name switch
             {
+                "Expander Kyoshin 6.35" or "Expander Kyoshin 635" => 0,
                 "Evaporator" => 1,
                 "Condenser" => 2,
-                "Expander Kyoshin 6.35" or "Expander Kyoshin 635" => 3,
                 "Expander Li-chin" => 4,
                 "Expander Kyoshin 7" => 5,
                 _ => int.MaxValue
@@ -970,9 +970,8 @@
 
             <div class="d-flex align-items-center gap-2" id="machineFilterPanel">
                 <label class="mb-0">Machine</label>
-                <select class="form-select" style="width: 140px;" id="SelectedMachineName" name="SelectedMachineName"
+                <select class="form-select" style="width: auto; min-width: 140px;" id="SelectedMachineName" name="SelectedMachineName"
                         asp-for="SelectedMachineName">
-                    <option value="All">All</option>
                     @foreach (var machine in orderedMachineNames)
                     {
                         <option value="@machine">@machine</option>

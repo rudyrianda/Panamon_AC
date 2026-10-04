@@ -75,6 +75,7 @@ namespace MonitoringSystem.Pages.ACOEE.ProductionReport
             public int NonShift_ActiveCount { get; set; } = 0;
             public int Overtime_ActiveCount { get; set; } = 0;
             public bool HasAnyPlan { get; set; } = false;
+            public int? PlcActual { get; set; } = null; // Actual Kyoshin dari PLC (PlcKyoshinChangePlan)
         }
 
         public class RestTime { public int Duration { get; set; } public TimeSpan StartTime { get; set; } public TimeSpan EndTime { get; set; } }
@@ -92,8 +93,18 @@ namespace MonitoringSystem.Pages.ACOEE.ProductionReport
 
         [BindProperty(SupportsGet = true)] public int SelectedMonth { get; set; } = DateTime.Now.Month;
         [BindProperty(SupportsGet = true)] public int SelectedYear { get; set; } = DateTime.Now.Year;
-        [BindProperty(SupportsGet = true)] public string MachineLine { get; set; } = "All";
+        // Production Achievement AC OEE hanya untuk Expander Kyoshin 635 (MachineLine "Expander"); nilai lain dari URL diabaikan
+        private const string OnlyMachineLine = "Expander";
+        private const string EditorMachineCode = "MCH1-01"; // kode mesin editor PLC ROHIB untuk Expander Kyoshin 6.35
+        [BindProperty(SupportsGet = true)] public string MachineLine { get; set; } = OnlyMachineLine;
         [BindProperty(SupportsGet = true)] public List<string> SelectedShifts { get; set; } = new List<string>();
+
+        public override void OnPageHandlerExecuting(Microsoft.AspNetCore.Mvc.Filters.PageHandlerExecutingContext context)
+        {
+            MachineLine = OnlyMachineLine;
+            SelectedShifts = new List<string> { "All" }; // tanpa filter shift: satu hari produksi = 07:00 - 07:00 besoknya
+            base.OnPageHandlerExecuting(context);
+        }
 
         public void OnGet()
         {
@@ -108,7 +119,7 @@ namespace MonitoringSystem.Pages.ACOEE.ProductionReport
         public IActionResult OnPost(string submitButton)
         {
             if (submitButton == "reset")
-                return RedirectToPage(new { SelectedYear = DateTime.Now.Year, SelectedMonth = DateTime.Now.Month, MachineLine = "All" });
+                return RedirectToPage(new { SelectedYear = DateTime.Now.Year, SelectedMonth = DateTime.Now.Month, MachineLine = OnlyMachineLine });
 
             return RedirectToPage(new
             {
@@ -349,12 +360,10 @@ WITH ShiftData AS (
         END AS Status_Di_Web,
         MachineCode
     FROM oeesn
-    WHERE SDate >= DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)
-      AND SDate < DATEADD(MONTH, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1))
-      AND (
-          CAST(SDate AS TIME) >= '07:00:00'
-          OR (SDate >= DATEADD(DAY, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)) AND CAST(SDate AS TIME) < '07:00:00')
-      )
+    -- Hari produksi 07:00 - 07:00 besoknya: tgl 1 jam 07:00 s/d tgl 1 bulan berikutnya jam 07:00
+    -- (malam terakhir bulan ini, 00:00-07:00 tgl 1 bulan depan, ikut hari terakhir)
+    WHERE SDate >= DATEADD(HOUR, 7, CAST(DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1) AS DATETIME))
+      AND SDate < DATEADD(HOUR, 7, CAST(DATEADD(MONTH, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)) AS DATETIME))
     {dateFilter}
     AND MachineCode = @MachineLine
 ),
@@ -465,17 +474,18 @@ SELECT DAY(ReportDate) as Day, * FROM DailyAggregates ORDER BY ReportDate ASC;";
                 var sapShiftConditions = SelectedShifts.Select(s => $"sp.Shift = '{s}'");
                 sapShiftFilter = $"AND ({string.Join(" OR ", sapShiftConditions)})";
             }
-            string sapPlanSql = $@"
-                            SELECT DAY(pp.CurrentDate) as Day,
-                                   SUM(ISNULL(sp.SapPlanNormal, 0)) as TotalSapNormal,
-                                   SUM(ISNULL(sp.SapPlanOvertime, 0)) as TotalSapOvertime
-                            FROM ProductionPlan pp
-                            INNER JOIN SapPlan sp ON pp.Id = sp.PlanId
-                            WHERE pp.CurrentDate >= DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)
-                              AND pp.CurrentDate < DATEADD(MONTH, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1))
-                              AND sp.MachineCode = @MachineLine
-                              {sapShiftFilter}
-                            GROUP BY DAY(pp.CurrentDate)";
+            // SAP Plan Expander Kyoshin 635 = isi editor Production Plan PLC ROHIB (/planmachine, tabel PlcRohibEditorRow),
+            // dijumlah per PlanDate. Editor tidak punya shift/overtime, jadi filter shift tidak berlaku dan overtime = 0.
+            string sapPlanSql = @"
+                            SELECT DAY(r.PlanDate) as Day,
+                                   SUM(r.ProdPlan) as TotalSapNormal,
+                                   0 as TotalSapOvertime
+                            FROM dbo.PlcRohibEditorRow r
+                            WHERE r.MachineCode = @EditorMachine
+                              AND r.PlanDate >= DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)
+                              AND r.PlanDate < DATEADD(MONTH, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1))
+                              AND r.ProdPlan > 0
+                            GROUP BY DAY(r.PlanDate)";
 
             try
             {
@@ -624,7 +634,7 @@ GROUP BY DAY(pp.CurrentDate)";
                         {
                             sapCmd.Parameters.AddWithValue("@SelectedYear", SelectedYear);
                             sapCmd.Parameters.AddWithValue("@SelectedMonth", SelectedMonth);
-                            sapCmd.Parameters.AddWithValue("@MachineLine", MachineLine);
+                            sapCmd.Parameters.AddWithValue("@EditorMachine", EditorMachineCode);
 
                             using (var reader = sapCmd.ExecuteReader())
                             {
@@ -646,6 +656,8 @@ GROUP BY DAY(pp.CurrentDate)";
             {
                 Console.WriteLine("Error LoadChartData: " + ex.Message);
             }
+
+            LoadKyoshinPlcChangePlan(combinedData);
 
             foreach (var data in combinedData)
             {
@@ -765,33 +777,42 @@ GROUP BY DAY(pp.CurrentDate)";
                 decimal normalUnits = 0;
                 decimal overtimeUnits = 0;
 
-                bool hasNormalActivity = data.Shift1_Unit > 0
-                                      || data.Shift2_Unit > 0
-                                      || data.Shift3_Unit > 0
-                                      || data.NonShift_Unit > 0;
-
-                if (isWeekend)
+                if (data.PlcActual.HasValue)
                 {
-                    normalUnits = 0;
-                    overtimeUnits = data.Shift1_Unit
-                                + data.Shift2_Unit
-                                + data.Shift3_Unit
-                                + data.NonShift_Unit
-                                + data.Overtime_Unit;
-                }
-                else if (hasNormalActivity)
-                {
-                    normalUnits = data.Shift1_Unit
-                                + data.Shift2_Unit
-                                + data.Shift3_Unit
-                                + data.NonShift_Unit;
-
-                    overtimeUnits = data.Overtime_Unit;
+                    // Kyoshin: Actual dari PLC per hari produksi; hari libur dihitung sebagai overtime (sama seperti data oeesn)
+                    normalUnits = isWeekend ? 0 : data.PlcActual.Value;
+                    overtimeUnits = isWeekend ? data.PlcActual.Value : 0;
                 }
                 else
                 {
-                    normalUnits = 0;
-                    overtimeUnits = data.Overtime_Unit;
+                    bool hasNormalActivity = data.Shift1_Unit > 0
+                                          || data.Shift2_Unit > 0
+                                          || data.Shift3_Unit > 0
+                                          || data.NonShift_Unit > 0;
+
+                    if (isWeekend)
+                    {
+                        normalUnits = 0;
+                        overtimeUnits = data.Shift1_Unit
+                                    + data.Shift2_Unit
+                                    + data.Shift3_Unit
+                                    + data.NonShift_Unit
+                                    + data.Overtime_Unit;
+                    }
+                    else if (hasNormalActivity)
+                    {
+                        normalUnits = data.Shift1_Unit
+                                    + data.Shift2_Unit
+                                    + data.Shift3_Unit
+                                    + data.NonShift_Unit;
+
+                        overtimeUnits = data.Overtime_Unit;
+                    }
+                    else
+                    {
+                        normalUnits = 0;
+                        overtimeUnits = data.Overtime_Unit;
+                    }
                 }
                 NormalData.Add(normalUnits);
                 OvertimeData.Add(overtimeUnits);
@@ -854,6 +875,43 @@ GROUP BY DAY(pp.CurrentDate)";
                         EffectivePlanOvertimeData.Add(effectiveOt);
                     }
                 }
+            }
+        }
+
+        // Change Plan & Actual Kyoshin per hari produksi (07:00-07:00) dari tabel PlcKyoshinChangePlan (diisi Plclogger tiap menit).
+        // Hari berjalan: Change Plan = jumlah PROD. PLAN (R20) model yang jalan; hari selesai: jumlah PLAN BY SUT (R23) akhir.
+        private void LoadKyoshinPlcChangePlan(List<DailyData> combinedData)
+        {
+            try
+            {
+                using var conn = new SqlConnection(this.connectionString);
+                conn.Open();
+                using var cmd = new SqlCommand(@"
+                    SELECT DAY(ProductionDate) AS Day, SUM(ChangePlan) AS ChangePlan, SUM(Actual) AS Actual
+                    FROM dbo.PlcKyoshinChangePlan
+                    WHERE MachineCode = @EditorMachine
+                      AND ProductionDate >= DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1)
+                      AND ProductionDate < DATEADD(MONTH, 1, DATEFROMPARTS(@SelectedYear, @SelectedMonth, 1))
+                    GROUP BY DAY(ProductionDate)", conn);
+                cmd.Parameters.AddWithValue("@EditorMachine", EditorMachineCode);
+                cmd.Parameters.AddWithValue("@SelectedYear", SelectedYear);
+                cmd.Parameters.AddWithValue("@SelectedMonth", SelectedMonth);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var d = combinedData.FirstOrDefault(x => x.Day == (int)reader["Day"]);
+                    if (d == null) continue;
+                    // Hari libur: plan masuk Overtime Plan, sejalan dengan Actual hari libur yang masuk Overtime
+                    int changePlan = Convert.ToInt32(reader["ChangePlan"]);
+                    bool isWeekend = DetermineTypeOfDay(new DateTime(SelectedYear, SelectedMonth, d.Day).DayOfWeek) == "WEEKEND";
+                    d.Plan = isWeekend ? 0 : changePlan;
+                    d.PlanOvertime = isWeekend ? changePlan : 0;
+                    d.PlcActual = Convert.ToInt32(reader["Actual"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error LoadKyoshinPlcChangePlan: " + ex.Message);
             }
         }
 

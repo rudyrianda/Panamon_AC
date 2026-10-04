@@ -44,5 +44,20 @@ namespace MonitoringSystem.Services.SapPlanImport
 
         /// <summary>Folder state (hash & status terakhir), audit log, dan hasil dry-run (relatif ke content root).</summary>
         public string StateFolder { get; set; } = "App_Data/SapPlanImport";
+
+        /// <summary>List mingguan (Senin-Minggu) dari file yang sama, ke tabel dbo.PsiWeeklyPlan.</summary>
+        public PsiWeeklyOptions PsiWeekly { get; set; } = new();
+    }
+
+    public class PsiWeeklyOptions
+    {
+        /// <summary>List mingguan ikut dibuat setiap siklus worker.</summary>
+        public bool Enabled { get; set; } = true;
+
+        /// <summary>null = ikut DryRun utama. true = hanya CSV, database tidak diubah.</summary>
+        public bool? DryRun { get; set; }
+
+        /// <summary>File urutan prioritas kategori No. 1 - No. 19 (relatif ke content root).</summary>
+        public string PriorityFile { get; set; } = "psi-weekly-priority.json";
     }
 }

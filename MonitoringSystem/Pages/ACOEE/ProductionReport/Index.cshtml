@@ -832,11 +832,7 @@
                             <div class="d-flex align-items-center gap-2">
                                 <label class="mb-0 text-white small">Machine</label>
                                 <select class="form-select form-select-sm" style="width: 240px; min-width: 240px;" id="MachineLine" name="MachineLine" asp-for="MachineLine">
-                                    <option value="All" selected>All</option>
-                                    <option value="Brazing">Evaporator</option>
-                                    <option value="Condenser">Condenser</option>
-                                    <option value="Expander">Expander Kyoshin 635</option>
-                                    <option value="Expander Li-chin">Expander Li-chin</option>
+                                    <option value="Expander" selected>Expander Kyoshin 635</option>
                                 </select>
                             </div>
 
@@ -862,26 +858,7 @@
                                 </select>
                             </div>
 
-                            <!-- SHIFT -->
-                            <div class="d-flex align-items-center gap-2">
-                                <label class="mb-0 text-white small">Shift</label>
-                                <div class="d-flex gap-2 shift-buttons-container">
-                                    <input type="checkbox" id="Shift1" name="SelectedShifts" value="1" @(Model.SelectedShifts.Contains("1") ? "checked" : "") style="display: none;">
-                                    <label for="Shift1" class="shift-button @(Model.SelectedShifts.Contains("1") ? "active" : "")">1</label>
-
-                                    <input type="checkbox" id="Shift2" name="SelectedShifts" value="2" @(Model.SelectedShifts.Contains("2") ? "checked" : "") style="display: none;">
-                                    <label for="Shift2" class="shift-button @(Model.SelectedShifts.Contains("2") ? "active" : "")">2</label>
-
-                                    <input type="checkbox" id="Shift3" name="SelectedShifts" value="3" @(Model.SelectedShifts.Contains("3") ? "checked" : "") style="display: none;">
-                                    <label for="Shift3" class="shift-button @(Model.SelectedShifts.Contains("3") ? "active" : "")">3</label>
-
-                                    <input type="checkbox" id="NonShift" name="SelectedShifts" value="NS" @(Model.SelectedShifts.Contains("NS") ? "checked" : "") style="display: none;">
-                                    <label for="NonShift" class="shift-button @(Model.SelectedShifts.Contains("NS") ? "active" : "")">NS</label>
-
-                                    <input type="checkbox" id="AllShift" name="SelectedShifts" value="All" @(Model.SelectedShifts.Contains("All") || !Model.SelectedShifts.Any() ? "checked" : "") style="display: none;">
-                                    <label for="AllShift" class="shift-button @(Model.SelectedShifts.Contains("All") || !Model.SelectedShifts.Any() ? "active" : "")">All</label>
-                                </div>
-                            </div>
+                            @* Filter shift dihapus: data per hari produksi 07:00 - 07:00 hari berikutnya *@
 
                             <button type="submit" name="submitButton" value="search" class="btn btn-sm btn-primary">Search</button>
                             <button type="button" id="toggleChangePlanButton" class="btn btn-sm btn-success">
@@ -1367,59 +1344,6 @@
                         });
                     });
 
-                        // SHIFT BUTTON LOGIC - MUTUAL EXCLUSIVITY
-            document.addEventListener('DOMContentLoaded', function() {
-                const allShiftCheckbox = document.getElementById('AllShift');
-                const individualShifts = ['Shift1', 'Shift2', 'Shift3', 'NonShift'];
-
-                // Ketika "All" diklik
-                allShiftCheckbox.addEventListener('change', function() {
-                    if (this.checked) {
-                        // Uncheck semua shift individual
-                        individualShifts.forEach(id => {
-                            const checkbox = document.getElementById(id);
-                            checkbox.checked = false;
-                            checkbox.nextElementSibling.classList.remove('active');
-                        });
-                        this.nextElementSibling.classList.add('active');
-                    } else {
-                        // Jika user uncheck "All" dan tidak ada shift lain yang dipilih
-                        const anyChecked = individualShifts.some(id =>
-                            document.getElementById(id).checked
-                        );
-                        if (!anyChecked) {
-                            // Force check "All" kembali
-                            this.checked = true;
-                            this.nextElementSibling.classList.add('active');
-                        }
-                    }
-                });
-
-                // Ketika shift individual diklik
-                individualShifts.forEach(shiftId => {
-                    const checkbox = document.getElementById(shiftId);
-                    checkbox.addEventListener('change', function() {
-                        if (this.checked) {
-                            // Uncheck "All"
-                            allShiftCheckbox.checked = false;
-                            allShiftCheckbox.nextElementSibling.classList.remove('active');
-                            this.nextElementSibling.classList.add('active');
-                        } else {
-                            this.nextElementSibling.classList.remove('active');
-
-                            // Jika semua shift individual di-uncheck
-                            const anyChecked = individualShifts.some(id =>
-                                document.getElementById(id).checked
-                            );
-                            if (!anyChecked) {
-                                // Auto-check "All"
-                                allShiftCheckbox.checked = true;
-                                allShiftCheckbox.nextElementSibling.classList.add('active');
-                            }
-                        }
-                    });
-                });
-            });
                 flatpickr(".datepicker", {
                 dateFormat: "Y-m-d",
                 allowInput: true

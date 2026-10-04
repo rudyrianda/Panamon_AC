@@ -20,6 +20,15 @@ namespace MonitoringSystem.Services
 
     public class BreakTimeService
     {
+        // Istirahat tambahan pada rentang tanggal tertentu, ditambahkan ke jadwal bawaan Shift 1 / Non-Shift
+        // (tidak dipakai jika tanggal itu punya jadwal custom di AdditionalBreakTimes).
+        // Friday: null = semua hari, true = hanya Jumat, false = selain Jumat.
+        private static readonly (DateOnly From, DateOnly To, bool? Friday, TimeSpan Start, TimeSpan End, string Reason)[] ExtraDayShiftBreaks =
+        {
+            (new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31), false, new TimeSpan(12, 15, 0), new TimeSpan(13, 0, 0), "Lunch"),
+            (new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31), true, new TimeSpan(11, 40, 0), new TimeSpan(13, 5, 0), "Lunch"),
+        };
+
         private readonly ApplicationDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly ILogger<BreakTimeService> _logger;
@@ -126,7 +135,11 @@ namespace MonitoringSystem.Services
                 generated.Add(new BreakTimeInfo { StartTime = new TimeSpan(7, 0, 0), EndTime = new TimeSpan(7, 7, 0), Reason = "Morning Assembly" });
                 generated.Add(new BreakTimeInfo { StartTime = new TimeSpan(9, 30, 0), EndTime = new TimeSpan(9, 35, 0), Reason = "Break Time" });
                 generated.Add(new BreakTimeInfo { StartTime = new TimeSpan(14, 30, 0), EndTime = new TimeSpan(14, 35, 0), Reason = "Break Time" });
-                
+
+                var isFriday = dateOnly.DayOfWeek == DayOfWeek.Friday;
+                foreach (var extra in ExtraDayShiftBreaks.Where(x => dateOnly >= x.From && dateOnly <= x.To && (x.Friday == null || x.Friday == isFriday)))
+                    generated.Add(new BreakTimeInfo { StartTime = extra.Start, EndTime = extra.End, Reason = extra.Reason });
+
                 if (hasShift1)
                     generated.Add(new BreakTimeInfo { StartTime = new TimeSpan(15, 40, 0), EndTime = new TimeSpan(15, 45, 0), Reason = "5S" });
                 else if (hasNonShift)

@@ -3,10 +3,13 @@
 @{
     ViewData["Title"] = "Machine";
 
+    // Expander Kyoshin 635 paling kiri & terbuka saat halaman dibuka (data langsung dari PLC lewat PLC ROHIB)
+    const string defaultMachine = "Expander Kyoshin 635";
     var machines = new[]
     {
+        "Expander Kyoshin 635",
         "Evaporator", "Condenser",
-        "Expander Li-chin", "Expander Kyoshin 635", "Expander Kyoshin 7",
+        "Expander Li-chin", "Expander Kyoshin 7",
         "400 Ton New", "300 Ton New", "300 Ton Old", "200 Ton", "110 Ton Amada", "110 Ton Komatsu",
         "Hairpin Bender 7row", "Hairpin Bender 14row", "Fix 80", "Fix 36", "Fix 12", "SF-250",
         "Eva Cutting New", "Eva Cutting Old", "HPV Condenser"
@@ -41,11 +44,13 @@
                     @foreach (var machine in machines)
                     {
                         var usesDatabaseModel = machine is "Evaporator" or "Condenser";
+                        var usesPlc = machine == "Expander Kyoshin 635";
                         var latestModel = usesDatabaseModel ? Model.LatestMachineModels[machine] : string.Empty;
-                        <button class="machine-tab @(machine == "Evaporator" ? "active" : null)"
+                        <button class="machine-tab @(machine == defaultMachine ? "active" : null)"
                                 type="button"
                                 data-machine="@machine"
                                 data-uses-database-model="@usesDatabaseModel.ToString().ToLowerInvariant()"
+                                data-uses-plc="@usesPlc.ToString().ToLowerInvariant()"
                                 data-model="@latestModel">
                             @if (machine == "Expander Li-chin")
                             {
@@ -77,21 +82,23 @@
             <section class="production-overview">
                 <div class="machine-title-panel">
                     <span></span>
-                    <h1 id="productionMachineTitle">EVAPORATOR</h1>
+                    <h1 id="productionMachineTitle">@defaultMachine.ToUpperInvariant()</h1>
                     <i class="fa-solid fa-chart-column"></i>
                 </div>
                 <article class="glass-panel model-panel">
                     <h2>MODEL NAME</h2>
-                    <strong id="productionModelName">@(string.IsNullOrWhiteSpace(Model.LatestMachineModels["Evaporator"]) ? "-" : Model.LatestMachineModels["Evaporator"])</strong>
+                    <strong id="productionModelName">-</strong>
                     <dl>
                         <div><dt>PRODUCTION PLAN</dt><dd><span>:</span> <output id="productionPlanValue">...</output></dd></div>
                         <div><dt>PLAN BY SUT</dt><dd><span>:</span> <output id="planBySutValue">1170</output></dd></div>
                         <div><dt>ACTUAL</dt><dd><span>:</span> <output id="productionActualValue">...</output></dd></div>
                         <div><dt>DIFFERENCE</dt><dd id="productionDifference"><span>:</span> <output id="productionDifferenceValue">...</output></dd></div>
-                        <div><dt>REMAINING</dt><dd id="productionRemainingValue"><span>:</span> <output>...</output></dd></div>
+                        @* Tab PLC (Expander Kyoshin 635): baris ini jadi LOSS TIME (R50); tab lain REMAINING *@
+                        <div><dt id="productionRemainingLabel">REMAINING</dt><dd id="productionRemainingValue"><span>:</span> <output>...</output></dd></div>
                         <div>
                             <dt>TOTAL NG</dt>
-                            <dd class="under-development-value">
+                            <dd id="productionTotalNgPlc" hidden><span>:</span> <output id="productionTotalNgValue">-</output></dd>
+                            <dd id="productionTotalNgDev" class="under-development-value">
                                 <span>:</span>
                                 <small><i class="fa-solid fa-gear"></i><b>Under Development</b></small>
                             </dd>
@@ -130,7 +137,7 @@
                     </header>
                     <div class="chart-body">
                         <span class="axis-title axis-y">Quantity</span>
-                        <svg class="plan-chart" viewBox="0 0 910 250" preserveAspectRatio="none" role="img" aria-label="Plan and actual production chart">
+                        <svg class="plan-chart" id="planActualChart" viewBox="0 0 910 250" preserveAspectRatio="none" role="img" aria-label="Plan and actual production chart">
                             <defs>
                                 <linearGradient id="planGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#287cf4" stop-opacity=".65" /><stop offset="1" stop-color="#287cf4" stop-opacity=".12" /></linearGradient>
                                 <linearGradient id="actualGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#11c2bd" stop-opacity=".45" /><stop offset="1" stop-color="#11c2bd" stop-opacity=".08" /></linearGradient>
@@ -139,14 +146,14 @@
                                 <path d="M56 14H894 M56 114H894 M56 214H894" />
                                 <path d="M56 14V214 M307.4 14V214 M558.8 14V214 M810.2 14V214 M894 14V214" />
                             </g>
-                            <g class="y-labels"><text x="46" y="19">100</text><text x="46" y="119">50</text><text x="46" y="219">0</text></g>
-                            <path class="plan-fill" d="M56 214 L307.4 166 L558.8 118 L810.2 70 L894 54 L894 214 L56 214 Z" />
-                            <path class="actual-fill" d="M56 214 L307.4 171.33 L558.8 128.67 L810.2 86 L894 71.78 L894 214 L56 214 Z" />
-                            <path class="plan-line" d="M56 214 L307.4 166 L558.8 118 L810.2 70 L894 54" />
-                            <path class="actual-line" d="M56 214 L307.4 171.33 L558.8 128.67 L810.2 86 L894 71.78" />
-                            <g class="plan-points"><circle cx="56" cy="214" r="4"/><circle cx="307.4" cy="166" r="4"/><circle cx="558.8" cy="118" r="4"/><circle cx="810.2" cy="70" r="4"/><circle cx="894" cy="54" r="4"/></g>
-                            <g class="actual-points"><circle cx="56" cy="214" r="4"/><circle cx="307.4" cy="171.33" r="4"/><circle cx="558.8" cy="128.67" r="4"/><circle cx="810.2" cy="86" r="4"/><circle cx="894" cy="71.78" r="4"/></g>
-                            <g class="x-labels"><text x="56" y="234">07:00</text><text x="307.4" y="234">08:00</text><text x="558.8" y="234">09:00</text><text x="810.2" y="234">10:00</text><text x="894" y="234">10:20</text></g>
+                            <g class="y-labels" id="chartYLabels"><text x="46" y="19">100</text><text x="46" y="119">50</text><text x="46" y="219">0</text></g>
+                            <path class="plan-fill" id="chartPlanFill" d="M56 214 L307.4 166 L558.8 118 L810.2 70 L894 54 L894 214 L56 214 Z" />
+                            <path class="actual-fill" id="chartActualFill" d="M56 214 L307.4 171.33 L558.8 128.67 L810.2 86 L894 71.78 L894 214 L56 214 Z" />
+                            <path class="plan-line" id="chartPlanLine" d="M56 214 L307.4 166 L558.8 118 L810.2 70 L894 54" />
+                            <path class="actual-line" id="chartActualLine" d="M56 214 L307.4 171.33 L558.8 128.67 L810.2 86 L894 71.78" />
+                            <g class="plan-points" id="chartPlanPoints"><circle cx="56" cy="214" r="4"/><circle cx="307.4" cy="166" r="4"/><circle cx="558.8" cy="118" r="4"/><circle cx="810.2" cy="70" r="4"/><circle cx="894" cy="54" r="4"/></g>
+                            <g class="actual-points" id="chartActualPoints"><circle cx="56" cy="214" r="4"/><circle cx="307.4" cy="171.33" r="4"/><circle cx="558.8" cy="128.67" r="4"/><circle cx="810.2" cy="86" r="4"/><circle cx="894" cy="71.78" r="4"/></g>
+                            <g class="x-labels" id="chartXLabels"><text x="56" y="234">07:00</text><text x="307.4" y="234">08:00</text><text x="558.8" y="234">09:00</text><text x="810.2" y="234">10:00</text><text x="894" y="234">10:20</text></g>
                         </svg>
                         <span class="axis-title axis-x">Hour</span>
                     </div>
@@ -155,17 +162,18 @@
 
             <section class="detail-grid">
                 <article class="glass-panel shift-summary">
+                    @* TOTAL LOSS TIME: tab PLC (Expander Kyoshin 635) mengisi shift yang sedang berjalan dari LOSS TIME R50 *@
                     <div class="shift-block shift-one">
                         <strong><i></i>SHIFT #1</strong>
-                        <dl><div><dt>WORKING TIME</dt><dd>: <b>473</b></dd></div><div><dt>STOP TIME</dt><dd>: <b>7</b></dd></div><div><dt>LOAD TIME</dt><dd>: <b>159</b></dd></div></dl>
+                        <dl><div><dt>WORKING TIME</dt><dd>: <b id="shiftWorkTime1">473</b></dd></div><div><dt>TOTAL LOSS TIME</dt><dd>: <b id="shiftStopTime1">7</b></dd></div><div><dt>LOAD TIME</dt><dd>: <b id="shiftLoadTime1">159</b></dd></div></dl>
                     </div>
                     <div class="shift-block shift-two">
                         <strong><i></i>SHIFT #2</strong>
-                        <dl><div><dt>WORKING TIME</dt><dd>: 0</dd></div><div><dt>STOP TIME</dt><dd>: 0</dd></div><div><dt>LOAD TIME</dt><dd>: 0</dd></div></dl>
+                        <dl><div><dt>WORKING TIME</dt><dd>: <span id="shiftWorkTime2">-</span></dd></div><div><dt>TOTAL LOSS TIME</dt><dd>: <span id="shiftStopTime2">0</span></dd></div><div><dt>LOAD TIME</dt><dd>: <span id="shiftLoadTime2">0</span></dd></div></dl>
                     </div>
                     <div class="shift-block shift-three">
                         <strong><i></i>SHIFT #3</strong>
-                        <dl><div><dt>WORKING TIME</dt><dd>: 0</dd></div><div><dt>STOP TIME</dt><dd>: 0</dd></div><div><dt>LOAD TIME</dt><dd>: 0</dd></div></dl>
+                        <dl><div><dt>WORKING TIME</dt><dd>: <span id="shiftWorkTime3">-</span></dd></div><div><dt>TOTAL LOSS TIME</dt><dd>: <span id="shiftStopTime3">0</span></dd></div><div><dt>LOAD TIME</dt><dd>: <span id="shiftLoadTime3">0</span></dd></div></dl>
                     </div>
                 </article>
 
@@ -180,7 +188,7 @@
                         <div class="timeline-row shift-@shift">
                             <h3>SHIFT @shift</h3>
                             <div class="timeline-wrap">
-                                <div class="timeline-track">
+                                <div class="timeline-track" id="timelineTrack@(shift)">
                                     @if (shift == 1)
                                     {
                                         <i class="segment run-segment" style="--left:0%;--width:8.5714%"></i><i class="segment stop-segment" style="--left:8.5714%;--width:1.3333%"></i><i class="segment run-segment" style="--left:9.9048%;--width:18.6666%"></i><i class="segment break-segment" style="--left:28.5714%;--width:0.9524%"></i><i class="segment run-segment" style="--left:29.5238%;--width:8.5714%"></i>

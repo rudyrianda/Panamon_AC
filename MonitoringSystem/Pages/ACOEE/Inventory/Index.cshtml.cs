@@ -58,13 +58,9 @@ namespace MonitoringSystem.Pages.ACOEE.Inventory
 
                 using var cmd = conn.CreateCommand();
 
-                // Inventory ACOEE hanya mengambil data dari Brazing dan Expander.
-                // Nilai filter lama/asing dari query string kembali ke pilihan All.
-                var selectedMachine = string.Equals(FilterMachineLine, "Brazing", StringComparison.OrdinalIgnoreCase)
-                    ? "Brazing"
-                    : string.Equals(FilterMachineLine, "Expander", StringComparison.OrdinalIgnoreCase)
-                        ? "Expander"
-                        : null;
+                // Inventory ACOEE hanya untuk Expander Kyoshin 635 (MachineCode "Expander");
+                // nilai filter lain dari query string diabaikan.
+                string? selectedMachine = "Expander";
                 FilterMachineLine = selectedMachine;
 
                 var machineFilter = selectedMachine == null
