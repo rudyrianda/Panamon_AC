@@ -624,7 +624,7 @@ main.pb-5 {
                             }
 
                                                             <tr class="@rowClass">
-                                                                <td class="text-start fw-bold">@cat</td>
+                                                                <td class="text-start fw-bold">@MonitoringSystem.Pages.ACOEE.AcOeeLossCategories.DisplayName(cat)</td>
                                 @for (int i = 0; i < 12; i++)
                                 {
                                     var planVal = Model.DetailPlans.ContainsKey(cat) ? Model.DetailPlans[cat][i] : 0;
@@ -750,11 +750,11 @@ main.pb-5 {
         const activeCategories = Object.keys(chartData.Actuals);
 
         activeCategories.forEach((cat) => {
-            let color = categoryColors[cat] || barColors[colorIdx % barColors.length];
+            let color = (chartData.Colors && chartData.Colors[cat]) || categoryColors[cat] || barColors[colorIdx % barColors.length];
 
             bpDatasetIndices.push(datasets.length);
             datasets.push({
-                type: 'bar', label: cat + ' (Plan)',
+                type: 'bar', label: ((chartData.DisplayNames && chartData.DisplayNames[cat]) || cat) + ' (Plan)',
                 data: chartData.Plans[cat],
                 backgroundColor: color,
                 borderColor: color,
@@ -764,7 +764,7 @@ main.pb-5 {
             });
 
             datasets.push({
-                type: 'bar', label: cat + ' (Act)',
+                type: 'bar', label: ((chartData.DisplayNames && chartData.DisplayNames[cat]) || cat) + ' (Act)',
                 data: chartData.Actuals[cat],
                 backgroundColor: color,
                 borderColor: color,

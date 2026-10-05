@@ -92,8 +92,13 @@ namespace MonitoringSystem.Pages.ACOEE.Quality
             LoadData();
         }
 
+        // Quality AC OEE hanya untuk line CU (MCH1-01); nilai lain dari form/URL diabaikan
+        private const string OnlyLine = "MCH1-01";
+
         private void LoadData()
         {
+            MachineCode = OnlyLine;
+            if (string.IsNullOrWhiteSpace(Station)) Station = "Expander 635"; // stasiun default saat halaman dibuka
             TotalPlan = 0;
             DefectQuantity = 0;
             DefectRatio = 100;
@@ -142,19 +147,19 @@ namespace MonitoringSystem.Pages.ACOEE.Quality
                         }
                     }
 
-                    // Data quality AC OEE belum dihubungkan ke kategori machine baru.
-                    // Jangan mengambil data line CU/CS secara tersembunyi ketika selector line dihapus.
                     if (string.IsNullOrWhiteSpace(MachineCode))
                         return;
 
+                    // TOTAL OUTPUT = actual dari PLC (R22) per model per hari produksi 07:00-07:00,
+                    // tabel PlcKyoshinDailyOutput yang diisi Plclogger tiap menit
                     string getTotalProduction = @"
                     SELECT
-                         COUNT(TotalUnit)
+                         ISNULL(SUM(Actual), 0)
                     FROM
-                        OEESN
+                        dbo.PlcKyoshinDailyOutput
                     WHERE
                         MachineCode = @MachineCode
-                       AND CAST(Date AS DATE) BETWEEN @StartDate AND @EndDate;";
+                       AND ProductionDate BETWEEN @StartDate AND @EndDate;";
 
                     using (SqlCommand command = new SqlCommand(getTotalProduction, connection))
                     {
@@ -336,13 +341,9 @@ namespace MonitoringSystem.Pages.ACOEE.Quality
                     }
 
                     List<string> masterStations = new List<string> {
-                        "Chassis",
-                        "PREPARING",
-                        "GAS LEAK",
-                        "STARTING - RUNNING",
-                        "INNER",
-                        "FINAL",
-                        "DETAIL"
+                        "Fix 80",
+                        "Expander 635",
+                        "Condenser"
                     };
 
                     if (string.IsNullOrEmpty(Station))

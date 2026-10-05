@@ -880,8 +880,9 @@
         overscroll-behavior: contain;
     }
 
+    /* Tinggi tabel mengikuti isi: baris tetap setinggi baris Panamon walau datanya sedikit (tidak melar mengisi kotak) */
     .loss-dashboard .loss-detail-card #lossTimeTable {
-        height: 100%;
+        height: auto;
     }
 
     .loss-dashboard .loss-detail-card #lossTimeTable.compact-filter-result {
@@ -1049,7 +1050,7 @@
                             [Machine@(Model.SelectedMachineName != "All" ? $": {Model.SelectedMachineName}" : "")]
                         </small>
                         <span id="mttBadge" class="mtt-info-badge" style="display:none;">
-                            <span class="mtt-dot"></span> Machine &amp; Tools Trouble Only
+                            <span class="mtt-dot"></span> Machine Trouble Only
                         </span>
                     </h5>
 
@@ -1128,7 +1129,7 @@
                         <select id="chartCategoryFilter" data-initial-filter="@Model.ChartCategoryFilter" onchange="onChartCategoryFilterChange(this.value)"
                                  title="Filter chart view">
                             <option value="all">All Categories</option>
-                            <option value="mtt">Machine &amp; Tools Trouble</option>
+                            <option value="mtt">Machine Trouble</option>
                         </select>
                     </div>
                 </div>
@@ -1170,6 +1171,8 @@
                                     <th>No.</th>
                                     <th>Date</th>
                                     <th>Category</th>
+                                    <th>Start</th>
+                                    <th>End</th>
                                     <th>Duration</th>
                                     <th>Location</th>
                                     <th>Shift</th>
@@ -1179,8 +1182,8 @@
                             <tbody id="lossTimeTableBody">
                                 @foreach (var item in Model.LossTimeData.Select((data, index) => new { Data = data, Index = index + 1 }))
                                 {
-                                    bool isMTT = item.Data.Category == "Machine & Tools Trouble";
-                                    <tr data-category="@item.Data.Category" class="@(isMTT ? "mtt-row" : "non-mtt-row")">
+                                    bool isMTT = item.Data.Category == MonitoringSystem.Pages.ACOEE.LossTime.IndexModel.MttCategory;
+                                    <tr data-category="@item.Data.Category" data-day="@item.Data.Date.Day" class="@(isMTT ? "mtt-row" : "non-mtt-row")">
                                         <td>@item.Index</td>
                                         <td>@item.Data.Date.ToString("dd-MM-yyyy")</td>
                                         <td>
@@ -1196,6 +1199,9 @@
                                                 @(Model.CategoryFullNames.ContainsKey(item.Data.Category) ? Model.CategoryFullNames[item.Data.Category] : item.Data.Category)
                                             }
                                         </td>
+                                        @* Data mesin lama tanpa jam mulai/selesai tampil "-" *@
+                                        <td>@(item.Data.Start == TimeSpan.Zero && item.Data.End == TimeSpan.Zero ? "-" : item.Data.Start.ToString(@"hh\:mm\:ss"))</td>
+                                        <td>@(item.Data.Start == TimeSpan.Zero && item.Data.End == TimeSpan.Zero ? "-" : item.Data.End.ToString(@"hh\:mm\:ss"))</td>
                                         <td>@Math.Round(item.Data.Duration / 60.0, 1) min</td>
                                         <td>@item.Data.Location</td>
                                         <td>@item.Data.Shift</td>
@@ -1205,7 +1211,7 @@
                                                     data-bs-target="#detailedReasonModal"
                                                     data-reason="@item.Data.DetailedReason"
                                                     data-record-id="@item.Data.RecordId"
-                                                    data-record-source="Machine"
+                                                    data-record-source="@item.Data.RecordSource"
                                                     title="@(item.Data.HasAttachment ? "Attachment uploaded — click to view or replace" : "View detail and upload attachment")">
                                                 View
                                             </button>
@@ -1222,9 +1228,12 @@
                                         <td>
                                             <span style="display:inline-flex;align-items:center;gap:4px;">
                                                 <span style="width:6px;height:6px;border-radius:50%;background:#C9CBCF;flex-shrink:0;"></span>
-                                                Machine &amp; Tools Trouble
+                                                Machine Trouble
                                             </span>
                                         </td>
+                                        @* Data mesin lama tanpa jam mulai/selesai tampil "-" *@
+                                        <td>@(item.Data.Start == TimeSpan.Zero && item.Data.End == TimeSpan.Zero ? "-" : item.Data.Start.ToString(@"hh\:mm\:ss"))</td>
+                                        <td>@(item.Data.Start == TimeSpan.Zero && item.Data.End == TimeSpan.Zero ? "-" : item.Data.End.ToString(@"hh\:mm\:ss"))</td>
                                         <td>@Math.Round(item.Data.Duration / 60.0, 1) min</td>
                                         <td>@item.Data.Location</td>
                                         <td>@item.Data.Shift</td>
@@ -1234,7 +1243,7 @@
                                                     data-bs-target="#detailedReasonModal"
                                                     data-reason="@item.Data.DetailedReason"
                                                     data-record-id="@item.Data.RecordId"
-                                                    data-record-source="Machine"
+                                                    data-record-source="@item.Data.RecordSource"
                                                     title="@(item.Data.HasAttachment ? "Attachment uploaded — click to view or replace" : "View detail and upload attachment")">
                                                 View
                                             </button>
@@ -1445,7 +1454,10 @@
         }
     };
 
-    const MTT_CATEGORY_NAME = "Machine & Tools Trouble";
+    const MTT_CATEGORY_NAME = "@MonitoringSystem.Pages.ACOEE.LossTime.IndexModel.MttCategory";
+    // Nama kategori untuk tampilan ("MODEL CHANGE" -> "Model Change"); data & pencocokan tetap memakai nama asli
+    const CATEGORY_DISPLAY_NAMES = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CategoryFullNames));
+    const displayCategory = (name) => CATEGORY_DISPLAY_NAMES[name] || name;
 
     let currentCategoryFilter = 'all';
     let summaryChartInstance = null;
@@ -1486,6 +1498,7 @@
     }
 
     function onChartCategoryFilterChange(mode) {
+        if (activeDailyFilter) applyDailyFilterToTable(null); // filter klik bar Daily dilepas saat ganti mode
         currentCategoryFilter = mode;
         activeMttSubCategoryFilter = null;
         const dateRangeCategoryFilter = document.getElementById('dateRangeCategoryFilter');
@@ -1575,7 +1588,7 @@
             summaryChartInstance.options.plugins.legend.display = false;
             summaryChartInstance.options.plugins.tooltip.callbacks.title = (ctx) => {
                 const label = (summaryChartData.fullLabels || [])[ctx[0].dataIndex] || '';
-                return label === MTT_CATEGORY_NAME ? '⚙️ ' + label : label;
+                return label === MTT_CATEGORY_NAME ? '⚙️ ' + displayCategory(label) : displayCategory(label);
             };
             summaryChartInstance.options.plugins.tooltip.callbacks.label = (c) => `${c.dataset.label}: ${c.raw} min`;
             summaryChartInstance.options.plugins.tooltip.callbacks.footer = (tooltipItems) => {
@@ -1609,7 +1622,7 @@
             `;
         } else {
             mttBadge.style.display = 'none';
-            mttBadge.innerHTML = `<span class="mtt-dot"></span> Machine &amp; Tools Trouble Only`;
+            mttBadge.innerHTML = `<span class="mtt-dot"></span> Machine Trouble Only`;
         }
     }
 
@@ -1623,7 +1636,7 @@
         const mttTopTotal = document.getElementById('mttTopSubCatTotal');
 
         if (mode === 'mtt') {
-            if (titleEl) titleEl.innerHTML = `Daily Loss Time — ${monthName} <small class="ms-2 opacity-75" style="font-size:11px;">⚙️ Machine &amp; Tools Trouble Breakdown</small>`;
+            if (titleEl) titleEl.innerHTML = `Daily Loss Time — ${monthName} <small class="ms-2 opacity-75" style="font-size:11px;">⚙️ Machine Trouble Breakdown</small>`;
 
             const mttDatasets = (mttDailyChartData.datasets || []);
 
@@ -1780,6 +1793,59 @@
                 scrollFrame = null;
             });
         }, { passive: true });
+    }
+
+    // Klik bar di grafik Daily Loss Time: tabel Detail Loss Time hanya menampilkan tanggal + kategori bar itu.
+    // Klik bar yang sama lagi, area kosong grafik, atau tanda ✕ di badge = tampilkan semua lagi.
+    let activeDailyFilter = null;
+
+    function applyDailyFilterToTable(filter) {
+        activeDailyFilter = filter;
+        const rows = document.querySelectorAll('#lossTimeTableBody > tr');
+        const badge = document.getElementById('tableFilterBadge');
+        const lossTimeTable = document.getElementById('lossTimeTable');
+        lossTimeTable?.classList.toggle('compact-filter-result', Boolean(filter));
+
+        if (!filter) {
+            rows.forEach(r => r.style.display = '');
+            if (badge && currentCategoryFilter !== 'mtt') badge.style.display = 'none';
+            const totalLabel = document.getElementById('displayedRecordTotal');
+            updateDisplayedRecordTotal(Number(totalLabel?.dataset.allCount) || rows.length);
+        } else {
+            let visibleCount = 0;
+            rows.forEach(r => {
+                const match = r.dataset.day === String(filter.day)
+                    && (r.dataset.category || '').toLowerCase() === filter.category.toLowerCase();
+                r.style.display = match ? '' : 'none';
+                if (match) visibleCount++;
+            });
+            if (badge) {
+                badge.textContent = `Tgl ${filter.day} · ${filter.category} ✕`;
+                badge.title = 'Klik untuk menampilkan semua data';
+                badge.style.cursor = 'pointer';
+                badge.style.display = 'inline';
+                badge.onclick = () => applyDailyFilterToTable(null);
+            }
+            updateDisplayedRecordTotal(visibleCount);
+        }
+
+        const container = document.querySelector('.loss-detail-card .table-responsive');
+        if (container) container.scrollTop = 0;
+        updateLossScrollNavigation(1);
+    }
+
+    function onDailyChartClick(evt) {
+        if (!dailyChartInstance || currentCategoryFilter !== 'all') return;
+        const elements = dailyChartInstance.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+        if (!elements.length) {
+            if (activeDailyFilter) applyDailyFilterToTable(null);
+            return;
+        }
+        const day = dailyChartInstance.data.labels[elements[0].index];
+        const category = dailyChartInstance.data.datasets[elements[0].datasetIndex]?.label;
+        if (!day || !category) return;
+        const same = activeDailyFilter && activeDailyFilter.day === String(day) && activeDailyFilter.category === category;
+        applyDailyFilterToTable(same ? null : { day: String(day), category: category });
     }
 
     function applyMttSubCategoryFilterToTable(subCat) {
@@ -2000,7 +2066,7 @@
                                     title: (ctx) => {
                                         const label = (summaryChartData.fullLabels || [])[ctx[0].dataIndex] || '';
                                         const isMTT = label === MTT_CATEGORY_NAME;
-                                        return isMTT ? '⚙️ ' + label : label;
+                                        return isMTT ? '⚙️ ' + displayCategory(label) : displayCategory(label);
                                     },
                                     label: (c) => `${c.dataset.label}: ${c.raw} min`,
                                     footer: (tooltipItems) => {
@@ -2027,7 +2093,7 @@
                                     },
                                     maxRotation: 0, minRotation: 0,
                                     callback: function (value) {
-                                        const label = this.getLabelForValue(value);
+                                        const label = displayCategory(this.getLabelForValue(value));
                                         const words = label.split(' ');
                                         const lines = [];
                                         let current = '';
@@ -2160,6 +2226,12 @@
                                 grid: { color: colors.gridColor },
                                 title: { display: true, text: 'Duration (Min)', color: colors.textColor }
                             }
+                        },
+                        onClick: onDailyChartClick,
+                        onHover: (evt, elements, chart) => {
+                            const hit = currentCategoryFilter === 'all'
+                                && chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true).length > 0;
+                            chart.canvas.style.cursor = hit ? 'pointer' : 'default';
                         }
                     }
                 });
@@ -2398,8 +2470,10 @@
         if(btnUploadFile && hiddenFileInput) {
             btnUploadFile.addEventListener('click', () => {
                 const recordSource = modal.getAttribute('data-current-record-source');
-                if(recordSource !== 'Assembly') {
-                    showCustomToast('Upload file hanya didukung untuk data Assembly', 'error');
+                const recordId = Number(modal.getAttribute('data-current-record-id') || 0);
+                // Lampiran bisa untuk data Assembly dan kejadian loss mesin dari PLC (PlcKyoshin)
+                if((recordSource !== 'Assembly' && recordSource !== 'PlcKyoshin') || recordId <= 0) {
+                    showCustomToast('Upload file hanya didukung untuk data Assembly dan loss time mesin (PLC)', 'error');
                     return;
                 }
                 hiddenFileInput.click();

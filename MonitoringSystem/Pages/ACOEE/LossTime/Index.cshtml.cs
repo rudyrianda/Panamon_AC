@@ -71,81 +71,28 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
         public List<string> MachineNameList { get; set; } = new List<string>();
         public List<LossTimeRecord> AllMttRecords { get; set; } = new List<LossTimeRecord>();
 
-        public List<string> AllCategories { get; set; } = new List<string>
-        {
-            "Model Change Loss",
-            "Mold Change Loss",
-            "Gawse - External Bodies",
-            "Material Shortage External",
-            "Material Shortage Internal",
-            "Material Shortage Inhouse",
-            "Man Power Adjustment",
-            "Quality Trouble",
-            "Machine & Tools Trouble",
-            "Set Repairing Loss",
-            "Rework",
-            "General Assembly",
-            "Loss Awal Hari",
-            "Morning Assembly",
-            "Other"
-        };
+        // Kategori Detail Loss Time AC OEE = nama kotak reason layar GOT LOSS TIME yang berlaku di PLC saat ini
+        // (lihat AcOeeLossCategories, sama dengan Trend Loss Time) + nama lama yang masih punya data + OTHER.
+        // Data dengan nama kategori lama AC OEE dipetakan ke reason GOT di CategorizeReason.
+        public const string MttCategory = AcOeeLossCategories.MachineTrouble;
 
-        public Dictionary<string, string> CategoryAbbreviations = new()
-        {
-            { "Model Change Loss",          "Change Model" },
-            { "Mold Change Loss",           "Mold Change" },
-            { "Gawse - External Bodies",    "Gawse Ext" },
-            { "Material Shortage External", "Mtrl Shortage Ex" },
-            { "Man Power Adjustment",       "MP Adjust" },
-            { "Material Shortage Internal", "Mtrl Shortage Int" },
-            { "Material Shortage Inhouse",  "Mtrl Shortage Inhs" },
-            { "Quality Trouble",            "Quality Trouble" },
-            { "Machine & Tools Trouble",    "M/C Trouble" },
-            { "Set Repairing Loss",         "Set Repair" },
-            { "Rework",                     "Rework" },
-            { "General Assembly",           "General Assy" },
-            { "Loss Awal Hari",             "Loss Awal Hari" },
-            { "Morning Assembly",           "Morning Assy" },
-            { "Other",                      "Other" }
-        };
+        public List<string> AllCategories { get; set; } = AcOeeLossCategories.Names.ToList();
 
-        public Dictionary<string, string> CategoryFullNames = new()
-        {
-            { "Model Change Loss",          "Model Change Loss" },
-            { "Mold Change Loss",           "Mold Change Loss" },
-            { "Gawse - External Bodies",    "Gawse - External Bodies" },
-            { "Material Shortage External", "Material Shortage External" },
-            { "Man Power Adjustment",       "Man Power Adjustment" },
-            { "Material Shortage Internal", "Material Shortage Internal" },
-            { "Material Shortage Inhouse",  "Material Shortage Inhouse" },
-            { "Quality Trouble",            "Quality Trouble" },
-            { "Machine & Tools Trouble",    "Machine & Tools Trouble" },
-            { "Set Repairing Loss",         "Set Repairing Loss" },
-            { "Rework",                     "Rework" },
-            { "General Assembly",           "General Assembly" },
-            { "Loss Awal Hari",             "Loss Awal Hari" },
-            { "Morning Assembly",           "Morning Assembly" },
-            { "Other",                      "Other" }
-        };
+        public Dictionary<string, string> CategoryFullNames { get; private set; } = new();
 
-        private readonly Dictionary<string, string> CategoryColors = new Dictionary<string, string>
+        private Dictionary<string, string> CategoryColors = new();
+
+        private List<AcOeeLossCategories.Slot>? _gotSlots;
+        private List<AcOeeLossCategories.Slot> GotSlots => _gotSlots ??= AcOeeLossCategories.LoadCurrentSlots(connectionString);
+
+        // Susun daftar kategori & warna dari kotak GOT saat ini dan kategori yang punya data di periode ini
+        private void SetCategoryList(IEnumerable<LossTimeRecord> records)
         {
-            { "Model Change Loss",          "#FF6384" },
-            { "Mold Change Loss",           "#FF8FAB" },
-            { "Gawse - External Bodies",    "#36A2EB" },
-            { "Material Shortage External", "#1A6EBF" },
-            { "Man Power Adjustment",       "#FFCE56" },
-            { "Material Shortage Internal", "#4BC0C0" },
-            { "Material Shortage Inhouse",  "#9966FF" },
-            { "Quality Trouble",            "#FF9F40" },
-            { "Machine & Tools Trouble",    "#C9CBCF" },
-            { "Set Repairing Loss",         "#A0A0A0" },
-            { "Rework",                     "#FF9F80" },
-            { "General Assembly",           "#198754" },
-            { "Loss Awal Hari",             "#20C997" },
-            { "Morning Assembly",           "#0D6EFD" },
-            { "Other",                      "#77DD77" }
-        };
+            AllCategories = AcOeeLossCategories.BuildCategoryList(GotSlots, records.Select(r => r.Category));
+            CategoryColors = AcOeeLossCategories.BuildColors(GotSlots, AllCategories);
+            // Nama tampilan ("Model Change"); kunci tetap nama asli PLC
+            CategoryFullNames = AllCategories.ToDictionary(c => c, c => AcOeeLossCategories.DisplayName(c), StringComparer.OrdinalIgnoreCase);
+        }
 
         // ? NEW: MTT sub-category colors palette
         private readonly Dictionary<string, string> MttSubCategoryColors = new Dictionary<string, string>
@@ -261,9 +208,21 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
                 .ToArray();
         }
 
-        private void PopulateAttachmentStatus(IEnumerable<LossTimeRecord> records, string recordSource)
+        // Sumber data yang bisa diberi lampiran: Assembly dan kejadian loss PLC Kyoshin (PlcKyoshinLossEvent.Id)
+        public const string PlcLossRecordSource = "PlcKyoshin";
+        private static bool SupportsAttachment(string? recordSource) =>
+            recordSource == "Assembly" || recordSource == PlcLossRecordSource;
+
+        private void PopulateAttachmentStatus(IEnumerable<LossTimeRecord> records, string selectedSource)
         {
-            if (!string.Equals(recordSource, "Assembly", StringComparison.OrdinalIgnoreCase)) return;
+            // Data PLC Kyoshin punya sumber sendiri; selain itu ikut sumber yang dipilih di filter
+            foreach (var group in records.GroupBy(r => r.RecordSource == PlcLossRecordSource ? PlcLossRecordSource : selectedSource))
+                PopulateAttachmentStatusForSource(group, group.Key);
+        }
+
+        private void PopulateAttachmentStatusForSource(IEnumerable<LossTimeRecord> records, string recordSource)
+        {
+            if (!SupportsAttachment(recordSource)) return;
 
             var recordList = records
                 .Where(record => record.RecordId > 0)
@@ -481,6 +440,7 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
             var displayedRecords = ApplyDisplayDateRange(currentRecords);
             var displayedLastMonthRecords = ApplyEquivalentPreviousMonthRange(lastMonthRecords);
 
+            SetCategoryList(displayedRecords.Concat(displayedLastMonthRecords));
             PrepareSummaryChartData(displayedRecords, displayedLastMonthRecords);
             PrepareDailyChartData(displayedRecords);
             PrepareMttDailyChartData(displayedRecords);
@@ -496,7 +456,7 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
             Console.WriteLine($"? LoadDataFromAssembly: {displayedRecords.Count} displayed records in {sw.ElapsedMilliseconds}ms");
 
             AllMttRecords = displayedRecords
-    .Where(r => r.Category == "Machine & Tools Trouble")
+    .Where(r => r.Category == MttCategory)
     .OrderByDescending(r => r.Date)
     .ThenBy(r => r.Location)
     .ToList();
@@ -534,7 +494,7 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
                 {
                     RecordId = actual.Id,   // Id dari LossTimeActuals (EF primary key)
                     Date = new DateTime(actual.Year, actual.Month, actual.Day),
-                    Category = actual.Category,
+                    Category = CategorizeReason(actual.Category),
                     Duration = (int)(actual.Minutes * 60),
                     Location = actual.MachineLine,
                     Shift = string.IsNullOrEmpty(actual.Shift) ? "1" : actual.Shift,
@@ -564,6 +524,7 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
             var displayedRecords = ApplyDisplayDateRange(currentRecords);
             var displayedLastMonthRecords = ApplyEquivalentPreviousMonthRange(lastMonthRecords);
 
+            SetCategoryList(displayedRecords.Concat(displayedLastMonthRecords));
             PrepareSummaryChartData(displayedRecords, displayedLastMonthRecords);
             PrepareDailyChartData(displayedRecords);
             PrepareMttDailyChartData(displayedRecords);
@@ -578,7 +539,7 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
             Console.WriteLine($"? LoadDataFromMachine: {LossTimeData.Count} records in {sw.ElapsedMilliseconds}ms");
 
             AllMttRecords = displayedRecords
-    .Where(r => r.Category == "Machine & Tools Trouble")
+    .Where(r => r.Category == MttCategory)
     .OrderByDescending(r => r.Date)
     .ThenBy(r => r.Location)
     .ToList();
@@ -649,7 +610,114 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
                 }
             }
             catch (Exception ex) { Console.WriteLine($"? GetMachineRecords error: {ex.Message}\n{ex.StackTrace}"); }
+            records.AddRange(GetKyoshinPlcLossRecords(start, end));
             return records;
+        }
+
+        // Kejadian loss Expander Kyoshin 6.35 dari PLC (timer R103, dicatat Plclogger ke PROMOSYS.dbo.PlcKyoshinLossEvent).
+        // Reason = kotak reason layar GOT LOSS TIME yang durasinya bertambah selama loss; kategori dari ForPlcReason.
+        // Detail: nama reason; untuk MODEL CHANGE "Model change loss dari <model sebelumnya> ke <model sesudahnya>"
+        // (dari riwayat model PLC per menit di PlcKyoshinTrend sekitar awal & akhir loss).
+        private List<LossTimeRecord> GetKyoshinPlcLossRecords(DateTime start, DateTime end)
+        {
+            var records = new List<LossTimeRecord>();
+            if (!SelectedMachineName.Trim().StartsWith("Expander Kyoshin 6", StringComparison.OrdinalIgnoreCase)) return records;
+            try
+            {
+                using var conn = new SqlConnection(connectionString);
+                conn.Open();
+                var rows = new List<(LossTimeRecord Record, bool Continuation, bool Running, string ReasonDetail, DateTime GroupStart, DateTime? GroupEnd)>();
+                using (var cmd = new SqlCommand(@"
+                    SELECT e.ProductionDate, e.ShiftNo, e.Model, e.StartAt, e.EndAt, e.DurationMin, e.ReasonName, e.ReasonDetail,
+                           e.Id, ISNULL(e.GroupId, e.Id) AS GroupId, g.GroupStart, g.GroupEnd
+                    FROM dbo.PlcKyoshinLossEvent e
+                    CROSS APPLY (
+                        SELECT MIN(x.StartAt) AS GroupStart,
+                               CASE WHEN COUNT(*) = COUNT(x.EndAt) THEN MAX(x.EndAt) END AS GroupEnd -- NULL = loss masih berjalan
+                        FROM dbo.PlcKyoshinLossEvent x
+                        WHERE ISNULL(x.GroupId, x.Id) = ISNULL(e.GroupId, e.Id)) g
+                    WHERE e.MachineCode = 'MCH1-01' AND e.ProductionDate BETWEEN @StartDate AND @EndDate AND e.DurationMin > 0
+                    ORDER BY e.StartAt", conn))
+                {
+                    cmd.Parameters.AddWithValue("@StartDate", start.Date);
+                    cmd.Parameters.AddWithValue("@EndDate", end.Date);
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        string shift = reader.GetByte(1).ToString();
+                        if (SelectedShifts != null && SelectedShifts.Any() && !SelectedShifts.Contains(shift)) continue;
+                        var startAt = reader.GetDateTime(3);
+                        DateTime? endAt = reader.IsDBNull(4) ? null : reader.GetDateTime(4);
+                        string reason = reader.IsDBNull(6) ? "" : reader.GetString(6);
+                        // ReasonDetail di database berisi "NAMA +menit; ..."; yang ditampilkan nama reason-nya saja
+                        string reasonDetail = reader.IsDBNull(7) ? "" : System.Text.RegularExpressions.Regex.Replace(reader.GetString(7), @"\s*\+\d+", "");
+                        var record = new LossTimeRecord
+                        {
+                            RecordId = Convert.ToInt32(reader.GetInt64(8)), // PlcKyoshinLossEvent.Id, untuk lampiran file
+                            RecordSource = PlcLossRecordSource,
+                            Date = reader.GetDateTime(0),
+                            LossTime = reason.Length > 0 ? reason : "Reason belum diisi di GOT",
+                            Start = startAt.TimeOfDay,
+                            End = (endAt ?? DateTime.Now).TimeOfDay,
+                            Duration = reader.GetInt32(5) * 60,
+                            Location = SelectedMachineName,
+                            Shift = shift,
+                            Category = AcOeeLossCategories.ForPlcReason(reason, GotSlots)
+                        };
+                        rows.Add((record, reader.GetInt64(9) != reader.GetInt64(8), endAt == null, reasonDetail,
+                                  reader.GetDateTime(10), reader.IsDBNull(11) ? null : reader.GetDateTime(11)));
+                    }
+                }
+
+                var modelChanges = new Dictionary<DateTime, (string? From, string? To)>();
+                foreach (var row in rows)
+                {
+                    var parts = new List<string>();
+                    if (row.Continuation) parts.Add("Lanjutan loss dari shift sebelumnya");
+                    if (row.Running) parts.Add("Masih berjalan");
+                    if (row.Record.Category.Contains("MODEL CHANGE", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!modelChanges.TryGetValue(row.GroupStart, out var change))
+                            modelChanges[row.GroupStart] = change = GetKyoshinModelChange(conn, row.GroupStart, row.GroupEnd);
+                        parts.Add(change.From != null && change.To != null ? $"Model change loss dari {change.From} ke {change.To}"
+                                : change.To != null ? $"Model change loss ke {change.To}"
+                                : "Model change loss");
+                    }
+                    else
+                    {
+                        parts.Add(row.ReasonDetail.Length > 0
+                            ? string.Join("; ", row.ReasonDetail.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(AcOeeLossCategories.DisplayName))
+                            : "Reason belum diisi di GOT");
+                    }
+                    row.Record.DetailedReason = string.Join(" | ", parts);
+                    records.Add(row.Record);
+                }
+            }
+            catch (Exception ex) { Console.WriteLine($"? GetKyoshinPlcLossRecords error: {ex.Message}"); }
+            return records;
+        }
+
+        // Model sesudah = model pertama yang terbaca setelah loss selesai (maks. 30 menit; loss berjalan = model terakhir),
+        // model sebelum = model terakhir sebelum loss mulai (maks. 2 jam) yang berbeda dari model sesudah.
+        private static (string? From, string? To) GetKyoshinModelChange(SqlConnection conn, DateTime lossStart, DateTime? lossEnd)
+        {
+            string? Scalar(string sql, params (string Name, object Value)[] ps)
+            {
+                using var cmd = new SqlCommand(sql, conn);
+                foreach (var (name, value) in ps) cmd.Parameters.AddWithValue(name, value);
+                var model = (cmd.ExecuteScalar() as string)?.Trim();
+                return string.IsNullOrEmpty(model) ? null : model;
+            }
+
+            const string trend = "dbo.PlcKyoshinTrend WHERE MachineCode = 'MCH1-01' AND LTRIM(RTRIM(Model)) <> ''";
+            string? to = lossEnd.HasValue
+                ? Scalar($"SELECT TOP 1 Model FROM {trend} AND SampleAt >= @end AND SampleAt < DATEADD(MINUTE, 30, @end) ORDER BY SampleAt", ("@end", lossEnd.Value))
+                  ?? Scalar($"SELECT TOP 1 Model FROM {trend} AND SampleAt <= @end ORDER BY SampleAt DESC", ("@end", lossEnd.Value))
+                : Scalar($"SELECT TOP 1 Model FROM {trend} ORDER BY SampleAt DESC");
+            string? from = to == null ? null
+                : Scalar($"SELECT TOP 1 Model FROM {trend} AND SampleAt < @start AND SampleAt >= DATEADD(MINUTE, -120, @start) AND LTRIM(RTRIM(Model)) <> @to ORDER BY SampleAt DESC",
+                         ("@start", lossStart), ("@to", to));
+            return (from, to);
         }
 
         private List<LossTimeRecord> GetCombinedRecords(DateTime lastStart, DateTime lastEnd, DateTime currStart, DateTime currEnd, List<(TimeSpan Start, TimeSpan End)> breakTimes)
@@ -800,7 +868,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
 
                 // Filter hanya records MTT
                 var mttRecords = currentRecords
-                    .Where(r => r.Category == "Machine & Tools Trouble")
+                    .Where(r => r.Category == MttCategory)
                     .ToList();
 
                 // Extract sub-category dari DetailedReason
@@ -1146,7 +1214,21 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
             else if (CurrentPage < 1) CurrentPage = 1;
         }
 
+        // Data non-PLC: nama kotak GOT saat ini kalau sama persis, selain itu kategori lama dipetakan ke reason GOT;
+        // padanan yang sudah tidak ada di PLC masuk OTHER
         private string CategorizeReason(string reason)
+        {
+            var trimmed = (reason ?? "").Trim();
+            var currentNames = GotSlots.Select(s => s.Name);
+            var got = AcOeeLossCategories.Match(trimmed, currentNames);
+            if (got != null) return got;
+            var legacy = LegacyCategory(trimmed);
+            return AcOeeLossCategories.FromLegacy.TryGetValue(legacy, out var mapped)
+                ? AcOeeLossCategories.Match(mapped, currentNames) ?? AcOeeLossCategories.Other
+                : AcOeeLossCategories.Other;
+        }
+
+        private string LegacyCategory(string reason)
         {
             var r = reason?.ToLower().Trim() ?? "";
             if (string.IsNullOrEmpty(r)) return "Other";
@@ -1505,8 +1587,8 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
                 if (!int.TryParse(form["recordId"], out int recordId) || recordId <= 0)
                     return new JsonResult(new { success = false, message = "Record ID tidak valid." });
 
-                if (recordSource != "Assembly")
-                    return new JsonResult(new { success = false, message = "Upload hanya didukung untuk data Assembly." });
+                if (!SupportsAttachment(recordSource))
+                    return new JsonResult(new { success = false, message = "Upload hanya didukung untuk data Assembly dan loss time mesin (PLC)." });
 
                 string uploadFolder = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "LossTimeAttachments");
                 if (!Directory.Exists(uploadFolder))
@@ -1680,5 +1762,6 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
         public string DetailedReason { get; set; }
         public string MttSubCategory { get; set; } = string.Empty;
         public bool HasAttachment { get; set; }
+        public string RecordSource { get; set; } = "Machine"; // "PlcKyoshin" = kejadian loss PLC (RecordId = PlcKyoshinLossEvent.Id)
     }
 }  // ← tutup namespace

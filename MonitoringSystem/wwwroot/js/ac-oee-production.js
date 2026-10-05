@@ -107,6 +107,12 @@
         return Number(value || 0).toLocaleString('id-ID');
     }
 
+    // DIFFERENCE: actual lebih = "+3", kurang = "-3", sama = "0"
+    function formatDifference(value) {
+        var n = Number(value || 0);
+        return (n > 0 ? '+' : '') + formatQuantity(n);
+    }
+
     function showEvaporatorMetrics(data) {
         var productionPlan = Number(data.productionPlan || 0);
         var planBySut = 1170;
@@ -117,7 +123,7 @@
         productionPlanValue.textContent = formatQuantity(productionPlan);
         planBySutValue.textContent = formatQuantity(planBySut);
         productionActualValue.textContent = formatQuantity(actual);
-        productionDifferenceValue.textContent = formatQuantity(difference);
+        productionDifferenceValue.textContent = formatDifference(difference);
         productionDifference.classList.toggle('negative', difference < 0);
         productionRemainingValue.querySelector('output').textContent = formatQuantity(remaining);
         productionRemainingValue.classList.toggle('negative', remaining < 0);
@@ -131,7 +137,7 @@
         productionPlanValue.textContent = formatQuantity(productionPlan);
         planBySutValue.textContent = '1170';
         productionActualValue.textContent = formatQuantity(actual);
-        productionDifferenceValue.textContent = formatQuantity(difference);
+        productionDifferenceValue.textContent = formatDifference(difference);
         productionDifference.classList.toggle('negative', difference < 0);
         productionRemainingValue.querySelector('output').textContent = '-2106';
         productionRemainingValue.classList.add('negative');
@@ -139,9 +145,12 @@
 
     // Expander Kyoshin 635: data langsung dari layar utama GOT (B-1) di PLC, lewat PLC ROHIB (/plcrohib-app).
     // MODEL R10, PRODUCTION PLAN R20, ACTUAL R22, PLAN BY SUT R23, DIFFERENCE D20.
-    // Baris REMAINING diganti LOSS TIME (R50) di tab ini. TOTAL NG = DEFECT R24 (tab lain tetap "Under Development").
-    // LOSS TIME R50 = TOTAL LOSS TIME shift yang sedang berjalan (Shift 1 07:00-15:45, Shift 2 15:45-23:15, Shift 3 23:15-07:00);
-    // TOTAL LOSS TIME shift lain tampil "-". Tab lain: kembali ke nilai semula.
+    // Baris REMAINING diganti LOSS TIME di tab ini. TOTAL NG = DEFECT R24 (tab lain tetap "Under Development").
+    // Loss time dari timer R103 yang dicatat Plclogger per kejadian (tabel PlcKyoshinLossEvent):
+    //   LOSS TIME       = akumulasi loss model yang sedang jalan (reset 0 saat ganti model / jam 07:00)  -> modelLossMin
+    //   TOTAL LOSS TIME = akumulasi loss per shift hari produksi berjalan (Shift 1 07:00-15:45, Shift 2 15:45-23:15,
+    //                     Shift 3 23:15-07:00); shift yang belum mulai "-"                               -> shiftLossMin
+    // Tab lain: kembali ke nilai semula.
     var PLC_MAIN_URL = '/plcrohib-app/api/plc/main';
     var PLC_POLL_MS = 3000;
     var totalNgPlc = document.getElementById('productionTotalNgPlc');
@@ -161,10 +170,10 @@
         return 3;
     }
 
-    function setShiftStopTimes(lossTime) {
-        var running = currentShiftNo();
+    function setShiftStopTimes(shiftLossMin) {
         shiftStopTimes.forEach(function (el, i) {
-            el.textContent = lossTime === null || i + 1 !== running ? '-' : formatQuantity(lossTime);
+            var value = shiftLossMin ? shiftLossMin[i] : null;
+            el.textContent = value === null || value === undefined ? '-' : formatQuantity(value);
         });
     }
 
@@ -383,7 +392,8 @@
     }
 
     // OEE tab PLC (Expander Kyoshin 635), rumus standar:
-    //   Operating = (Load Time - Stop Time) / Load Time   Load Time = menit sejak awal shift - istirahat; Stop Time = R50
+    //   Operating = (Load Time - Stop Time) / Load Time   Load Time = menit sejak awal shift - istirahat;
+    //                                                      Stop Time = TOTAL LOSS TIME shift berjalan (akumulasi R103)
     //   Ability   = Actual / Plan                          R22 / R23 (Plan by SUT)
     //   Quality   = (Actual - Defect) / Actual             R22, R24
     //   OEE       = Operating x Ability x Quality
@@ -392,7 +402,7 @@
         var clampPercent = function (v) { return Math.max(0, Math.min(100, v)); };
         var running = currentShiftNo();
         var loadMinutes = Math.max(0, shiftElapsedMinutes(running) - elapsedBreakMinutes(running));
-        var stopMinutes = Number(data.lossTime || 0);
+        var stopMinutes = Number((data.shiftLossMin && data.shiftLossMin[running - 1]) || 0);
         var actual = Number(data.actual || 0);
         var plan = Number(data.plan || 0);
         var defect = Number(data.defect || 0);
@@ -486,18 +496,19 @@
         var productionPlan = Number(data.prodPlan || 0);
         var actual = Number(data.actual || 0);
         var difference = Number(data.difference || 0);
-        var lossTime = Number(data.lossTime || 0);
+        var modelLoss = data.modelLossMin; // null = Plclogger belum punya akumulasi loss
 
         modelName.textContent = (data.model || '').trim() || '-';
         modelName.title = 'PLC ' + (data.source || '') + ' - terbaca ' + (data.readAt || '');
         productionPlanValue.textContent = formatQuantity(productionPlan);
         planBySutValue.textContent = formatQuantity(data.plan);
         productionActualValue.textContent = formatQuantity(actual);
-        productionDifferenceValue.textContent = formatQuantity(difference);
+        productionDifferenceValue.textContent = formatDifference(difference);
         productionDifference.classList.toggle('negative', difference < 0);
-        productionRemainingValue.querySelector('output').textContent = formatQuantity(lossTime); // label: LOSS TIME
+        productionRemainingValue.querySelector('output').textContent =
+            modelLoss === null || modelLoss === undefined ? '-' : formatQuantity(modelLoss); // label: LOSS TIME
         productionRemainingValue.classList.remove('negative');
-        setShiftStopTimes(lossTime);
+        setShiftStopTimes(data.shiftLossMin);
         totalNgValue.textContent = formatQuantity(data.defect);
         updateOeeMetrics(calculatePlcOee(data));
     }

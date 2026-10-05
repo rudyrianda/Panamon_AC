@@ -193,7 +193,7 @@ namespace MonitoringSystem.Pages.ACOEE.ProductionReport
 
             this.connectionString = _configuration.GetConnectionString("DefaultConnection");
             var dailyLosses = loadSupportingData
-                ? GetDailyLossTimeTotals()
+                ? GetKyoshinPlcDailyLossSeconds()
                 : new Dictionary<int, int>();
             bool isCurrentMonthView = (SelectedYear == DateTime.Now.Year && SelectedMonth == DateTime.Now.Month);
             this.IsCurrentMonthView = isCurrentMonthView;
@@ -826,7 +826,8 @@ GROUP BY DAY(pp.CurrentDate)";
                                      (data.NonShift_Unit > 0 || data.NonShift_EndTime != TimeSpan.Zero) ||
                                      (data.Overtime_Unit > 0 || totalOtMinutes > 0);
 
-                if (!isShiftActive)
+                // Loss PLC Kyoshin tetap dihitung walau tidak ada data shift di oeesn
+                if (!isShiftActive && !dailyLosses.ContainsKey(data.Day))
                 {
                     lossDurationSec = 0;
                 }
@@ -962,188 +963,30 @@ GROUP BY DAY(pp.CurrentDate)";
             DailyNetManHours = Enumerable.Repeat(0d, DaysInMonth).ToList();
         }
 
-        private Dictionary<int, int> GetDailyLossTimeTotals()
+        // Loss time Kyoshin per hari produksi (07:00-07:00) dari kejadian loss PLC (timer R103, tabel PlcKyoshinLossEvent),
+        // sama dengan data di Detail Loss Time. Nilai dalam detik.
+        private Dictionary<int, int> GetKyoshinPlcDailyLossSeconds()
         {
             var dailyTotals = new Dictionary<int, int>();
-            var breakTimesByDate = new Dictionary<DateTime, List<(TimeSpan Start, TimeSpan End)>>();
-
-            bool hasActuals = false;
             try
             {
-                string checkSql = $@"
-            SELECT TOP (1) 1 FROM LossTimeActuals
-            WHERE Month = @Month AND Year = @Year
-            AND MachineLine = @MachineLine";
-
-                using (var conn = new SqlConnection(this.connectionString))
-                {
-                    conn.Open();
-                    using (var cmd = new SqlCommand(checkSql, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@Month", SelectedMonth);
-                        cmd.Parameters.AddWithValue("@Year", SelectedYear);
-                        cmd.Parameters.AddWithValue("@MachineLine", MachineLine);
-                        hasActuals = cmd.ExecuteScalar() != null;
-                    }
-                }
+                using var conn = new SqlConnection(this.connectionString);
+                conn.Open();
+                using var cmd = new SqlCommand(@"
+                    SELECT DAY(ProductionDate) AS Day, SUM(DurationMin) AS TotalMinutes
+                    FROM dbo.PlcKyoshinLossEvent
+                    WHERE MachineCode = @EditorMachine AND DurationMin > 0
+                      AND ProductionDate >= DATEFROMPARTS(@Year, @Month, 1)
+                      AND ProductionDate < DATEADD(MONTH, 1, DATEFROMPARTS(@Year, @Month, 1))
+                    GROUP BY DAY(ProductionDate)", conn);
+                cmd.Parameters.AddWithValue("@EditorMachine", EditorMachineCode);
+                cmd.Parameters.AddWithValue("@Year", SelectedYear);
+                cmd.Parameters.AddWithValue("@Month", SelectedMonth);
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    dailyTotals[Convert.ToInt32(reader["Day"])] = Convert.ToInt32(reader["TotalMinutes"]) * 60;
             }
-            catch (Exception ex) { Console.WriteLine($"Error check LossTimeActuals: {ex.Message}"); }
-
-            if (hasActuals)
-            {
-                try
-                {
-                    string shiftFilter = "";
-                    if (SelectedShifts.Any() && !SelectedShifts.Contains("All"))
-                    {
-                        var shiftList = string.Join(",", SelectedShifts.Select(s => $"'{s}'"));
-                        shiftFilter = $"AND Shift IN ({shiftList})";
-                    }
-
-                    string actualsSql = $@"
-                SELECT Day, SUM(Minutes) as TotalMinutes
-                FROM LossTimeActuals
-                WHERE Month = @Month AND Year = @Year AND Minutes > 0
-                AND MachineLine = @MachineLine
-                {shiftFilter}
-                GROUP BY Day";
-
-                    using (var conn = new SqlConnection(this.connectionString))
-                    {
-                        conn.Open();
-                        using (var cmd = new SqlCommand(actualsSql, conn))
-                        {
-                            cmd.Parameters.AddWithValue("@Month", SelectedMonth);
-                            cmd.Parameters.AddWithValue("@Year", SelectedYear);
-                            cmd.Parameters.AddWithValue("@MachineLine", MachineLine);
-
-                            using (var reader = cmd.ExecuteReader())
-                            {
-                                while (reader.Read())
-                                {
-                                    int day = Convert.ToInt32(reader["Day"]);
-                                    double totalMinutes = Convert.ToDouble(reader["TotalMinutes"]);
-                                    dailyTotals[day] = (int)(totalMinutes * 60);
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex) { Console.WriteLine($"Error GetDailyLossTimeTotals (Actuals): {ex.Message}"); }
-
-                return dailyTotals;
-            }
-
-            string shiftFilterSql = "";
-            if (SelectedShifts.Any() && !SelectedShifts.Contains("All"))
-            {
-                var conditions = new List<string>();
-                foreach (var shift in SelectedShifts)
-                {
-                    if (shift == "1") 
-                    {
-                        if (SelectedYear == 2026 && (SelectedMonth == 7 || SelectedMonth == 8))
-                            conditions.Add("(CAST(Time AS TIME) >= '07:00:00' AND CAST(Time AS TIME) <= '19:45:00')");
-                        else
-                            conditions.Add("(CAST(Time AS TIME) >= '07:00:00' AND CAST(Time AS TIME) <= '15:45:00')");
-                    }
-                    else if (shift == "2") 
-                    {
-                        if (SelectedYear == 2026 && (SelectedMonth == 7 || SelectedMonth == 8))
-                            conditions.Add("1=0");
-                        else
-                            conditions.Add("(CAST(Time AS TIME) > '15:45:00' AND CAST(Time AS TIME) <= '23:15:00')");
-                    }
-                    else if (shift == "3") 
-                    {
-                        if (SelectedYear == 2026 && (SelectedMonth == 7 || SelectedMonth == 8))
-                            conditions.Add("(CAST(Time AS TIME) > '19:45:00' OR CAST(Time AS TIME) <= '07:00:00')");
-                        else
-                            conditions.Add("(CAST(Time AS TIME) > '23:15:00' OR CAST(Time AS TIME) <= '07:00:00')");
-                    }
-                }
-                
-                if (conditions.Any())
-                {
-                    shiftFilterSql = $"AND ({string.Join(" OR ", conditions)})";
-                }
-            }
-
-            string lossTimeMachineFilter = "AND MachineCode = @Machine";
-
-            string query = $@"
-        SELECT 
-            CAST(Date AS DATE) as FullDate,
-            CAST(Time AS TIME) as StartTime, 
-            CAST(EndDateTime AS TIME) as EndTime, 
-            LossTime as Duration
-        FROM AssemblyLossTime
-        WHERE Date >= DATEFROMPARTS(@Year, @Month, 1)
-          AND Date < DATEADD(MONTH, 1, DATEFROMPARTS(@Year, @Month, 1))
-          {lossTimeMachineFilter}
-          {shiftFilterSql}";
-
-            try
-            {
-                using (var connection = new SqlConnection(this.connectionString))
-                {
-                    using (var command = new SqlCommand(query, connection))
-                    {
-                        command.Parameters.AddWithValue("@Year", SelectedYear);
-                        command.Parameters.AddWithValue("@Month", SelectedMonth);
-                        command.Parameters.AddWithValue("@Machine", MachineLine);
-
-                        connection.Open();
-                        using (var reader = command.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                var fullDate = (DateTime)reader["FullDate"];
-                                var startTime = (TimeSpan)reader["StartTime"];
-
-                                if (startTime >= TimeSpan.Zero && startTime < new TimeSpan(7, 0, 0))
-                                    fullDate = fullDate.AddDays(-1);
-
-                                var day = fullDate.Day;
-                                var endTime = (TimeSpan)reader["EndTime"];
-                                var duration = Convert.ToInt32(reader["Duration"]);
-
-                                // Break time hanya berubah per tanggal. Cache lokal ini menjaga
-                                // perhitungan tetap sama sambil menghindari query berulang untuk
-                                // setiap record loss pada tanggal yang sama.
-                                var breakDate = fullDate.Date;
-                                if (!breakTimesByDate.TryGetValue(breakDate, out var breakTimes))
-                                {
-                                    breakTimes = _breakTimeService.GetBreakTimesForDateAsync(breakDate).Result
-                                        .Select(b => (b.StartTime, b.EndTime))
-                                        .ToList();
-                                    breakTimesByDate[breakDate] = breakTimes;
-                                }
-
-                                int actualDurationSec = duration;
-                                foreach (var (breakStart, breakEnd) in breakTimes)
-                                {
-                                    if (startTime < breakEnd && endTime > breakStart)
-                                    {
-                                        var overlapStart = startTime > breakStart ? startTime : breakStart;
-                                        var overlapEnd = endTime < breakEnd ? endTime : breakEnd;
-                                        int overlapSec = (int)(overlapEnd - overlapStart).TotalSeconds;
-                                        actualDurationSec -= overlapSec;
-                                    }
-                                }
-
-                                if (actualDurationSec > 0)
-                                {
-                                    if (!dailyTotals.ContainsKey(day)) dailyTotals[day] = 0;
-                                    dailyTotals[day] += actualDurationSec;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex) { Console.WriteLine($"Error fetching loss time: {ex.Message}"); }
-
+            catch (Exception ex) { Console.WriteLine($"Error GetKyoshinPlcDailyLossSeconds: {ex.Message}"); }
             return dailyTotals;
         }
 

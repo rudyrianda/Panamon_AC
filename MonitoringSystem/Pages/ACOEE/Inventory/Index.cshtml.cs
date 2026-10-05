@@ -58,113 +58,23 @@ namespace MonitoringSystem.Pages.ACOEE.Inventory
 
                 using var cmd = conn.CreateCommand();
 
-                // Inventory ACOEE hanya untuk Expander Kyoshin 635 (MachineCode "Expander");
-                // nilai filter lain dari query string diabaikan.
-                string? selectedMachine = "Expander";
-                FilterMachineLine = selectedMachine;
+                // Inventory ACOEE hanya untuk Expander Kyoshin 635; nilai filter lain dari query string diabaikan.
+                // Isi = output (actual R22) per model per hari produksi 07:00-07:00 dari PLC,
+                // tabel PlcKyoshinDailyOutput yang diisi Plclogger tiap menit (sama dengan TOTAL OUTPUT di Quality).
+                FilterMachineLine = "Expander";
 
-                var machineFilter = selectedMachine == null
-                    ? "AND o.MachineCode IN ('Brazing', 'Expander')"
-                    : "AND o.MachineCode = @filterMachine";
-
-                cmd.CommandText = $@"
-                    WITH ShiftData AS (
-                        SELECT 
-                            o.Product_Id,
-                            ISNULL(m.ProductName, o.Product_Id) AS Model,
-                            o.MachineCode,
-                            CASE
-                                WHEN CAST(o.SDate AS TIME) < '07:00:00' THEN CAST(DATEADD(DAY, -1, o.SDate) AS DATE)
-                                ELSE CAST(o.SDate AS DATE)
-                            END AS ReportDate,
-                            CASE 
-                                WHEN o.ShiftMode = 'NON-SHIFT' THEN
-                                    CASE
-                                        WHEN CAST(o.SDate AS TIME) > '16:00:00' THEN 'OVERTIME'
-                                        ELSE 'NON-SHIFT'
-                                    END
-                                WHEN o.ShiftMode LIKE 'OVERTIME%' THEN
-                                    CASE 
-                                        WHEN MONTH(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 7 AND YEAR(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 2026 AND DAY(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) <= 5 THEN 'OVERTIME'
-                                        WHEN CAST(o.SDate AS TIME) >= '15:45:00' AND CAST(o.SDate AS TIME) <= '19:45:59' THEN 'OVERTIME SHIFT 1'
-                                        WHEN CAST(o.SDate AS TIME) >= '19:46:00' AND CAST(o.SDate AS TIME) <= '23:14:59' THEN 'OVERTIME SHIFT 3'
-                                        WHEN CAST(o.SDate AS TIME) >= '23:15:00' OR CAST(o.SDate AS TIME) < '07:00:00' THEN 'SHIFT 3'
-                                        ELSE 'OVERTIME'
-                                    END
-                                WHEN o.ShiftMode = 'SHIFT 2' AND MONTH(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) IN (7, 8) AND YEAR(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 2026 THEN
-                                    CASE 
-                                        WHEN CAST(o.SDate AS TIME) >= '07:00:00' AND CAST(o.SDate AS TIME) <= '15:44:59' THEN 'SHIFT 1'
-                                        WHEN CAST(o.SDate AS TIME) >= '15:45:00' AND CAST(o.SDate AS TIME) <= '19:45:59' THEN 'OVERTIME SHIFT 1'
-                                        WHEN CAST(o.SDate AS TIME) >= '19:46:00' AND CAST(o.SDate AS TIME) <= '23:14:59' THEN 'OVERTIME SHIFT 3'
-                                        ELSE 'SHIFT 3'
-                                    END
-                                WHEN o.ShiftMode = 'SHIFT 3' AND CAST(o.SDate AS TIME) >= '19:46:00' AND CAST(o.SDate AS TIME) <= '23:14:59' THEN 'OVERTIME SHIFT 3'
-                                ELSE o.ShiftMode
-                            END AS Status_Di_Web,
-                            CASE 
-                                WHEN YEAR(@startDate) = 2026 AND MONTH(@startDate) >= 3 AND MONTH(@startDate) <= 7 THEN MAX(o.TotalUnit)
-                                ELSE COUNT(o.Product_Id)
-                            END AS Shift_Actual
-                        FROM OEESN o
-                        LEFT JOIN MasterData m ON m.Product_Id = o.Product_Id
-                        WHERE (
-                            (YEAR(o.SDate) = YEAR(@startDate) AND MONTH(o.SDate) = MONTH(@startDate) AND CAST(o.SDate AS TIME) >= '07:00:00')
-                            OR
-                            (o.SDate >= DATEADD(DAY, 1, @startDate) AND o.SDate < @endDate AND CAST(o.SDate AS TIME) < '07:00:00')
-                        )
-                        {machineFilter}
-                        GROUP BY 
-                            o.Product_Id, 
-                            ISNULL(m.ProductName, o.Product_Id), 
-                            o.MachineCode, 
-                            CASE
-                                WHEN CAST(o.SDate AS TIME) < '07:00:00' THEN CAST(DATEADD(DAY, -1, o.SDate) AS DATE)
-                                ELSE CAST(o.SDate AS DATE)
-                            END,
-                            CASE 
-                                WHEN o.ShiftMode = 'NON-SHIFT' THEN
-                                    CASE
-                                        WHEN CAST(o.SDate AS TIME) > '16:00:00' THEN 'OVERTIME'
-                                        ELSE 'NON-SHIFT'
-                                    END
-                                WHEN o.ShiftMode LIKE 'OVERTIME%' THEN
-                                    CASE 
-                                        WHEN MONTH(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 7 AND YEAR(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 2026 AND DAY(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) <= 5 THEN 'OVERTIME'
-                                        WHEN CAST(o.SDate AS TIME) >= '15:45:00' AND CAST(o.SDate AS TIME) <= '19:45:59' THEN 'OVERTIME SHIFT 1'
-                                        WHEN CAST(o.SDate AS TIME) >= '19:46:00' AND CAST(o.SDate AS TIME) <= '23:14:59' THEN 'OVERTIME SHIFT 3'
-                                        WHEN CAST(o.SDate AS TIME) >= '23:15:00' OR CAST(o.SDate AS TIME) < '07:00:00' THEN 'SHIFT 3'
-                                        ELSE 'OVERTIME'
-                                    END
-                                WHEN o.ShiftMode = 'SHIFT 2' AND MONTH(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) IN (7, 8) AND YEAR(CAST(DATEADD(hour, -7, o.SDate) AS DATE)) = 2026 THEN
-                                    CASE 
-                                        WHEN CAST(o.SDate AS TIME) >= '07:00:00' AND CAST(o.SDate AS TIME) <= '15:44:59' THEN 'SHIFT 1'
-                                        WHEN CAST(o.SDate AS TIME) >= '15:45:00' AND CAST(o.SDate AS TIME) <= '19:45:59' THEN 'OVERTIME SHIFT 1'
-                                        WHEN CAST(o.SDate AS TIME) >= '19:46:00' AND CAST(o.SDate AS TIME) <= '23:14:59' THEN 'OVERTIME SHIFT 3'
-                                        ELSE 'SHIFT 3'
-                                    END
-                                WHEN o.ShiftMode = 'SHIFT 3' AND CAST(o.SDate AS TIME) >= '19:46:00' AND CAST(o.SDate AS TIME) <= '23:14:59' THEN 'OVERTIME SHIFT 3'
-                                ELSE o.ShiftMode
-                            END,
-                            CASE
-                                WHEN CAST(o.SDate AS TIME) >= '07:00:00' AND CAST(o.SDate AS TIME) <= '15:44:59' THEN 1
-                                WHEN CAST(o.SDate AS TIME) >= '15:45:00' AND CAST(o.SDate AS TIME) <= '19:45:59' THEN 2
-                                WHEN CAST(o.SDate AS TIME) >= '19:46:00' AND CAST(o.SDate AS TIME) <= '23:14:59' THEN 3
-                                ELSE 4
-                            END
-                    )
-                    SELECT 
-                        Product_Id AS Data_Id,
+                cmd.CommandText = @"
+                    SELECT
+                        Model AS Data_Id,
                         Model,
-                        MachineCode,
-                        DAY(ReportDate) AS DayNum,
-                        SUM(Shift_Actual) AS Actual
-                    FROM ShiftData
-                    GROUP BY 
-                        Product_Id,
-                        Model,
-                        MachineCode,
-                        DAY(ReportDate)
-                    ORDER BY MachineCode, Model, DayNum";
+                        'Expander' AS MachineCode,
+                        DAY(ProductionDate) AS DayNum,
+                        SUM(Actual) AS Actual
+                    FROM dbo.PlcKyoshinDailyOutput
+                    WHERE MachineCode = 'MCH1-01'
+                      AND ProductionDate >= @startDate AND ProductionDate < @endDate
+                    GROUP BY Model, DAY(ProductionDate)
+                    ORDER BY Model, DayNum";
 
                 var pStart = cmd.CreateParameter();
                 pStart.ParameterName = "@startDate";
@@ -175,14 +85,6 @@ namespace MonitoringSystem.Pages.ACOEE.Inventory
                 pEnd.ParameterName = "@endDate";
                 pEnd.Value = endDate;
                 cmd.Parameters.Add(pEnd);
-
-                if (selectedMachine != null)
-                {
-                    var pMachine = cmd.CreateParameter();
-                    pMachine.ParameterName = "@filterMachine";
-                    pMachine.Value = selectedMachine;
-                    cmd.Parameters.Add(pMachine);
-                }
 
                 // ── Group hasil query per Product_Id + MachineCode ──
                 var dataMap = new Dictionary<string, InventoryData>();

@@ -78,8 +78,12 @@ namespace Plclogger
         public short Plan { get; set; }         // R23 PLAN
         public short Defect { get; set; }       // R24 DEFECT
         public short LossTime { get; set; }     // R50 LOSS TIME/MIN
+        public short LossRunning { get; set; }  // R103 timer loss berjalan (menit), 0 = mesin tidak loss
         public short Difference { get; set; }   // D20 DIFFERENCE
         public string? Source { get; set; }
+        // Akumulasi loss dari tabel PlcKyoshinLossEvent (dihitung KyoshinLossLogger tiap 5 detik), menit:
+        public int? ModelLossMin { get; set; }      // model yang sedang jalan (reset saat ganti model / jam 07:00)
+        public int?[]? ShiftLossMin { get; set; }   // shift 1, 2, 3 hari produksi berjalan (null = shift belum mulai)
     }
 
     public class EditorDraftRequest
@@ -351,10 +355,20 @@ namespace Plclogger
                 if (!string.IsNullOrWhiteSpace(plcIp)) PlcIp = plcIp;
 
                 if (int.TryParse(config["PlcConfig:Port"], out int port)) PlcPort = port;
+
+                var loggerHost = config["BackgroundJobs:ServerMachineName"];
+                if (loggerHost != null) LoggerMachineName = loggerHost.Trim();
             }
 
             Task.Run(() => CheckDbConnection());
         }
+
+        // Pencatat ke database (riwayat PLC, change plan & output harian, kejadian loss) hanya jalan di PC server ini,
+        // supaya Plclogger di laptop/PC lain tidak mencatat dobel. Kosongkan (appsettings BackgroundJobs:ServerMachineName = "")
+        // untuk mengizinkan semua PC. Halaman & pembacaan PLC tetap jalan di semua PC.
+        public string LoggerMachineName { get; private set; } = "29485ACP101-103";
+        public bool IsLoggerHost =>
+            LoggerMachineName.Length == 0 || string.Equals(Environment.MachineName, LoggerMachineName, StringComparison.OrdinalIgnoreCase);
 
         public bool CheckDbConnection()
         {
@@ -892,9 +906,10 @@ namespace Plclogger
                 {
                     var block = plc.ReadInt16("R10", 15);   // R10..R24
                     var loss = plc.ReadInt16("R50");
+                    var lossRunning = plc.ReadInt16("R103");
                     var diff = plc.ReadInt16("D20");
                     plc.ConnectClose();
-                    if (block.IsSuccess && block.Content?.Length == 15 && loss.IsSuccess && diff.IsSuccess)
+                    if (block.IsSuccess && block.Content?.Length == 15 && loss.IsSuccess && lossRunning.IsSuccess && diff.IsSuccess)
                     {
                         var words = new Dictionary<int, short>();
                         for (int k = 0; k < 15; k++) words[10 + k] = block.Content![k];
@@ -905,6 +920,7 @@ namespace Plclogger
                         result.Plan = words[23];
                         result.Defect = words[24];
                         result.LossTime = loss.Content;
+                        result.LossRunning = lossRunning.Content;
                         result.Difference = diff.Content;
                         result.Source = $"{PlcIp}:{PlcPort}";
                     }
@@ -946,7 +962,8 @@ namespace Plclogger
             conn.Open();
             using var cmd = new SqlCommand($@"
                 INSERT INTO dbo.{TrendTable} (MachineCode, SampleAt, ProductionDate, ShiftNo, Model, ProdPlan, PlanBySut, Actual, Difference, Defect, LossTime)
-                VALUES (@mc, @at, @pd, @shift, @model, @prodPlan, @plan, @actual, @diff, @defect, @loss)", conn);
+                SELECT @mc, @at, @pd, @shift, @model, @prodPlan, @plan, @actual, @diff, @defect, @loss
+                WHERE NOT EXISTS (SELECT 1 FROM dbo.{TrendTable} WHERE MachineCode = @mc AND SampleAt = @at)", conn); // satu sampel per menit
             cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
             cmd.Parameters.Add("@at", SqlDbType.DateTime2).Value = at;
             cmd.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate;
@@ -995,6 +1012,7 @@ namespace Plclogger
         // Model yang lewat jam 07:00 dipotong: hari ini hanya menghitung kenaikan R22/R23 sejak sampel terakhir kemarin.
         // =========================================================
         public const string ChangePlanTable = "PlcKyoshinChangePlan";
+        public const string DailyOutputTable = "PlcKyoshinDailyOutput"; // output harian per model, diisi bersama ChangePlanTable
 
         public sealed class KyoshinRun
         {
@@ -1053,7 +1071,10 @@ namespace Plclogger
                 WHERE t.MachineCode = @mc AND t.ProductionDate >= DATEADD(DAY, -45, @cur) AND t.ProductionDate <= @cur
                   AND (t.ProductionDate = @cur OR NOT EXISTS (
                         SELECT 1 FROM dbo.{ChangePlanTable} c
-                        WHERE c.MachineCode = t.MachineCode AND c.ProductionDate = t.ProductionDate AND c.IsFinal = 1))", conn))
+                        WHERE c.MachineCode = t.MachineCode AND c.ProductionDate = t.ProductionDate AND c.IsFinal = 1)
+                       OR NOT EXISTS (
+                        SELECT 1 FROM dbo.{DailyOutputTable} o
+                        WHERE o.MachineCode = t.MachineCode AND o.ProductionDate = t.ProductionDate AND o.IsFinal = 1))", conn))
             {
                 cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
                 cmd.Parameters.Add("@cur", SqlDbType.Date).Value = currentDate;
@@ -1121,7 +1142,422 @@ namespace Plclogger
                 ins.Parameters.Add("@final", SqlDbType.Bit).Value = isFinal;
                 ins.ExecuteNonQuery();
             }
+
+            // Output harian per model (semua kali jalan model itu dijumlah), dipakai AC OEE Quality & Inventory
+            using (var del = new SqlCommand($"DELETE FROM dbo.{DailyOutputTable} WHERE MachineCode = @mc AND ProductionDate = @pd", conn, tx))
+            {
+                del.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                del.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate.Date;
+                del.ExecuteNonQuery();
+            }
+            foreach (var g in runs.GroupBy(x => x.Model))
+            {
+                using var ins = new SqlCommand($@"
+                    INSERT INTO dbo.{DailyOutputTable} (MachineCode, ProductionDate, Model, Actual, IsFinal, UpdatedAt)
+                    VALUES (@mc, @pd, @model, @actual, @final, SYSDATETIME())", conn, tx);
+                ins.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                ins.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate.Date;
+                ins.Parameters.Add("@model", SqlDbType.NVarChar, 50).Value = g.Key;
+                ins.Parameters.Add("@actual", SqlDbType.Int).Value = g.Sum(x => x.Actual);
+                ins.Parameters.Add("@final", SqlDbType.Bit).Value = isFinal;
+                ins.ExecuteNonQuery();
+            }
             tx.Commit();
+        }
+
+        // =========================================================
+        // KEJADIAN LOSS TIME KYOSHIN (tabel dbo.PlcKyoshinLossEvent), dipantau KyoshinLossLogger tiap 5 detik.
+        // R103 = timer loss (menit): bukan 0 = loss mulai, kembali 0 = loss selesai.
+        // Satu loss dipotong per shift (07:00 / 15:45 / 23:15): tiap potongan satu baris dengan GroupId yang sama
+        // (GroupId = Id potongan pertama) dan R103Offset = nilai R103 di awal potongan, DurationMin = R103 - R103Offset.
+        // Layar GOT LOSS TIME: 18 reason, nama 9 word ASCII di R410, R420, ... R580 dan durasi (menit) di R419, R429, ... R589.
+        // Reason loss = reason yang durasinya bertambah sejak loss mulai; berlaku untuk semua potongan loss itu.
+        // Kalau belum terisi saat loss selesai, dicek lagi sampai loss berikutnya mulai atau 2 jam (ReasonPendingUntil).
+        // Hanya satu loss terbuka per mesin (index unik UX_PlcKyoshinLossEvent_Open) supaya Plclogger kedua tidak mencatat dobel.
+        // =========================================================
+        public const string LossEventTable = "PlcKyoshinLossEvent";
+        private const int LossReasonFirstReg = 410, LossReasonCount = 18, LossReasonStride = 10, LossReasonNameWords = 9;
+        private static readonly TimeSpan LossReasonLateWindow = TimeSpan.FromHours(2);
+
+        public sealed record LossReason(int Slot, string Name, int Minutes);
+
+        private sealed class OpenLoss
+        {
+            public long Id, GroupId;
+            public DateTime StartAt;
+            public int Offset, DurationMin;
+            public string Model = "";
+            public List<LossReason>? StartReasons; // salinan reason saat loss (potongan pertama) mulai
+        }
+
+        private OpenLoss? _openLoss;
+        private bool _openLossLoaded;
+        private (long GroupId, List<LossReason>? StartReasons, DateTime Until)? _pendingLossReason;
+
+        // Baca 18 reason layar LOSS TIME (satu blok R410..R589). null = PLC tidak terbaca.
+        public List<LossReason>? ReadLossReasons()
+        {
+            if (!Monitor.TryEnter(_mainScreenLock, 3000)) return null;
+            try
+            {
+                MelsecMcNet plc = new MelsecMcNet(PlcIp, PlcPort);
+                plc.ConnectTimeOut = 3000;
+                if (!plc.ConnectServer().IsSuccess) return null;
+                var block = plc.ReadInt16($"R{LossReasonFirstReg}", (ushort)(LossReasonCount * LossReasonStride));
+                plc.ConnectClose();
+                if (!block.IsSuccess || block.Content == null || block.Content.Length < LossReasonCount * LossReasonStride) return null;
+
+                var words = new Dictionary<int, short>();
+                for (int k = 0; k < block.Content.Length; k++) words[LossReasonFirstReg + k] = block.Content[k];
+                var reasons = new List<LossReason>();
+                for (int i = 0; i < LossReasonCount; i++)
+                {
+                    int b = LossReasonFirstReg + i * LossReasonStride;
+                    reasons.Add(new LossReason(i + 1, WordsToAscii(words, b, LossReasonNameWords).Trim(), Math.Max(0, (int)words[b + LossReasonNameWords])));
+                }
+                return reasons;
+            }
+            finally
+            {
+                Monitor.Exit(_mainScreenLock);
+            }
+        }
+
+        // Reason yang durasinya bertambah dibanding saat loss mulai. Name = kenaikan terbesar, Detail = semua yang bertambah.
+        public static (string? Name, string? Detail) LossReasonDelta(IReadOnlyList<LossReason>? atStart, IReadOnlyList<LossReason>? now)
+        {
+            if (atStart == null || now == null) return (null, null);
+            var deltas = new List<(string Name, int Delta)>();
+            foreach (var cur in now)
+            {
+                var before = atStart.FirstOrDefault(x => x.Slot == cur.Slot);
+                // Nama kotak berubah atau durasinya turun (di-reset) = dihitung dari 0
+                int baseMin = before != null && before.Name == cur.Name && cur.Minutes >= before.Minutes ? before.Minutes : 0;
+                int delta = cur.Minutes - baseMin;
+                if (delta > 0) deltas.Add((cur.Name.Length > 0 ? cur.Name : $"REASON {cur.Slot}", delta));
+            }
+            if (deltas.Count == 0) return (null, null);
+            var ordered = deltas.OrderByDescending(x => x.Delta).ToList();
+            var detail = string.Join("; ", ordered.Select(x => $"{x.Name} +{x.Delta}"));
+            return (ordered[0].Name, detail.Length > 400 ? detail.Substring(0, 400) : detail);
+        }
+
+        // Akhir shift tempat t berada: Shift 1 -> 15:45, Shift 2 -> 23:15, Shift 3 -> 07:00 hari produksi berikutnya
+        public static DateTime ShiftEndOf(DateTime t)
+        {
+            var (productionDate, shiftNo, shiftStart) = ShiftOf(t);
+            return shiftNo switch
+            {
+                1 => shiftStart.Date.Add(new TimeSpan(15, 45, 0)),
+                2 => shiftStart.Date.Add(new TimeSpan(23, 15, 0)),
+                _ => productionDate.AddDays(1).AddHours(7)
+            };
+        }
+
+        // Potongan loss per shift. Loss yang mulai di start (R103 = offset saat itu) dan sekarang R103 = r103:
+        // menit sampai akhir shift masuk shift itu, sisanya pindah ke shift berikutnya. Kalau R103 tidak bertambah
+        // sebanyak waktu yang lewat (mis. timer berhenti / PLC mati), sisa loss dianggap selesai di shift itu.
+        // Hasil: potongan selesai (End terisi) + potongan terakhir yang masih terbuka (End = null).
+        public static List<(DateTime Start, DateTime? End, int Offset, int Minutes)> PlanLossSegments(DateTime start, int offset, int r103, DateTime now)
+        {
+            var segments = new List<(DateTime Start, DateTime? End, int Offset, int Minutes)>();
+            while (true)
+            {
+                int total = Math.Max(0, r103 - offset);
+                var end = ShiftEndOf(start);
+                int fit = (int)Math.Floor((end - start).TotalMinutes);
+                if (now < end || total <= fit)
+                {
+                    segments.Add((start, null, offset, total));
+                    return segments;
+                }
+                segments.Add((start, end, offset, fit));
+                start = end;
+                offset += fit;
+            }
+        }
+
+        // Jam selesai potongan: saat R103 terbaca 0, tapi tidak lebih dari mulai + durasi R103 (+1 menit pembulatan),
+        // supaya loss yang selesai saat Plclogger mati / PLC offline tidak tercatat selesai berjam-jam kemudian.
+        public static DateTime LossEndAt(DateTime start, int minutes, DateTime now)
+        {
+            var byTimer = start.AddMinutes(minutes + 1);
+            var end = now < byTimer ? now : byTimer;
+            end = end < start ? start : end;
+            return end.AddTicks(-(end.Ticks % TimeSpan.TicksPerSecond));
+        }
+
+        // Dipanggil tiap 5 detik dengan pembacaan layar utama terbaru (PLC live), hanya di PC server logger
+        public void ProcessLossSample(PlcMainScreen s, DateTime now)
+        {
+            using var conn = new SqlConnection(DbConnectionString);
+            conn.Open();
+
+            if (!_openLossLoaded) LoadLossState(conn, now);
+
+            int r103 = Math.Max(0, (int)s.LossRunning);
+
+            // Timer kembali 0 (atau turun = timer baru tanpa sempat terbaca 0): loss selesai
+            if (_openLoss != null && (r103 == 0 || r103 < _openLoss.Offset + _openLoss.DurationMin))
+                CloseLoss(conn, now);
+
+            if (_openLoss == null && r103 > 0)
+                StartLoss(conn, s, r103, now);
+            else if (_openLoss != null)
+                UpdateOpenLoss(conn, r103, now);
+
+            // Reason belum terdeteksi saat loss selesai: cek lagi (operator mengisi belakangan)
+            if (_openLoss == null && _pendingLossReason is { } pending)
+            {
+                if (now > pending.Until) _pendingLossReason = null;
+                else TryResolvePendingReason(conn, ReadLossReasons());
+            }
+        }
+
+        // Plclogger baru jalan: lanjutkan loss yang masih terbuka dan penantian reason yang tersimpan di database
+        private void LoadLossState(SqlConnection conn, DateTime now)
+        {
+            _openLoss = null;
+            using (var cmd = new SqlCommand($@"
+                SELECT TOP 1 e.Id, ISNULL(e.GroupId, e.Id), e.StartAt, e.R103Offset, e.DurationMin, e.Model, g.ReasonsAtStart
+                FROM dbo.{LossEventTable} e
+                LEFT JOIN dbo.{LossEventTable} g ON g.Id = ISNULL(e.GroupId, e.Id)
+                WHERE e.MachineCode = @mc AND e.EndAt IS NULL ORDER BY e.Id DESC", conn))
+            {
+                cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                using var r = cmd.ExecuteReader();
+                if (r.Read())
+                    _openLoss = new OpenLoss
+                    {
+                        Id = r.GetInt64(0),
+                        GroupId = r.GetInt64(1),
+                        StartAt = r.GetDateTime(2),
+                        Offset = r.GetInt32(3),
+                        DurationMin = r.GetInt32(4),
+                        Model = r.GetString(5),
+                        StartReasons = r.IsDBNull(6) ? null : JsonSerializer.Deserialize<List<LossReason>>(r.GetString(6))
+                    };
+            }
+
+            _pendingLossReason = null;
+            using (var cmd = new SqlCommand($@"
+                SELECT TOP 1 ISNULL(e.GroupId, e.Id), g.ReasonsAtStart, e.ReasonPendingUntil
+                FROM dbo.{LossEventTable} e
+                LEFT JOIN dbo.{LossEventTable} g ON g.Id = ISNULL(e.GroupId, e.Id)
+                WHERE e.MachineCode = @mc AND e.EndAt IS NOT NULL AND e.ReasonName IS NULL AND e.ReasonPendingUntil > @now
+                ORDER BY e.Id DESC", conn))
+            {
+                cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                cmd.Parameters.Add("@now", SqlDbType.DateTime2).Value = now;
+                using var r = cmd.ExecuteReader();
+                if (r.Read() && !r.IsDBNull(1))
+                    _pendingLossReason = (r.GetInt64(0), JsonSerializer.Deserialize<List<LossReason>>(r.GetString(1)), r.GetDateTime(2));
+            }
+            _openLossLoaded = true;
+        }
+
+        private void TryResolvePendingReason(SqlConnection conn, List<LossReason>? reasons)
+        {
+            if (_pendingLossReason is not { } pending) return;
+            var (name, detail) = LossReasonDelta(pending.StartReasons, reasons);
+            if (name == null) return;
+            SaveLossReason(conn, pending.GroupId, name, detail, null);
+            _pendingLossReason = null;
+        }
+
+        // Reason / batas penantian berlaku untuk semua potongan satu loss
+        private static void SaveLossReason(SqlConnection conn, long groupId, string? name, string? detail, DateTime? pendingUntil)
+        {
+            using var cmd = new SqlCommand($@"
+                UPDATE dbo.{LossEventTable}
+                SET ReasonName = @name, ReasonDetail = @detail, ReasonPendingUntil = @pending, UpdatedAt = SYSDATETIME()
+                WHERE ISNULL(GroupId, Id) = @group", conn);
+            cmd.Parameters.Add("@name", SqlDbType.NVarChar, 50).Value = (object?)name ?? DBNull.Value;
+            cmd.Parameters.Add("@detail", SqlDbType.NVarChar, 400).Value = (object?)detail ?? DBNull.Value;
+            cmd.Parameters.Add("@pending", SqlDbType.DateTime2).Value = (object?)pendingUntil ?? DBNull.Value;
+            cmd.Parameters.Add("@group", SqlDbType.BigInt).Value = groupId;
+            cmd.ExecuteNonQuery();
+        }
+
+        // Tambah potongan loss (loss baru atau lanjutan di shift berikutnya). false = sudah ada loss terbuka di database
+        // (dicatat Plclogger lain): tidak dicatat dobel, status dimuat ulang dari database pada sampel berikutnya.
+        private bool InsertLossSegment(SqlConnection conn, OpenLoss seg, List<LossReason>? reasons)
+        {
+            var (productionDate, shiftNo, _) = ShiftOf(seg.StartAt);
+            using var cmd = new SqlCommand($@"
+                INSERT INTO dbo.{LossEventTable} (MachineCode, ProductionDate, ShiftNo, Model, StartAt, EndAt, DurationMin, R103Offset, GroupId, ReasonsAtStart, UpdatedAt)
+                OUTPUT INSERTED.Id
+                VALUES (@mc, @pd, @shift, @model, @start, NULL, @dur, @offset, @group, @reasons, SYSDATETIME())", conn);
+            cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+            cmd.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate;
+            cmd.Parameters.Add("@shift", SqlDbType.TinyInt).Value = shiftNo;
+            cmd.Parameters.Add("@model", SqlDbType.NVarChar, 50).Value = seg.Model;
+            cmd.Parameters.Add("@start", SqlDbType.DateTime2).Value = seg.StartAt;
+            cmd.Parameters.Add("@dur", SqlDbType.Int).Value = seg.DurationMin;
+            cmd.Parameters.Add("@offset", SqlDbType.Int).Value = seg.Offset;
+            cmd.Parameters.Add("@group", SqlDbType.BigInt).Value = seg.GroupId > 0 ? seg.GroupId : DBNull.Value;
+            cmd.Parameters.Add("@reasons", SqlDbType.NVarChar, 2000).Value = reasons == null ? DBNull.Value : JsonSerializer.Serialize(reasons);
+            try
+            {
+                seg.Id = (long)cmd.ExecuteScalar()!;
+            }
+            catch (SqlException ex) when (ex.Number == 2601 || ex.Number == 2627)
+            {
+                Console.WriteLine("[LOSS] Sudah ada loss terbuka di database (Plclogger lain?), tidak dicatat dobel.");
+                _openLoss = null;
+                _openLossLoaded = false;
+                return false;
+            }
+            if (seg.GroupId <= 0)
+            {
+                seg.GroupId = seg.Id;
+                using var upd = new SqlCommand($"UPDATE dbo.{LossEventTable} SET GroupId = Id WHERE Id = @id", conn);
+                upd.Parameters.Add("@id", SqlDbType.BigInt).Value = seg.Id;
+                upd.ExecuteNonQuery();
+            }
+            _openLoss = seg;
+            return true;
+        }
+
+        private void StartLoss(SqlConnection conn, PlcMainScreen s, int r103, DateTime now)
+        {
+            var reasons = ReadLossReasons();
+            TryResolvePendingReason(conn, reasons); // cek terakhir untuk loss sebelumnya
+            if (_pendingLossReason is { } pending) SaveLossReason(conn, pending.GroupId, null, null, null); // berhenti menunggu
+            _pendingLossReason = null;
+
+            // R103 sudah menghitung menit sejak loss mulai
+            var startAt = now.AddMinutes(-r103);
+            startAt = startAt.AddTicks(-(startAt.Ticks % TimeSpan.TicksPerSecond));
+            var first = new OpenLoss { StartAt = startAt, Model = (s.Model ?? "").Trim(), StartReasons = reasons };
+            if (!InsertLossSegment(conn, first, reasons)) return;
+            UpdateOpenLoss(conn, r103, now); // isi durasi, sekaligus potong per shift kalau loss sudah melewati akhir shift
+        }
+
+        // Perbarui durasi loss terbuka; kalau sudah melewati akhir shift, tutup potongan di akhir shift dan lanjut di shift berikutnya
+        private void UpdateOpenLoss(SqlConnection conn, int r103, DateTime now)
+        {
+            var open = _openLoss!;
+            var plan = PlanLossSegments(open.StartAt, open.Offset, r103, now);
+            for (int i = 0; i < plan.Count - 1; i++)
+            {
+                using (var cmd = new SqlCommand($@"
+                    UPDATE dbo.{LossEventTable} SET EndAt = @end, DurationMin = @dur, UpdatedAt = SYSDATETIME() WHERE Id = @id", conn))
+                {
+                    cmd.Parameters.Add("@end", SqlDbType.DateTime2).Value = plan[i].End!.Value;
+                    cmd.Parameters.Add("@dur", SqlDbType.Int).Value = plan[i].Minutes;
+                    cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = open.Id;
+                    cmd.ExecuteNonQuery();
+                }
+                var next = new OpenLoss
+                {
+                    GroupId = open.GroupId, StartAt = plan[i + 1].Start, Offset = plan[i + 1].Offset,
+                    Model = open.Model, StartReasons = open.StartReasons
+                };
+                if (!InsertLossSegment(conn, next, null)) return;
+                open = next;
+            }
+
+            int duration = plan[^1].Minutes;
+            if (duration != open.DurationMin)
+            {
+                using var upd = new SqlCommand($"UPDATE dbo.{LossEventTable} SET DurationMin = @dur, UpdatedAt = SYSDATETIME() WHERE Id = @id", conn);
+                upd.Parameters.Add("@dur", SqlDbType.Int).Value = duration;
+                upd.Parameters.Add("@id", SqlDbType.BigInt).Value = open.Id;
+                upd.ExecuteNonQuery();
+                open.DurationMin = duration;
+            }
+        }
+
+        private void CloseLoss(SqlConnection conn, DateTime now)
+        {
+            var open = _openLoss!;
+            using (var cmd = new SqlCommand($"UPDATE dbo.{LossEventTable} SET EndAt = @end, UpdatedAt = SYSDATETIME() WHERE Id = @id", conn))
+            {
+                cmd.Parameters.Add("@end", SqlDbType.DateTime2).Value = LossEndAt(open.StartAt, open.DurationMin, now);
+                cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = open.Id;
+                cmd.ExecuteNonQuery();
+            }
+            var (name, detail) = LossReasonDelta(open.StartReasons, ReadLossReasons());
+            if (name != null) SaveLossReason(conn, open.GroupId, name, detail, null);
+            else
+            {
+                var until = now + LossReasonLateWindow;
+                SaveLossReason(conn, open.GroupId, null, null, until);
+                _pendingLossReason = (open.GroupId, open.StartReasons, until);
+            }
+            _openLoss = null;
+        }
+
+        // Akumulasi untuk halaman AC OEE: LOSS TIME model yang sedang jalan (reset saat ganti model / jam 07:00)
+        // dan TOTAL LOSS TIME per shift hari produksi berjalan (shift yang belum mulai = null).
+        public int? LossModelMinutes { get; private set; }
+        public int?[]? LossShiftMinutes { get; private set; }
+        public DateTime LossAggregatesAt { get; private set; } = DateTime.MinValue;
+        private string? _lossSeenModel;
+        private DateTime _lossSeenModelAt, _lossSeenModelDay;
+
+        public void RefreshLossAggregates(string? model, DateTime now)
+        {
+            var (currentDate, currentShift, _) = ShiftOf(now);
+            model = (model ?? "").Trim();
+            if (model != _lossSeenModel || _lossSeenModelDay != currentDate)
+            {
+                _lossSeenModel = model;
+                _lossSeenModelAt = now;
+                _lossSeenModelDay = currentDate;
+            }
+
+            using var conn = new SqlConnection(DbConnectionString);
+            conn.Open();
+
+            var shifts = new int?[3];
+            for (int no = 1; no <= currentShift; no++) shifts[no - 1] = 0;
+            using (var cmd = new SqlCommand($@"
+                SELECT ShiftNo, SUM(DurationMin) FROM dbo.{LossEventTable}
+                WHERE MachineCode = @mc AND ProductionDate = @pd GROUP BY ShiftNo", conn))
+            {
+                cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                cmd.Parameters.Add("@pd", SqlDbType.Date).Value = currentDate;
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    int no = r.GetByte(0);
+                    if (no >= 1 && no <= 3) shifts[no - 1] = r.GetInt32(1);
+                }
+            }
+
+            int? modelLoss = null;
+            if (model.Length > 0)
+            {
+                // Awal model yang sedang jalan: run terakhir hari ini di PlcKyoshinChangePlan kalau modelnya sama dan masih berlangsung,
+                // selain itu saat Plclogger pertama melihat model ini
+                var runStart = _lossSeenModelAt;
+                using (var cmd = new SqlCommand($@"
+                    SELECT TOP 1 Model, StartAt, EndAt FROM dbo.{ChangePlanTable}
+                    WHERE MachineCode = @mc AND ProductionDate = @pd ORDER BY RunNo DESC", conn))
+                {
+                    cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                    cmd.Parameters.Add("@pd", SqlDbType.Date).Value = currentDate;
+                    using var r = cmd.ExecuteReader();
+                    if (r.Read() && r.GetString(0).Trim() == model && now - r.GetDateTime(2) < TimeSpan.FromMinutes(3) && r.GetDateTime(1) < runStart)
+                        runStart = r.GetDateTime(1);
+                }
+                using (var cmd = new SqlCommand($@"
+                    SELECT ISNULL(SUM(DurationMin), 0) FROM dbo.{LossEventTable}
+                    WHERE MachineCode = @mc AND ProductionDate = @pd AND Model = @model AND StartAt >= @runStart", conn))
+                {
+                    cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                    cmd.Parameters.Add("@pd", SqlDbType.Date).Value = currentDate;
+                    cmd.Parameters.Add("@model", SqlDbType.NVarChar, 50).Value = model;
+                    cmd.Parameters.Add("@runStart", SqlDbType.DateTime2).Value = runStart.AddMinutes(-5); // loss yang mulai tepat saat ganti model
+                    modelLoss = (int)cmd.ExecuteScalar()!;
+                }
+            }
+
+            LossShiftMinutes = shifts;
+            LossModelMinutes = modelLoss;
+            LossAggregatesAt = now;
         }
 
         private string _lastPlcDataHash = string.Empty;
@@ -1977,6 +2413,11 @@ namespace Plclogger
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            if (!_svc.IsLoggerHost)
+            {
+                Console.WriteLine($"[TREND] PC ini ({Environment.MachineName}) bukan server logger ({_svc.LoggerMachineName}); riwayat PLC & change plan tidak dicatat dari sini.");
+                return;
+            }
             bool missingTableReported = false, missingChangePlanReported = false;
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -2015,12 +2456,60 @@ namespace Plclogger
                 catch (SqlException ex) when (ex.Number == 208)
                 {
                     if (!missingChangePlanReported)
-                        Console.WriteLine("[CHANGE PLAN] Tabel dbo.PlcKyoshinChangePlan belum ada (jalankan database_plc_kyoshin_change_plan.sql).");
+                        Console.WriteLine("[CHANGE PLAN] Tabel dbo.PlcKyoshinChangePlan / PlcKyoshinDailyOutput belum ada (jalankan database_plc_kyoshin_change_plan.sql & database_plc_kyoshin_daily_output.sql).");
                     missingChangePlanReported = true;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     Console.WriteLine($"[CHANGE PLAN] Gagal menghitung change plan Kyoshin: {ex.Message.Split('\n')[0]}");
+                }
+            }
+        }
+    }
+
+    // Pantau R103 (timer loss) tiap 5 detik: catat kejadian loss ke dbo.PlcKyoshinLossEvent dan hitung akumulasi
+    // LOSS TIME per model & TOTAL LOSS TIME per shift untuk AC OEE. Hanya membaca PLC.
+    public class KyoshinLossLogger : BackgroundService
+    {
+        private static readonly TimeSpan Interval = TimeSpan.FromSeconds(5);
+        private readonly FactoryDataService _svc;
+
+        public KyoshinLossLogger(FactoryDataService svc) => _svc = svc;
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            bool missingTableReported = false;
+            bool isLoggerHost = _svc.IsLoggerHost;
+            if (!isLoggerHost)
+                Console.WriteLine($"[LOSS] PC ini ({Environment.MachineName}) bukan server logger ({_svc.LoggerMachineName}); kejadian loss tidak dicatat dari sini (hanya dibaca).");
+            string? lastModel = null;
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try { await Task.Delay(Interval, stoppingToken); }
+                catch (TaskCanceledException) { break; }
+
+                try
+                {
+                    var now = DateTime.Now;
+                    var screen = await Task.Run(() => _svc.ReadMainScreen(), stoppingToken);
+                    // PLC offline: kejadian yang terbuka dibiarkan terbuka sampai PLC terbaca lagi
+                    if (screen.Live && (now - screen.ReadAtTime).TotalSeconds < 10)
+                    {
+                        if (isLoggerHost) await Task.Run(() => _svc.ProcessLossSample(screen, now), stoppingToken);
+                        lastModel = screen.Model;
+                    }
+                    await Task.Run(() => _svc.RefreshLossAggregates(lastModel, now), stoppingToken);
+                    missingTableReported = false;
+                }
+                catch (SqlException ex) when (ex.Number == 208)
+                {
+                    if (!missingTableReported)
+                        Console.WriteLine("[LOSS] Tabel dbo.PlcKyoshinLossEvent / PlcKyoshinChangePlan belum ada (jalankan database_plc_kyoshin_loss_event.sql).");
+                    missingTableReported = true;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    Console.WriteLine($"[LOSS] Gagal memproses loss time Kyoshin: {ex.Message.Split('\n')[0]}");
                 }
             }
         }
@@ -2109,6 +2598,7 @@ namespace Plclogger
             // builder.Services.AddHostedService<ShiftSchedulerBackgroundService>();
             // Pencatat riwayat layar utama GOT (hanya baca PLC) untuk grafik Plan vs Actual AC OEE
             builder.Services.AddHostedService<MainScreenTrendLogger>();
+            builder.Services.AddHostedService<KyoshinLossLogger>();
             builder.Services.AddSingleton<LossTimeService>();
             // builder.Services.AddHostedService<LossTimeBackgroundService>();
 
@@ -2206,7 +2696,24 @@ namespace Plclogger
             });
 
             // 5b. Layar utama GOT (B-1): Model, Prod. Plan, Actual, Plan, Difference, Defect, Loss Time (hanya baca)
-            app.MapGet("/api/plc/main", (FactoryDataService svc) => Results.Ok(svc.ReadMainScreen()));
+            app.MapGet("/api/plc/main", (FactoryDataService svc) =>
+            {
+                var screen = svc.ReadMainScreen();
+                // Akumulasi loss dari KyoshinLossLogger (tiap 5 detik); kosong kalau logger/tabel belum jalan
+                bool fresh = DateTime.Now - svc.LossAggregatesAt < TimeSpan.FromSeconds(30);
+                screen.ModelLossMin = fresh ? svc.LossModelMinutes : null;
+                screen.ShiftLossMin = fresh ? svc.LossShiftMinutes : null;
+                return Results.Ok(screen);
+            });
+
+            // 18 reason layar GOT LOSS TIME (R410..R589), untuk cek alamat & isi reason
+            app.MapGet("/api/plc/loss-reasons", (FactoryDataService svc) =>
+            {
+                var reasons = svc.ReadLossReasons();
+                return reasons == null
+                    ? Results.Ok(new { Success = false, Message = "PLC tidak terbaca." })
+                    : Results.Ok(new { Success = true, Reasons = reasons });
+            });
 
             // 6. Baca data saat ini dari PLC dengan Change Detection (Hanya kirim rows jika ada perubahan)
             app.MapGet("/api/plc/read", (FactoryDataService svc, HttpContext ctx) =>

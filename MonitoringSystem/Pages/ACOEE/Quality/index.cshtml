@@ -30,23 +30,21 @@
         <div class="row g-3 quality-main-row">
             <div class="col-md-2 quality-filter-column">
                 <div class="grid-border">
-                    <label class="fw-semibold" style="font-size: 0.9rem; color: var(--panasonic-blue); margin-bottom: 8px; display: block;">SELECT MACHINE</label>
-                    <select class="form-control" id="machineDropdown" style="background-color: white; border: 2px solid var(--panasonic-blue); color: var(--text-dark); padding: 8px; border-radius: 5px; margin-bottom: 10px;">
-                        <option value="Expander" selected>Expander Kyoshin 635</option>
+                    <label class="fw-semibold" style="font-size: 0.9rem; color: var(--panasonic-blue); margin-bottom: 8px; display: block;">SELECT LINE</label>
+                    <select class="form-control" id="machineDropdown" name="MachineCode" style="background-color: white; border: 2px solid var(--panasonic-blue); color: var(--text-dark); padding: 8px; border-radius: 5px; margin-bottom: 10px;">
+                        <option value="MCH1-01" selected>CU (MCH1-01)</option>
                     </select>
                 </div>
 
                 <div class="grid-border quality-station-panel">
                     <div class="section-title" style="font-size:1rem;">STATION</div>
                     <div class="btn-custom-group">
-                            <button type="submit" name="Station" value="" class="@(string.IsNullOrEmpty(Model.Station) ? "btn-blue-active" : "btn-outline-inactive")">ALL STATION</button>
-                            <button type="submit" name="Station" value="Chassis" class="@(Model.Station == "Chassis" ? "btn-blue-active" : "btn-outline-inactive")">CHASSIS</button>
-                            <button type="submit" name="Station" value="PREPARING" class="@(Model.Station == "PREPARING" ? "btn-blue-active" : "btn-outline-inactive")">PREPARING</button>
-                            <button type="submit" name="Station" value="GAS LEAK" class="@(Model.Station == "GAS LEAK" ? "btn-blue-active" : "btn-outline-inactive")">GAS LEAK</button>
-                            <button type="submit" name="Station" value="STARTING - RUNNING" class="@(Model.Station == "STARTING - RUNNING" ? "btn-blue-active" : "btn-outline-inactive")">RUNNING</button>
-                            <button type="submit" name="Station" value="INNER" class="@(Model.Station == "INNER" ? "btn-blue-active" : "btn-outline-inactive")">INNER</button>
-                            <button type="submit" name="Station" value="FINAL" class="@(Model.Station == "FINAL" ? "btn-blue-active" : "btn-outline-inactive")">FINAL</button>
-                            <button type="submit" name="Station" value="DETAIL" class="@(Model.Station == "DETAIL" ? "btn-blue-active" : "btn-outline-inactive")">DETAIL</button>
+                            @* Halaman dibuka langsung di stasiun EXPANDER 635; selalu ada satu stasiun yang aktif *@
+                            @foreach (var st in new[] { ("Fix 80", "FIX 80"), ("Expander 635", "EXPANDER 635"), ("Condenser", "CONDENSER") })
+                            {
+                                bool active = string.Equals(Model.Station, st.Item1, StringComparison.OrdinalIgnoreCase);
+                                <button type="submit" name="Station" value="@st.Item1" class="@(active ? "btn-blue-active" : "btn-outline-inactive")">@st.Item2</button>
+                            }
                     </div>
                 </div>
 

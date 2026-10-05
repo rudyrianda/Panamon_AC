@@ -27,3 +27,15 @@ BEGIN
     CREATE INDEX IX_PlcKyoshinTrend_Shift ON dbo.PlcKyoshinTrend (MachineCode, ProductionDate, ShiftNo, SampleAt);
 END
 GO
+
+-- -------------------------------------------------------------------------
+-- 2026-10-05: satu sampel per mesin per menit (cegah dobel kalau ada dua Plclogger).
+-- Sampel dobel lama dihapus (yang Id-nya terkecil dipertahankan), lalu dibuat index unik.
+-- -------------------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_PlcKyoshinTrend_Minute' AND object_id = OBJECT_ID(N'dbo.PlcKyoshinTrend'))
+BEGIN
+    ;WITH d AS (SELECT Id, ROW_NUMBER() OVER (PARTITION BY MachineCode, SampleAt ORDER BY Id) AS rn FROM dbo.PlcKyoshinTrend)
+    DELETE FROM d WHERE rn > 1;
+    CREATE UNIQUE INDEX UX_PlcKyoshinTrend_Minute ON dbo.PlcKyoshinTrend (MachineCode, SampleAt);
+END
+GO

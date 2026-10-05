@@ -21,6 +21,13 @@ namespace MonitoringSystem.Services.SapPlanImport
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            var onlyOn = (_options.CurrentValue.OnlyOnMachine ?? "").Trim();
+            if (onlyOn.Length > 0 && !string.Equals(Environment.MachineName, onlyOn, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("SapPlanImport: PC ini ({Machine}) bukan server ({Server}); jadwal otomatis tidak dijalankan.",
+                    Environment.MachineName, onlyOn);
+                return;
+            }
             try
             {
                 await Task.Delay(TimeSpan.FromSeconds(Math.Max(0, _options.CurrentValue.StartupDelaySeconds)), stoppingToken);

@@ -122,30 +122,18 @@ namespace MonitoringSystem.Pages.ACOEE.LossTimeReport
         {
             string[] months = { "April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March" };
 
-            // Pengambilan actual dari logic line lama (CU/CS), termasuk agregasi "All",
-            // dinonaktifkan sampai mapping backend untuk dropdown machine baru tersedia.
-            // Struktur kategori tetap dikirim ke frontend dengan nilai actual 0.
-            var actualsRaw = new List<MonthlyCategoryData>();
+            // Actual = loss time Expander Kyoshin 635 dari PLC (kejadian loss timer R103, sama dengan Detail Loss Time),
+            // dijumlah per bulan per kategori reason GOT.
+            var actualsRaw = GetKyoshinPlcMonthlyLoss(SelectedYear);
 
             // Pengambilan data BP/plan dinonaktifkan sementara.
             // Koleksi kosong dipertahankan agar struktur tabel dan chart BP di frontend tetap tersedia.
             var plansRaw = new List<MonthlyCategoryData>();
 
-            // Semua kategori untuk Tabel
-            var allCats = WorkingLossCategories
-                          .Append("Other")
-                          .Union(actualsRaw.Select(x => x.Category))
-                          .Union(plansRaw.Select(x => x.Category))
-                          .Distinct()
-                          .ToList();
-
-            Categories = allCats
-                .OrderBy(c => {
-                    string group = GetCategoryGroup(c);
-                    return group == "Working Loss" ? 1 : 2;
-                })
-                .ThenBy(c => c)
-                .ToList();
+            // Kategori tabel, legend, dan bar = nama kotak reason GOT LOSS TIME di PLC saat ini (urutan GOT, sama dengan
+            // Detail Loss Time) + nama lama yang punya data di fiscal year ini + OTHER
+            Categories = AcOeeLossCategories.BuildCategoryList(GotSlots,
+                actualsRaw.Select(x => x.Category).Concat(plansRaw.Select(x => x.Category)));
 
             // Khusus Legend & Data Grafik (Hanya Working Loss)
             LegendCategories = Categories
@@ -212,6 +200,8 @@ namespace MonitoringSystem.Pages.ACOEE.LossTimeReport
                 // Filter dictionary agar JS Chart hanya merender Working Loss
                 Actuals = DetailActuals.Where(x => LegendCategories.Contains(x.Key)).ToDictionary(x => x.Key, x => x.Value),
                 Plans = DetailPlans.Where(x => LegendCategories.Contains(x.Key)).ToDictionary(x => x.Key, x => x.Value),
+                Colors = AcOeeLossCategories.BuildColors(GotSlots, Categories), // warna per nomor kotak, sama dengan Detail Loss Time
+                DisplayNames = Categories.ToDictionary(c => c, AcOeeLossCategories.DisplayName), // tampilan "Model Change"; kunci tetap nama asli
                 RatioActualVsBp = RatioActualVsBp
             };
 
@@ -221,6 +211,8 @@ namespace MonitoringSystem.Pages.ACOEE.LossTimeReport
         public string GetCategoryGroup(string categoryName)
         {
             if (string.IsNullOrWhiteSpace(categoryName)) return "Working Loss";
+            // Semua kategori reason GOT (termasuk nama lama & OTHER) tampil di legend, bar, dan total loss
+            if (AcOeeLossCategories.Match(categoryName, Categories) != null) return "Working Loss";
             string lowerCat = categoryName.ToLower().Trim();
 
             if (lowerCat.Contains("break time") || lowerCat.Contains("company activity") ||
@@ -288,6 +280,40 @@ namespace MonitoringSystem.Pages.ACOEE.LossTimeReport
             public int Month { get; set; }
             public string Category { get; set; }
             public double Total { get; set; }
+        }
+
+        private List<AcOeeLossCategories.Slot>? _gotSlots;
+        private List<AcOeeLossCategories.Slot> GotSlots => _gotSlots ??= AcOeeLossCategories.LoadCurrentSlots(_connectionString);
+
+        // Loss time PLC Kyoshin (tabel PlcKyoshinLossEvent) per bulan fiscal year (April - Maret), menit.
+        // Kategori = nama kotak reason GOT saat ini; nama lama tetap jadi kategorinya sendiri; reason kosong masuk OTHER.
+        private List<MonthlyCategoryData> GetKyoshinPlcMonthlyLoss(int fiscalYear)
+        {
+            var result = new List<MonthlyCategoryData>();
+            try
+            {
+                using var conn = new SqlConnection(_connectionString);
+                conn.Open();
+                using var cmd = new SqlCommand(@"
+                    SELECT MONTH(ProductionDate) AS Month, ISNULL(ReasonName, '') AS Reason, SUM(DurationMin) AS TotalMinutes
+                    FROM dbo.PlcKyoshinLossEvent
+                    WHERE MachineCode = 'MCH1-01' AND DurationMin > 0
+                      AND ProductionDate >= @start AND ProductionDate < @end
+                    GROUP BY MONTH(ProductionDate), ISNULL(ReasonName, '')", conn);
+                cmd.Parameters.AddWithValue("@start", new DateTime(fiscalYear, 4, 1));
+                cmd.Parameters.AddWithValue("@end", new DateTime(fiscalYear + 1, 4, 1));
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var category = AcOeeLossCategories.ForPlcReason(reader.GetString(1), GotSlots);
+                    int month = reader.GetInt32(0);
+                    var row = result.FirstOrDefault(x => x.Month == month && x.Category == category);
+                    if (row == null) result.Add(row = new MonthlyCategoryData { Month = month, Category = category });
+                    row.Total += Convert.ToDouble(reader["TotalMinutes"]);
+                }
+            }
+            catch (Exception ex) { Console.WriteLine($"Error GetKyoshinPlcMonthlyLoss: {ex.Message}"); }
+            return result;
         }
 
         private List<MonthlyCategoryData> GetDetailedActualData(int fiscalYear, string line)

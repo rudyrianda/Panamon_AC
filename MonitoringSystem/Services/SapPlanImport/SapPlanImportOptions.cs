@@ -8,6 +8,10 @@ namespace MonitoringSystem.Services.SapPlanImport
         /// <summary>Worker aktif atau tidak.</summary>
         public bool Enabled { get; set; } = false;
 
+        /// <summary>Jadwal otomatis hanya jalan di PC dengan nama ini (server), supaya Panamon di laptop/PC lain
+        /// tidak ikut import ke database yang sama. Kosongkan ("") untuk mengizinkan semua PC.</summary>
+        public string OnlyOnMachine { get; set; } = "29485ACP101-103";
+
         /// <summary>True = hanya hitung & tulis ringkasan ke file, TIDAK menulis database.</summary>
         public bool DryRun { get; set; } = true;
 

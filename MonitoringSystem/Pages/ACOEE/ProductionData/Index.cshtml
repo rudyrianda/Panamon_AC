@@ -93,7 +93,7 @@
                         <div><dt>PLAN BY SUT</dt><dd><span>:</span> <output id="planBySutValue">1170</output></dd></div>
                         <div><dt>ACTUAL</dt><dd><span>:</span> <output id="productionActualValue">...</output></dd></div>
                         <div><dt>DIFFERENCE</dt><dd id="productionDifference"><span>:</span> <output id="productionDifferenceValue">...</output></dd></div>
-                        @* Tab PLC (Expander Kyoshin 635): baris ini jadi LOSS TIME (R50); tab lain REMAINING *@
+                        @* Tab PLC (Expander Kyoshin 635): baris ini jadi LOSS TIME (akumulasi R103 model yang sedang jalan); tab lain REMAINING *@
                         <div><dt id="productionRemainingLabel">REMAINING</dt><dd id="productionRemainingValue"><span>:</span> <output>...</output></dd></div>
                         <div>
                             <dt>TOTAL NG</dt>
@@ -162,7 +162,7 @@
 
             <section class="detail-grid">
                 <article class="glass-panel shift-summary">
-                    @* TOTAL LOSS TIME: tab PLC (Expander Kyoshin 635) mengisi shift yang sedang berjalan dari LOSS TIME R50 *@
+                    @* TOTAL LOSS TIME: tab PLC (Expander Kyoshin 635) mengisi akumulasi loss R103 per shift *@
                     <div class="shift-block shift-one">
                         <strong><i></i>SHIFT #1</strong>
                         <dl><div><dt>WORKING TIME</dt><dd>: <b id="shiftWorkTime1">473</b></dd></div><div><dt>TOTAL LOSS TIME</dt><dd>: <b id="shiftStopTime1">7</b></dd></div><div><dt>LOAD TIME</dt><dd>: <b id="shiftLoadTime1">159</b></dd></div></dl>
