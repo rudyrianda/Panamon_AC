@@ -22,7 +22,7 @@ namespace MonitoringSystem.Pages.CAC.Summary
         public string? FilterDate { get; set; }
 
         [BindProperty(SupportsGet = true)]
-        public string? FilterMachineLine { get; set; } = "CAC";
+        public string? FilterMachineLine { get; set; } = "CAC-ALL";
 
         public List<PwkData> listData { get; set; } = new();
 

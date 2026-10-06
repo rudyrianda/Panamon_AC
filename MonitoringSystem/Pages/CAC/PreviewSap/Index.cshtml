@@ -120,6 +120,7 @@
         <div class="d-flex align-items-center">
             <label for="MachineLine">Line</label>
             <select class="form-select form-select-sm" style="width: 150px" name="MachineLine" id="MachineLine">
+                <option value="CAC-ALL" selected="@(Model.MachineLine == "CAC-ALL")">All</option>
                 <option value="CAC" selected="@(Model.MachineLine == "CAC")">CAC</option>
                 <option value="SKD" selected="@(Model.MachineLine == "SKD")">SKD</option>
                 <option value="STANDING FLOOR" selected="@(Model.MachineLine == "STANDING FLOOR")">Standing Floor</option>

@@ -46,7 +46,7 @@ namespace MonitoringSystem.Pages.CAC.Shared
 
         public void OnGet()
         {
-            if (string.IsNullOrEmpty(FilterMachineCode)) FilterMachineCode = "MCH1-01";
+            if (string.IsNullOrEmpty(FilterMachineCode)) FilterMachineCode = "CAC";
             CurrentDate = FilterDate.HasValue ? FilterDate.Value.Date : DateTime.Now.Date;
             getListModelName();
             InsertProductionPlanNow();
@@ -68,7 +68,7 @@ namespace MonitoringSystem.Pages.CAC.Shared
                         WHERE P.MachineCode = @MachineCode;";
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
-                        command.Parameters.AddWithValue("@MachineCode", FilterMachineCode ?? "MCH1-01");
+                        command.Parameters.AddWithValue("@MachineCode", FilterMachineCode ?? "CAC");
                         using (SqlDataReader dataReader = command.ExecuteReader())
                         {
                             while (dataReader.Read())
@@ -111,7 +111,7 @@ namespace MonitoringSystem.Pages.CAC.Shared
                     using (SqlCommand command = new SqlCommand(query, connection))
                     {
                         command.Parameters.AddWithValue("@CurrentDate", CurrentDate);
-                        command.Parameters.AddWithValue("@MachineCode", FilterMachineCode ?? "MCH1-01");
+                        command.Parameters.AddWithValue("@MachineCode", FilterMachineCode ?? "CAC");
 
                         using (SqlDataReader reader = command.ExecuteReader())
                         {
@@ -195,7 +195,7 @@ namespace MonitoringSystem.Pages.CAC.Shared
                     using (SqlCommand cmdSap = new SqlCommand(querySapPlan, connection))
                     {
                         cmdSap.Parameters.AddWithValue("@CurrentDate", CurrentDate);
-                        cmdSap.Parameters.AddWithValue("@MachineCode", FilterMachineCode ?? "MCH1-01");
+                        cmdSap.Parameters.AddWithValue("@MachineCode", FilterMachineCode ?? "CAC");
 
                         using (SqlDataReader reader = cmdSap.ExecuteReader())
                         {
@@ -232,7 +232,7 @@ namespace MonitoringSystem.Pages.CAC.Shared
                     using (SqlCommand commandSelectAll = new SqlCommand(querySelectAllData, connection))
                     {
                         commandSelectAll.Parameters.AddWithValue("@CurrentDate", CurrentDate);
-                        commandSelectAll.Parameters.AddWithValue("@MachineCode", FilterMachineCode ?? "MCH1-01");
+                        commandSelectAll.Parameters.AddWithValue("@MachineCode", FilterMachineCode ?? "CAC");
 
                         using (SqlDataReader dataReader = commandSelectAll.ExecuteReader())
                         {
@@ -301,7 +301,7 @@ namespace MonitoringSystem.Pages.CAC.Shared
         {
             string productName = Request.Form["ProductName"];
             string machineCode = Request.Form["FilterMachineCode"];
-            if (string.IsNullOrEmpty(machineCode)) machineCode = FilterMachineCode ?? "MCH1-01";
+            if (string.IsNullOrEmpty(machineCode)) machineCode = FilterMachineCode ?? "CAC";
 
             string filterDateString = Request.Form["FilterDate"];
             if (string.IsNullOrEmpty(filterDateString) && FilterDate.HasValue)
@@ -415,7 +415,7 @@ namespace MonitoringSystem.Pages.CAC.Shared
                         using (SqlCommand cmdDel = new SqlCommand(queryDelOld, connection))
                         {
                             cmdDel.Parameters.AddWithValue("@PlanId", planId);
-                            cmdDel.Parameters.AddWithValue("@Mc2", FilterMachineCode ?? "MCH1-01");
+                            cmdDel.Parameters.AddWithValue("@Mc2", FilterMachineCode ?? "CAC");
                             cmdDel.ExecuteNonQuery();
                         }
                     }
@@ -565,7 +565,7 @@ namespace MonitoringSystem.Pages.CAC.Shared
                             else
                             {
                                 cmd.Parameters.AddWithValue("@Pid", planId);
-                                string mCode = FilterMachineCode ?? "MCH1-01";
+                                string mCode = FilterMachineCode ?? "CAC";
                                 string qM = "SELECT TOP 1 MachineCode FROM Product WHERE ProductName = @Pn";
                                 using (SqlCommand cM = new SqlCommand(qM, connection))
                                 {
@@ -614,7 +614,7 @@ namespace MonitoringSystem.Pages.CAC.Shared
             string recordId = Request.Form["RecordId"];
             string filterDateString = Request.Form["FilterDate"];
             string filterMachine = Request.Form["FilterMachineCode"];
-            if (string.IsNullOrEmpty(filterMachine)) filterMachine = FilterMachineCode ?? "MCH1-01";
+            if (string.IsNullOrEmpty(filterMachine)) filterMachine = FilterMachineCode ?? "CAC";
             if (string.IsNullOrEmpty(filterDateString) && FilterDate.HasValue) filterDateString = FilterDate.Value.ToString("yyyy-MM-dd");
             if (string.IsNullOrEmpty(filterDateString)) filterDateString = DateTime.Now.ToString("yyyy-MM-dd");
             try
@@ -647,7 +647,7 @@ namespace MonitoringSystem.Pages.CAC.Shared
             int planId = 0;
             string filterDateString = Request.Form["FilterDate"];
             string filterMachine = Request.Form["FilterMachineCode"];
-            if (string.IsNullOrEmpty(filterMachine)) filterMachine = FilterMachineCode ?? "MCH1-01";
+            if (string.IsNullOrEmpty(filterMachine)) filterMachine = FilterMachineCode ?? "CAC";
             if (string.IsNullOrEmpty(filterDateString) && FilterDate.HasValue) filterDateString = FilterDate.Value.ToString("yyyy-MM-dd");
             if (string.IsNullOrEmpty(filterDateString)) filterDateString = DateTime.Now.ToString("yyyy-MM-dd");
             

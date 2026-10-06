@@ -71,7 +71,7 @@ namespace MonitoringSystem.Pages.CAC.LossTimeReport
         public int SelectedYear { get; set; } = DateTime.Today.Year;
 
         [BindProperty(SupportsGet = true)]
-        public string MachineLine { get; set; } = "CAC";
+        public string MachineLine { get; set; } = "CAC-ALL";
 
         [BindProperty]
         public string UploadMachineLine { get; set; }

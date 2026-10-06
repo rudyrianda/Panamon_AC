@@ -25,7 +25,7 @@ namespace MonitoringSystem.Pages.CAC.Inventory
         public int? FilterTahun { get; set; }
 
         [BindProperty(SupportsGet = true)]
-        public string FilterMachineLine { get; set; } = "CAC";
+        public string FilterMachineLine { get; set; } = "CAC-ALL";
 
         // Bulan & tahun yang benar-benar dipakai (fallback ke bulan/tahun sekarang)
         public int ActiveBulan { get; set; }

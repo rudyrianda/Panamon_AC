@@ -48,7 +48,7 @@ namespace MonitoringSystem.Pages.CAC.LossTime
         [BindProperty] public int SelectedYear { get; set; } = DateTime.Today.Year;
         [BindProperty] public int TargetYear { get; set; } = DateTime.Today.Year;
         [BindProperty] public int TargetMonth { get; set; } = DateTime.Today.Month;
-        [BindProperty] public string MachineLine { get; set; } = "CAC";
+        [BindProperty] public string MachineLine { get; set; } = "CAC-ALL";
         [BindProperty] public string SelectedSource { get; set; } = "Assembly";
         [BindProperty] public string SelectedMachineName { get; set; } = "All";
         [BindProperty] public List<string> SelectedShifts { get; set; } = new List<string> { "1", "2", "3" };
@@ -359,7 +359,7 @@ namespace MonitoringSystem.Pages.CAC.LossTime
             SelectedMonth = DateTime.Today.Month;
             SelectedYear = DateTime.Today.Year;
             SetDatesFromMonthYear();
-            MachineLine = "All";
+            MachineLine = "CAC-ALL";
             SelectedShifts = new List<string> { "1", "2", "3" };
             SelectedPageSize = DefaultPageSize;
             PageSize = DefaultPageSize;

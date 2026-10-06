@@ -22,7 +22,7 @@ public class IndexModel : PageModel
     public DateTime EndDate { get; set; } = DateTime.Today;
 
     [BindProperty(SupportsGet = true)]
-    public string MachineLine { get; set; } = "CAC";
+    public string MachineLine { get; set; } = "CAC-ALL";
 
     public List<ModelPerformance> Models { get; private set; } = new();
     public List<DailyModelPerformance> DailyRows { get; private set; } = new();
@@ -72,8 +72,8 @@ public class IndexModel : PageModel
         if (EndDate < StartDate)
             EndDate = StartDate;
 
-        if (MachineLine is not ("MCH1-01" or "MCH1-02"))
-            MachineLine = "All";
+        if (MachineLine is not ("CAC" or "SKD" or "STANDING FLOOR"))
+            MachineLine = "CAC-ALL";
     }
 
     private async Task LoadDataAsync()

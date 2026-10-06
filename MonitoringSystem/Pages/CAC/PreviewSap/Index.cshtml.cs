@@ -17,7 +17,7 @@ namespace MonitoringSystem.Pages.CAC.PreviewSap
         [BindProperty(SupportsGet = true)] public int SelectedMonth { get; set; } = DateTime.Now.Month;
         [BindProperty(SupportsGet = true)] public int SelectedYear { get; set; } = DateTime.Now.Year;
         [BindProperty(SupportsGet = true)] public int SelectedDay { get; set; } = 0; // 0 = semua tanggal
-        [BindProperty(SupportsGet = true)] public string MachineLine { get; set; } = "CAC";
+        [BindProperty(SupportsGet = true)] public string MachineLine { get; set; } = "CAC-ALL";
         [BindProperty(SupportsGet = true)] public string Shift { get; set; } = "All";
 
         public class SapPlanRow

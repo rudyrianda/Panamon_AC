@@ -95,7 +95,7 @@ namespace MonitoringSystem.Pages.CAC.ProductionReport
 
         [BindProperty(SupportsGet = true)] public int SelectedMonth { get; set; } = DateTime.Now.Month;
         [BindProperty(SupportsGet = true)] public int SelectedYear { get; set; } = DateTime.Now.Year;
-        [BindProperty(SupportsGet = true)] public string MachineLine { get; set; } = "CAC";
+        [BindProperty(SupportsGet = true)] public string MachineLine { get; set; } = "CAC-ALL";
         [BindProperty(SupportsGet = true)] public List<string> SelectedShifts { get; set; } = new List<string>();
 
         public void OnGet()
@@ -111,7 +111,7 @@ namespace MonitoringSystem.Pages.CAC.ProductionReport
         public IActionResult OnPost(string submitButton)
         {
             if (submitButton == "reset")
-                return RedirectToPage(new { SelectedYear = DateTime.Now.Year, SelectedMonth = DateTime.Now.Month, MachineLine = "All" });
+                return RedirectToPage(new { SelectedYear = DateTime.Now.Year, SelectedMonth = DateTime.Now.Month, MachineLine = "CAC-ALL" });
 
             return RedirectToPage(new
             {

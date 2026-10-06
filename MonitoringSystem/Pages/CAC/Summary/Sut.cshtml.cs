@@ -15,7 +15,7 @@ namespace MonitoringSystem.Pages.CAC.Shared
         }
 
         [BindProperty(SupportsGet = true)]
-        public string? FilterMachineCode { get; set; } = "CAC";
+        public string? FilterMachineCode { get; set; } = "CAC-ALL";
 
         public List<ProductSut> listProducts { get; set; } = new();
 

@@ -57,6 +57,7 @@
                     <div class="d-flex align-items-center gap-2">
                         <label class="mb-0">Machine Line</label>
                         <select class="form-select" style="width: 150px;" name="FilterMachineLine">
+                            <option value="CAC-ALL" selected="@(Model.FilterMachineLine == "CAC-ALL")">All</option>
                             <option value="CAC" selected="@(Model.FilterMachineLine == "CAC")">CAC</option>
                             <option value="SKD" selected="@(Model.FilterMachineLine == "SKD")">SKD</option>
                             <option value="STANDING FLOOR" selected="@(Model.FilterMachineLine == "STANDING FLOOR")">Standing Floor</option>
