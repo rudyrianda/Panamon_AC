@@ -31,12 +31,10 @@ body.production-data-page {
     grid-template-rows: clamp(63px, 6.8vh, 76px) minmax(0, 1fr);
     overflow: hidden;
     color: var(--pd-text);
-    border: 1px solid rgba(82, 123, 168, .34);
+    border: 1px solid transparent;
     border-radius: 10px;
-    background:
-        radial-gradient(circle at 50% 20%, rgba(39, 74, 114, .24), transparent 47%),
-        linear-gradient(135deg, rgba(9, 23, 42, .58), rgba(7, 20, 39, .48) 48%, rgba(10, 26, 46, .58));
-    box-shadow: inset 0 0 70px rgba(26, 69, 112, .12), 0 0 24px rgba(0, 0, 0, .22);
+    background: transparent;
+    box-shadow: none;
     font-family: "DINPro", Arial, sans-serif;
 }
 
@@ -101,7 +99,7 @@ button { color: inherit; }
 
 .production-header {
     display: grid;
-    grid-template-columns: 152px minmax(0, 1fr) 280px;
+    grid-template-columns: 152px minmax(0, 1fr);
     align-items: stretch;
     padding: 0 21px;
     border-bottom: 1px solid rgba(74, 109, 147, .2);
@@ -138,6 +136,20 @@ button { color: inherit; }
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     border-left: 1px solid rgba(95, 126, 159, .13);
+}
+
+/* Use the exact unselected-machine-tab colour across the complete top bar. */
+body.machine-production-layout:not(.light-mode) .production-header,
+body.machine-production-layout:not(.light-mode) .production-page-label,
+body.machine-production-layout:not(.light-mode) .machine-tabs-shell,
+body.machine-production-layout:not(.light-mode) .machine-tabs-controls {
+    background: #304156 !important;
+    background-image: none !important;
+    background-clip: padding-box;
+}
+
+body.machine-production-layout:not(.light-mode) .machine-tabs-controls {
+    box-shadow: none;
 }
 .machine-tabs { display: flex; min-width: 0; height: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; scroll-behavior: smooth; }
 .machine-tabs::-webkit-scrollbar { display: none; }
@@ -204,43 +216,6 @@ button { color: inherit; }
 }
 .machine-tabs-arrow:disabled { opacity: .25; cursor: default; }
 
-.production-clock {
-    position: relative;
-    display: grid;
-    grid-template-columns: 35px 107px 1fr;
-    align-items: center;
-    margin-left: 15px;
-    color: #dce8f6;
-}
-.production-date-picker {
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 142px;
-    height: 100%;
-    border: 0;
-    opacity: 0;
-    cursor: pointer;
-    z-index: 3;
-}
-.production-clock:has(.production-date-picker:hover) > i,
-.production-clock:has(.production-date-picker:focus) > i { color: #78b3ff; filter: drop-shadow(0 0 5px rgba(55, 137, 255, .65)); }
-.production-clock > i { color: #4a94ff; font-size: 20px; text-align: center; }
-.clock-date {
-    padding: 3px 16px 3px 5px;
-    border-right: 1px solid rgba(89, 124, 161, .22);
-    font-size: 12px;
-    line-height: 1.45;
-    text-align: center;
-}
-.production-clock time {
-    padding-left: 12px;
-    color: #a8d6ff;
-    font-family: Consolas, monospace;
-    font-size: 16px;
-    letter-spacing: 1.2px;
-    white-space: nowrap;
-}
-
 .production-body {
     min-width: 0;
     min-height: 0;
@@ -301,7 +276,7 @@ button { color: inherit; }
 
 .production-main {
     min-height: 0;
-    padding: clamp(16px, 1.7vh, 20px) clamp(19px, 1.15vw, 26px) clamp(15px, 1.6vh, 19px);
+    padding: clamp(16px, 1.7vh, 20px) 0 clamp(15px, 1.6vh, 19px);
     display: grid;
     grid-template-rows: minmax(412px, 49.65%) minmax(0, 1fr);
     gap: clamp(12px, 1.25vh, 15px);
@@ -352,16 +327,27 @@ body.machine-production-layout:not(.light-mode) .machine-title-panel {
 .machine-title-panel h1 { margin: 0; padding: 0 45px; font-size: clamp(25px, 1.45vw, 32px); font-weight: 700; letter-spacing: .5px; text-align: center; }
 .machine-title-panel i { position: absolute; right: 21px; color: var(--pd-blue); font-size: 23px; }
 
-.model-panel { padding: 20px 23px; }
-.model-panel h2 { margin: 0; font-size: 17px; font-weight: 500; }
+/* Isi panel model menyesuaikan tinggi panel: baris dibagi rata ke tinggi yang ada,
+   dan ukuran huruf ikut tinggi PANEL (cqh = % tinggi panel), supaya tidak keluar kotak di zoom browser berapa pun.
+   Baris pertama tiap aturan = cadangan (vh) untuk browser tanpa container query. */
+.model-panel { container-type: size; padding: clamp(10px, 1.7vh, 20px) 23px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.model-panel h2 { margin: 0; font-size: clamp(14px, 1.6vh, 17px); font-size: clamp(12px, 5.4cqh, 17px); font-weight: 500; }
 .chart-panel h2 { margin: 0; font-size: clamp(16px, .95vw, 18px); font-weight: 600; }
-.model-panel > strong { display: block; margin: 10px 0 25px; font-size: 27px; font-weight: 400; }
-.model-panel dl { margin: 0; }
-.model-panel dl > div { display: grid; grid-template-columns: 58% 1fr; margin: 0 0 9px; font-size: clamp(16px, .92vw, 19px); }
+.model-panel > strong {
+    display: block; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    margin: clamp(4px, .9vh, 10px) 0 clamp(8px, 1.8vh, 25px); margin: clamp(2px, 2cqh, 10px) 0 clamp(4px, 4cqh, 25px);
+    font-size: clamp(20px, 2.5vh, 27px); font-size: clamp(16px, 8.5cqh, 27px);
+}
+.model-panel dl { margin: 0; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 2px; }
+.model-panel dl > div {
+    display: grid; grid-template-columns: 58% 1fr; margin: 0; line-height: 1.2;
+    font-size: clamp(13px, min(.92vw, 1.75vh), 19px); font-size: clamp(11px, min(.92vw, 6.4cqh), 19px);
+}
 .model-panel dt, .model-panel dd { margin: 0; }
 .model-panel dd span { display: inline-block; width: 12px; }
 .model-panel dd.negative { color: #ff285d; }
 .model-panel .under-development-value { display: flex; align-items: center; }
+.model-panel [hidden] { display: none !important; } /* nilai khusus tab PLC (Total NG) */
 .under-development-value small { display: inline-flex; align-items: center; gap: 9px; color: #eef6ff; font-size: clamp(11px, .67vw, 13px); line-height: 1; white-space: nowrap; }
 .under-development-value small i { padding-right: 9px; border-right: 2px solid rgba(75, 128, 176, .6); color: #eef7ff; font-size: 16px; filter: drop-shadow(0 0 3px rgba(128, 190, 245, .35)); }
 .under-development-value small b { font-weight: 400; }
@@ -379,7 +365,7 @@ body.machine-production-layout:not(.light-mode) .machine-title-panel {
 .ring-operating { stroke: var(--pd-red); stroke-width: 13px; stroke-dasharray: 71 29; }
 .ring-ability { stroke: var(--pd-orange); stroke-width: 13px; stroke-dasharray: 82 18; }
 .ring-quality { stroke: #3383ff; stroke-width: 13px; stroke-dasharray: 100 0; }
-.production-gauge text { fill: #f3f7ff; font-size: 29px; font-weight: 300; text-anchor: middle; }
+.production-gauge text { fill: #f3f7ff; font-size: 23px; font-weight: 300; text-anchor: middle; }
 .gauge-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 15px; color: #bfcddd; font-size: clamp(14px, .78vw, 16px); line-height: 1.1; transform: translateX(30px); }
 .gauge-legend span { white-space: nowrap; }
 .gauge-legend .legend-dot { width: 11px; height: 11px; margin-right: 7px; }
@@ -413,15 +399,16 @@ body.machine-production-layout:not(.light-mode) .machine-title-panel {
 
 .detail-grid { min-width: 0; min-height: 0; display: grid; grid-template-columns: clamp(307px, 18.3vw, 430px) minmax(0, 1fr); gap: clamp(18px, 1.15vw, 24px); }
 .shift-summary { min-height: 0; padding: 10px 15px 15px; display: grid; grid-template-rows: repeat(3, 1fr); }
-.shift-block { display: grid; grid-template-columns: 105px 1fr; align-content: center; align-items: start; padding: 10px 0 10px 8px; border-bottom: 1px solid rgba(117, 149, 181, .23); }
+.shift-block { display: grid; grid-template-columns: clamp(86px, 5.5vw, 105px) 1fr; align-content: center; align-items: start; padding: 10px 0 10px 8px; border-bottom: 1px solid rgba(117, 149, 181, .23); }
 .shift-block:last-child { border-bottom: 0; }
 .shift-block strong { font-size: clamp(16px, .88vw, 18px); font-weight: 500; line-height: 1.3; }
 .shift-block strong i { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: #3986ff; }
 .shift-two strong i { background: #28c3c8; }
 .shift-three strong i { background: var(--pd-orange); }
-.shift-block dl { margin: 0; }
-.shift-block dl div { display: grid; grid-template-columns: clamp(125px, 7vw, 150px) 1fr; margin-bottom: 6px; font-size: clamp(15px, .84vw, 17px); line-height: 1.25; }
-.shift-block dl div:last-child { margin-bottom: 0; }
+/* Kolom label mengikuti label terpanjang ("TOTAL LOSS TIME") supaya tidak turun baris & angka tetap sejajar */
+.shift-block dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; column-gap: 10px; row-gap: 6px; font-size: clamp(13px, .84vw, 17px); line-height: 1.25; }
+.shift-block dl div { display: contents; }
+.shift-block dt { white-space: nowrap; }
 .shift-block dt, .shift-block dd { margin: 0; }
 .shift-block dd { display: block; white-space: nowrap; }
 .shift-block dd b { margin-left: 4px; }
@@ -446,11 +433,23 @@ body.machine-production-layout:not(.light-mode) .machine-title-panel {
         repeating-linear-gradient(90deg, transparent 0, transparent calc(1.25% - 1px), rgba(92, 126, 162, .12) calc(1.25% - 1px), rgba(92, 126, 162, .12) 1.25%),
         #111d2d;
 }
+.timeline-row.shift-1 .timeline-track {
+    border: 2px solid rgba(140, 175, 209, .72);
+    background: transparent;
+}
+.timeline-row.shift-2 .timeline-track,
+.timeline-row.shift-3 .timeline-track {
+    border: 2px solid rgba(140, 175, 209, .72);
+    background: transparent;
+}
 .timeline-track::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: #f22b5e; }
-.timeline-row.shift-2 .timeline-track::after { background: transparent; }
+.timeline-row.shift-1 .timeline-track::after,
+.timeline-row.shift-2 .timeline-track::after,
+.timeline-row.shift-3 .timeline-track::after { background: transparent; }
 .segment { position: absolute; top: 0; bottom: 3px; left: var(--left); width: var(--width); border-radius: 2px; }
 .run-segment { background: linear-gradient(90deg, rgba(42, 125, 237, .88), rgba(32, 104, 210, .92)); border: 1px solid #2381ff; }
 .stop-segment { background: linear-gradient(90deg, rgba(230, 43, 88, .92), rgba(210, 39, 83, .9)); border: 1px solid #ff316a; }
+.break-segment { border: 1px solid rgba(153, 177, 204, .55); background: #0c1a2b; }
 .idle-segment { background: rgba(12, 26, 43, .9); }
 .time-labels { display: flex; align-items: flex-start; justify-content: space-between; min-width: 0; height: 24px; padding: 4px 3px 0 7px; color: #c2cfde; font-size: clamp(14px, .76vw, 16px); }
 .time-labels span { white-space: nowrap; }
@@ -466,14 +465,12 @@ body.machine-production-layout:not(.light-mode) .machine-title-panel {
 }
 
 @media (max-width: 1450px) {
-    .production-header { grid-template-columns: 135px minmax(0, 1fr) 235px; padding: 0 15px; }
+    .production-header { grid-template-columns: 135px minmax(0, 1fr); padding: 0 15px; }
     .production-page-label { gap: 6px; padding-right: 10px; font-size: 12px; }
     .machine-tab { flex-basis: 112px; width: 112px; padding: 0 7px; font-size: 11px; }
     .machine-tabs-controls { gap: 3px; padding-left: 7px; }
     .machine-tabs-arrow { width: 27px; }
-    .production-clock { grid-template-columns: 30px 94px 1fr; margin-left: 7px; }
-    .production-clock time { padding-left: 10px; font-size: 14px; }
-    .production-main { padding-left: 15px; padding-right: 15px; }
+    .production-main { padding-left: 0; padding-right: 0; }
     .production-body { grid-template-columns: 126px minmax(0, 1fr); }
     .production-side-link { min-height: 82px; font-size: 13px; }
     .production-side-link i { font-size: 22px; }

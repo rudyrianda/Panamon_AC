@@ -120,8 +120,9 @@
                         <span class="nav-label">Quality</span>
                     </a>
                 </li>
+                <!-- MACHINE / AC OEE -->
                 <li class="nav-item">
-                    <a href="/Machine/index">
+                    <a href="/ACOEE/dashboard">
                         <i class="fa-solid fa-gear"></i>
                         <span class="nav-label">Machine</span>
                     </a>
@@ -144,7 +145,7 @@
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                         <span class="nav-label">More</span>
                     </a>
-                    <div id="moreMenuPopup">
+                    <div id="moreMenuPopup" class="sidebar-menu-popup">
                         <a href="/Summary/ProductionPlan">
                             <i class="fa-solid fa-clipboard-list"></i>
                             <span>Production<br>Plan</span>
@@ -165,9 +166,13 @@
                             <i class="fa-solid fa-square-poll-vertical"></i>
                             <span>PWK</span>
                         </a>
-                        <a href="/ACOEE" aria-label="Open AC OEE dashboard">
-                            <i class="fa-solid fa-gauge-high"></i>
-                            <span>AC OEE</span>
+                        <a asp-page="/PWKActual/Index">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            <span>PWK<br>Actual</span>
+                        </a>
+                        <a href="/planmachine">
+                            <i class="fa-solid fa-network-wired"></i>
+                            <span>Plan<br>Exp 6.35</span>
                         </a>
                     </div>
                 </li>

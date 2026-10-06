@@ -1,0 +1,233 @@
+@page "/ACOEE/dashboard"
+@model MonitoringSystem.Pages.ACOEE.Dashboard.IndexModel
+@using MonitoringSystem.Data
+@using MonitoringSystem.Pages.ACOEE
+@{
+    ViewData["Title"] = "AC OEE";
+    Layout = null;
+
+    var evaporatorOperating = Model.EvaporatorOperatingPercent
+        .ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+    var expanderKyoshinOperating = Model.ExpanderKyoshinOperatingPercent
+        .ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+    var condenserOperating = Model.CondenserOperatingPercent
+        .ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+    var expanderLiChinOperating = Model.ExpanderLiChinOperatingPercent
+        .ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+    var abilityValues = Enumerable.Range(0, 4)
+        .Select(_ => AcOeeMetricsCalculator.GenerateAbilityPercent())
+        .ToArray();
+    var operatingValues = new[]
+    {
+        Model.EvaporatorOperatingPercent,
+        Model.ExpanderKyoshinOperatingPercent,
+        Model.CondenserOperatingPercent,
+        Model.ExpanderLiChinOperatingPercent
+    };
+    var oeePercentages = Enumerable.Range(0, 4)
+        .Select(index => AcOeeMetricsCalculator.CalculateOeePercent(operatingValues[index], abilityValues[index], 100d)
+            .ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))
+        .ToArray();
+
+    var firstPageMachines = new[]
+    {
+        new { Name = "EVAPORATOR", Running = true, Oee = oeePercentages[0], Ability = abilityValues[0].ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), Operating = evaporatorOperating, Quality = "100", State = "", Duration = "" },
+        new { Name = "EXPANDER KYOSHIN 365", Running = true, Oee = oeePercentages[1], Ability = abilityValues[1].ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), Operating = expanderKyoshinOperating, Quality = "100", State = "", Duration = "" },
+        new { Name = "100T AMADA", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "SF 250", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "FIX 80", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "CONDENSOR", Running = true, Oee = oeePercentages[2], Ability = abilityValues[2].ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), Operating = condenserOperating, Quality = "100", State = "", Duration = "" },
+        new { Name = "EXPANDER LI-CHIN", Running = true, Oee = oeePercentages[3], Ability = abilityValues[3].ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), Operating = expanderLiChinOperating, Quality = "100", State = "", Duration = "" },
+        new { Name = "100T KOMATSU", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "200T", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "HAIRPIN BENDER 14", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" }
+    };
+
+    var secondPageMachines = new[]
+    {
+        new { Name = "EXPANDER KYOSHIN 7", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "400T NEW", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "300T NEW", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "300T OLD", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "HAIRPIN BENDER 7", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "FIX 36", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "FIX 12", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "EVA CUTTING NEW", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "EVA CUTTING OLD", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" },
+        new { Name = "HPV CONDENSER", Running = false, Oee = "0", Ability = "0", Operating = "0", Quality = "0", State = "NO CONNECTION", Duration = "0 MIN" }
+    };
+
+    var machinePages = new[] { firstPageMachines, secondPageMachines };
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AC OEE - Dashboard</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/fontawesome/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/sweetalert2.css" />
+    <link rel="stylesheet" href="~/css/fonts.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/background-style.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/ac-oee.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/ac-oee-navigation.css" asp-append-version="true" />
+</head>
+<body class="ac-oee-page ac-oee-dashboard-page">
+    <div class="oee-shell">
+        <header class="oee-header">
+            <a class="panasonic-brand" href="/" aria-label="Panasonic home">
+                <img src="~/assets/PanasonicIcon.png" alt="Panasonic" />
+            </a>
+            <div class="ac-oee-header-title">AC OEE</div>
+            <div class="header-meta">
+                <button class="theme-chip" id="oeeThemeToggle" type="button" aria-label="Toggle color theme">
+                    <span class="theme-moon">●</span>
+                    <span id="oeeThemeLabel">Dark</span>
+                </button>
+                <span id="oeeDate">Tuesday, 18 August 2026</span>
+                <span id="oeeTime">16:13</span>
+            </div>
+        </header>
+
+        <div class="oee-body">
+            <aside id="bdSidebar" class="panamon-oee-sidebar" aria-label="AC OEE navigation">
+                @await Html.PartialAsync("/Pages/ACOEE/_SidebarMenu.cshtml")
+                <div class="align-items-center center">
+                    <button id="oeeSidebarThemeToggle" type="button" title="Toggle Theme">
+                        <i id="oeeSidebarThemeIcon" class="fa-solid fa-sun"></i>
+                        <span class="nav-label">Theme</span>
+                    </button>
+                </div>
+                <div class="align-items-center center logout-section">
+                    <form method="post"
+                          asp-area="Identity"
+                          asp-page="/Account/Logout"
+                          asp-route-returnUrl="@Url.Page("/Index", new { area = "" })">
+                        <button type="submit" class="logout-btn">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                            <span class="nav-label">Log Out</span>
+                        </button>
+                    </form>
+                </div>
+            </aside>
+
+            <main class="oee-main">
+                <div class="dashboard-top-row">
+                    <section class="summary-grid" aria-label="Machine summary">
+                        <article class="summary-card total-card">
+                            <div><span class="summary-label">TOTAL MACHINE</span><strong>20</strong></div>
+                            <i class="fa-solid fa-chart-simple summary-icon"></i>
+                        </article>
+                        <article class="summary-card operating-card">
+                            <div><span class="summary-label">OPERATING</span><strong>4</strong></div>
+                            <i class="fa-solid fa-rotate summary-icon"></i>
+                        </article>
+                        <article class="summary-card stop-card">
+                            <div><span class="summary-label">STOP</span><strong>16</strong></div>
+                            <i class="fa-solid fa-triangle-exclamation summary-icon"></i>
+                        </article>
+                    </section>
+
+                    <nav class="machine-page-navigation" aria-label="Machine dashboard pages">
+                        <button id="machinePagePrevious" class="machine-page-button" type="button" aria-label="Show previous machine page" disabled>
+                            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                        </button>
+                        <span class="machine-page-indicator">
+                            <strong id="machinePageIndicator">1</strong>
+                        </span>
+                        <button id="machinePageNext" class="machine-page-button" type="button" aria-label="Show next machine page">
+                            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                        </button>
+                    </nav>
+                </div>
+
+                <section class="machine-grid" aria-label="AC machine OEE status">
+                    @for (var pageIndex = 0; pageIndex < machinePages.Length; pageIndex++)
+                    {
+                        var pageNumber = pageIndex + 1;
+                        foreach (var machine in machinePages[pageIndex])
+                        {
+                        <article class="machine-card @(machine.Running ? "running" : "stopped") @(pageNumber == 1 ? null : "is-hidden")"
+                                 data-machine-page="@pageNumber"
+                                 aria-hidden="@(pageNumber == 1 ? "false" : "true")">
+                            <header class="machine-header">
+                                <h2>@machine.Name</h2>
+                                @if (machine.Running)
+                                {
+                                    <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+                                }
+                                else
+                                {
+                                    <i class="fa-solid fa-triangle-exclamation warning-icon" aria-hidden="true"></i>
+                                }
+                            </header>
+
+                            @if (machine.Running)
+                            {
+                                <div class="gauge-wrap">
+                                    <svg class="oee-gauge" viewBox="0 0 180 180" role="img" aria-label="@machine.Name OEE @machine.Oee percent">
+                                        <g class="gauge-tracks">
+                                            <circle cx="90" cy="90" r="76" pathLength="100" />
+                                            <circle cx="90" cy="90" r="61" pathLength="100" />
+                                            <circle cx="90" cy="90" r="49" pathLength="100" />
+                                            <circle cx="90" cy="90" r="38" pathLength="100" />
+                                        </g>
+                                        <g class="gauge-values">
+                                            <circle class="gauge-oee @(machine.Oee == "100" ? "gauge-full" : null)" cx="90" cy="90" r="76" pathLength="100" style="--gauge-value:@machine.Oee" />
+                                            <circle class="gauge-operating @(machine.Operating == "100" ? "gauge-full" : null)" cx="90" cy="90" r="61" pathLength="100" style="--gauge-value:@machine.Operating" />
+                                            <circle class="gauge-ability @(machine.Ability == "100" ? "gauge-full" : null)" cx="90" cy="90" r="49" pathLength="100" style="--gauge-value:@machine.Ability" />
+                                            <circle class="gauge-quality @(machine.Quality == "100" ? "gauge-full" : null)" cx="90" cy="90" r="38" pathLength="100" style="--gauge-value:@machine.Quality" />
+                                        </g>
+                                        <text class="gauge-percent" x="90" y="91">@machine.Oee%</text>
+                                        <text class="gauge-caption" x="90" y="111">OEE</text>
+                                    </svg>
+                                </div>
+                                <div class="metric-legend">
+                                    <span><i class="dot oee-dot"></i>OEE&nbsp; @machine.Oee%</span>
+                                    <span><i class="dot ability-dot"></i>Ability&nbsp; @machine.Ability%</span>
+                                    <span><i class="dot operating-dot"></i>Operating&nbsp; @machine.Operating%</span>
+                                    <span><i class="dot quality-dot"></i>Quality&nbsp; @machine.Quality%</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="stop-content">
+                                    <strong>@machine.State</strong>
+                                    <div class="loading-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+                                    <span>@machine.Duration</span>
+                                </div>
+                            }
+                        </article>
+                        }
+                    }
+                </section>
+            </main>
+        </div>
+
+        <footer class="oee-footer">
+            &copy;2026 - Panasonic Manufacturing Indonesia (PMI) - Air Conditioner
+        </footer>
+    </div>
+
+    <!-- Break Time Filter Modal -->
+    <div class="modal fade" id="breakTimeFilterModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 700px;">
+            <div class="modal-content">
+                @{
+                    var breakTimeModel = new MonitoringSystem.Pages.Shared.ApplyBreakFilterModel(
+                        (ApplicationDbContext)ViewContext.HttpContext.RequestServices.GetService(typeof(ApplicationDbContext)),
+                        (IConfiguration)ViewContext.HttpContext.RequestServices.GetService(typeof(IConfiguration)));
+                    await breakTimeModel.LoadBreakTimesAsync();
+                    await Html.RenderPartialAsync("/Pages/Shared/_BreakTimeFilterPartial.cshtml", breakTimeModel);
+                }
+            </div>
+        </div>
+    </div>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/sweetalert2.min.js"></script>
+    <script src="~/js/ac-oee.js" asp-append-version="true"></script>
+</body>
+</html>

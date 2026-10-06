@@ -1,0 +1,275 @@
+@page
+@model MonitoringSystem.Pages.ACOEE.Quality.QualityModel
+@{
+    ViewData["Title"] = "Pass Through Ratio";
+    /* Pa Adan Disini */
+    // Page awan baik
+}
+
+
+<div id="targetModal" class="modal">
+    <div class="modal-content">
+        <span class="close-button">&times;</span>
+        <h4 class="fw-bold" style="color: var(--panasonic-blue);">Update Target Ratio</h4>
+        <hr />
+        <form method="post" asp-page-handler="UpdateTargetRatio">
+            <div class="form-group">
+                <label for="target-input" class="fw-semibold">New Target Ratio (%)</label>
+                <input type="number" step="0.01" class="form-control" id="target-input" asp-for="NewTargetRatio" required placeholder="1.5">
+            </div>
+            <input type="hidden" name="StartDate" value="@Model.StartDate" />
+            <input type="hidden" name="EndDate" value="@Model.EndDate" />
+            <input type="hidden" name="Station" value="@Model.Station" />
+            <button type="submit" class="btn btn-primary mt-3 fw-bold" style="background-color: var(--panasonic-blue); border:none;">Save Target</button>
+        </form>
+    </div>
+</div>
+
+<div class="container-fluid dashboard-container quality-dashboard">
+    <form method="post">
+        <div class="row g-3 quality-main-row">
+            <div class="col-md-2 quality-filter-column">
+                <div class="grid-border">
+                    <label class="fw-semibold" style="font-size: 0.9rem; color: var(--panasonic-blue); margin-bottom: 8px; display: block;">SELECT LINE</label>
+                    <select class="form-control" id="machineDropdown" name="MachineCode" style="background-color: white; border: 2px solid var(--panasonic-blue); color: var(--text-dark); padding: 8px; border-radius: 5px; margin-bottom: 10px;">
+                        <option value="MCH1-01" selected>CU (MCH1-01)</option>
+                    </select>
+                </div>
+
+                <div class="grid-border quality-station-panel">
+                    <div class="section-title" style="font-size:1rem;">STATION</div>
+                    <div class="btn-custom-group">
+                            @* Halaman dibuka langsung di stasiun EXPANDER 635; selalu ada satu stasiun yang aktif *@
+                            @foreach (var st in new[] { ("Fix 80", "FIX 80"), ("Expander 635", "EXPANDER 635"), ("Condenser", "CONDENSER") })
+                            {
+                                bool active = string.Equals(Model.Station, st.Item1, StringComparison.OrdinalIgnoreCase);
+                                <button type="submit" name="Station" value="@st.Item1" class="@(active ? "btn-blue-active" : "btn-outline-inactive")">@st.Item2</button>
+                            }
+                    </div>
+                </div>
+
+                <div class="grid-border">
+                    <div class="section-title" style="font-size:1rem;">DAILY FILTER</div>
+                    <div class="mb-2">
+                        <label class="fw-bold text-muted" style="font-size:0.8rem;">START DATE</label>
+                        <input class="form-control" type="date" asp-for="StartDate">
+                    </div>
+                    <div class="mb-2">
+                        <label class="fw-bold text-muted" style="font-size:0.8rem;">END DATE</label>
+                        <input class="form-control" type="date" asp-for="EndDate">
+                    </div>
+                    <button type="submit" class="btn btn-blue-active">APPLY FILTER</button>
+                </div>
+            </div>
+
+            <div class="col-md-10 quality-content-column">
+
+                <div class="row g-2 quality-kpi-row">
+                    <div class="col-md-3">
+                        <div class="kpi-box">
+                            <div class="kpi-header">TARGET RATIO</div>
+                            <div class="kpi-value" id="openModalButton" style="cursor: pointer; color: var(--panasonic-blue);">
+                                @String.Format("{0:0.00}", Model.CurrentTargetRatio) %
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="kpi-box">
+                            <div class="kpi-header">DEFECT QUANTITY</div>
+                            <div class="kpi-value">@Model.DefectQuantity</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="kpi-box">
+                            <div class="kpi-header">Pass Through Ratio</div>
+                            @{
+                                var ratioColor = "var(--text-dark)";
+                                if (Model.DefectRatio <= (100 - Model.CurrentTargetRatio)) { ratioColor = "red"; }
+                            }
+                            <div class="kpi-value" style="color: @ratioColor">
+                                @String.Format("{0:0.00}", Model.DefectRatio) %
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="kpi-box">
+                            <div class="kpi-header">TOTAL OUTPUT</div>
+                            <div class="kpi-value">@Model.TotalPlan</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 quality-upper-charts">
+                    <div class="col-md-6">
+                        <div class="grid-border fill-height">
+                            <div class="section-title">DEFECT CLASSIFICATION (BY STATION)</div>
+                            <div class="quality-chart-body flex-grow-1 d-flex justify-content-center align-items-center">
+                                <canvas id="pieb"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="grid-border fill-height">
+                            <div class="section-title">DEFECT CAUSES</div>
+                            <div class="quality-chart-body flex-grow-1 d-flex justify-content-center align-items-center">
+                                <canvas id="bar"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @* <div class="row g-0"> *@
+                @*     <div class="col-12"> *@
+                @*         <div class="grid-border fill-height" style="height: 350px;"> *@
+                @*             <div class="section-title">MONTHLY DEFECT GRAPHICS @DateTime.Now.Year</div> *@
+                @*             <div class="flex-grow-1 d-flex justify-content-center"> *@
+                @*                 <canvas id="bara" style="width: 100%; height: 100%;"></canvas> *@
+                @*             </div> *@
+                @*         </div> *@
+                @*     </div> *@
+                @* </div> *@
+
+                <div class="row g-0 quality-yearly-chart">
+                    <div class="col-12">
+                        <div class="grid-border fill-height">
+                            <div class="section-title">YEARLY DEFECT GRAPHICS @DateTime.Parse(Model.StartDate).Year</div>
+                            <div class="quality-chart-body flex-grow-1 d-flex justify-content-center">
+                                <canvas id="bara"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </form>
+</div>
+
+<script src="~/js/chart.umd.min.js"></script>
+<script>
+    const dailyDefectLabels = @Html.Raw(Json.Serialize(Model.TopDailyDefects.Select(d => d.Cause)));
+    const dailyDefectData = @Html.Raw(Json.Serialize(Model.TopDailyDefects.Select(d => d.Quantity)));
+    const defectProblemLabels = @Html.Raw(Json.Serialize(Model.DefectProblems.Select(d => d.Cause)));
+    const defectProblemData = @Html.Raw(Json.Serialize(Model.DefectProblems.Select(d => d.Quantity)));
+    const defectByModelLabels = @Html.Raw(Json.Serialize(Model.DefectsByModel.Select(d => d.ProductName)));
+    const defectByModelData = @Html.Raw(Json.Serialize(Model.DefectsByModel.Select(d => d.Quantity)));
+    const yearlyDefectsRaw = @Html.Raw(Json.Serialize(Model.YearlyDefects));
+
+    const colorPalette = [
+        'rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)',
+        'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)',
+        'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)',
+        'rgba(255, 99, 255, 0.7)', 'rgba(99, 255, 132, 0.7)',
+        'rgba(132, 99, 255, 0.7)', 'rgba(235, 162, 54, 0.7)'
+    ];
+
+    const allCauses = [...new Set([...defectProblemLabels, ...yearlyDefectsRaw.map(d => d.cause)])];
+    const colorMap = {};
+    allCauses.forEach((cause, index) => {
+        colorMap[cause] = colorPalette[index % colorPalette.length];
+    });
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    const yearlyDefectCauses = [...new Set(yearlyDefectsRaw.map(d => d.cause))];
+    const yearlyDatasets = yearlyDefectCauses.map(cause => {
+        const dataForCause = monthNames.map((monthName, index) => {
+            const monthNumber = index + 1;
+            const entry = yearlyDefectsRaw.find(d => d.month === monthNumber && d.cause === cause);
+            return entry ? entry.quantity : 0;
+        });
+        return {
+            label: cause,
+            data: dataForCause,
+            backgroundColor: colorMap[cause] || '#CCCCCC',
+        };
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+
+        const isLight = document.body.classList.contains('light-mode');
+        const chartTextColor = isLight ? '#1a1a2e' : '#ffffff';
+        const chartGridColor = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.10)';
+        Chart.defaults.color = chartTextColor;
+        Chart.defaults.borderColor = chartGridColor;
+
+        new Chart(document.getElementById('bar'), {
+            type: 'bar',
+            data: {
+                labels: dailyDefectLabels,
+                datasets: [{
+                    label: 'Qty',
+                    data: dailyDefectData,
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => `Qty: ${ctx.parsed.x}` } }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: { precision: 0, stepSize: 1, color: chartTextColor }
+                    }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('pieb'), {
+            type: 'pie',
+            data: {
+                labels: defectByModelLabels,
+                datasets: [{
+                    data: defectByModelData,
+                    backgroundColor: colorPalette,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: { color: chartTextColor, font: { size: 12 } }
+                    }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('bara'), {
+            type: 'bar',
+            data: {
+                labels: monthNames,
+                datasets: yearlyDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: { stacked: true, ticks: { color: chartTextColor } },
+                    y: { stacked: true, beginAtZero: true, ticks: { color: chartTextColor } }
+                }
+            }
+        });
+
+        var modal = document.getElementById('targetModal');
+        var openModalButton = document.getElementById('openModalButton');
+        var closeButton = document.getElementsByClassName('close-button')[0];
+        openModalButton.onclick = function () { modal.style.display = 'block'; }
+        closeButton.onclick = function () { modal.style.display = 'none'; }
+        window.onclick = function (event) {
+            if (event.target == modal) { modal.style.display = 'none'; }
+        }
+    });
+</script>

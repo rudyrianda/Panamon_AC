@@ -1239,7 +1239,7 @@
                             <tbody id="mttAllDataBody" style="display:none;">
                                 @foreach (var item in Model.AllMttRecords.Select((data, index) => new { Data = data, Index = index + 1 }))
                                 {
-                                    <tr data-detailed-reason="@item.Data.DetailedReason">
+                                    <tr data-detailed-reason="@item.Data.DetailedReason" data-mtt-subcategory="@item.Data.MttSubCategory">
                                         <td>@item.Index</td>
                                         <td>@item.Data.Date.ToString("dd-MM-yyyy")</td>
                                         <td>
@@ -1833,9 +1833,9 @@
 
         let visibleCount = 0;
         rows.forEach(r => {
-            const detailedReason = (r.getAttribute('data-detailed-reason') || '').toLowerCase();
             const subCatLower = subCat.toLowerCase();
-            const match = detailedReason.includes(subCatLower) || matchMttKeyword(detailedReason, subCat);
+            const classifiedSubCat = (r.getAttribute('data-mtt-subcategory') || '').toLowerCase();
+            const match = classifiedSubCat === subCatLower;
             r.style.display = match ? '' : 'none';
             if (match) visibleCount++;
         });
@@ -1848,22 +1848,6 @@
         const mttCountNum = document.getElementById('mttCountNum');
         if (mttCountNum) mttCountNum.textContent = visibleCount;
         updateDisplayedRecordTotal(visibleCount);
-    }
-
-    function matchMttKeyword(detailedReasonLower, subCat) {
-        const sc = subCat.toLowerCase();
-        if (sc === 'vaccum' && (detailedReasonLower.includes('vaccum') || detailedReasonLower.includes('vacuum'))) return true;
-        if (sc === 'laser' && detailedReasonLower.includes('laser')) return true;
-        if (sc === 'dummy ng' && (detailedReasonLower.includes('dummy') || detailedReasonLower.includes('dumy'))) return true;
-        if (sc === 'conveyor' && detailedReasonLower.includes('conveyor')) return true;
-        if (sc === 'driver' && detailedReasonLower.includes('driver')) return true;
-        if (sc === 'gas charge' && detailedReasonLower.includes('gas')) return true;
-        if (sc === 'bending condensor reguler' && detailedReasonLower.includes('bending')) return true;
-        if (sc === 'straping band' && (detailedReasonLower.includes('straping') || detailedReasonLower.includes('strapping'))) return true;
-        if (sc === 'lifter prouduct' && detailedReasonLower.includes('lifter')) return true;
-        if (sc === 'running trip' && (detailedReasonLower.includes('running') || detailedReasonLower.includes('trip'))) return true;
-        if (sc === 'scanner fm cu' && detailedReasonLower.includes('scanner') && !detailedReasonLower.includes(' cs')) return true;
-        return false;
     }
 
     function applySortTable(mode) {

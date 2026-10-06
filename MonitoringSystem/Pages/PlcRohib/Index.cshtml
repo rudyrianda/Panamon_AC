@@ -1,0 +1,36 @@
+@page "/planmachine"
+@model MonitoringSystem.Pages.PlcRohib.IndexModel
+@{
+    ViewData["Title"] = "PLC ROHIB";
+}
+
+<style>
+    .plcrohib-frame {
+        display: block;
+        width: 100%;
+        /* Naik 23px supaya batas atas sejajar sidebar Panamon
+           (konten: padding-top 3px + p-4 24px = 27px, sidebar: margin-top 4px) */
+        margin-top: -23px;
+        /* Batas bawah 8px di atas batas bawah sidebar (sidebar berakhir di 100vh - 21px) */
+        height: calc(100vh - 78px);
+        min-height: 600px;
+        border: 0;
+        border-radius: 10px;
+        background: #f1f5f9;
+    }
+
+    /* Khusus halaman ini: jarak bawah dirapatkan & footer © PMI dibuat ringkas
+       supaya kotak PLC ROHIB + footer muat satu layar (footer tidak terpotong) */
+    .main-content-wrapper > .p-4 { padding-bottom: 0 !important; }
+    .main-content-wrapper main { padding-bottom: 0 !important; }
+    .footer-copyright { padding: 2px 0 !important; margin-top: 4px !important; }
+
+    /* Popup sidebar (More, dll.) transparan -> tidak terlihat di atas halaman PLC ROHIB yang putih */
+    .sidebar-menu-popup {
+        background: rgba(15, 23, 42, 0.96) !important;
+        border-color: rgba(255, 255, 255, 0.15) !important;
+    }
+</style>
+
+@* Aplikasi PLC ROHIB (Plclogger) diteruskan oleh Panamon lewat /plcrohib-app/ (lihat Services/PlcRohibService.cs) *@
+<iframe class="plcrohib-frame" src="/plcrohib-app/" title="PLC ROHIB - Production Plan &amp; PLC Dispatcher"></iframe>

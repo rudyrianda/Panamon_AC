@@ -267,16 +267,17 @@ body.light-mode .inv-card {
 
 :root {
     --sb-w: 8px;
+    --inv-body-scrollbar-w: 0px;
 }
 
-/* ── HEADER: scroll horizontal disinkron via JS, tidak discroll manual ──
-   PENTING: tidak ada padding kiri-kanan, harus sama persis dengan body ── */
+/* ── HEADER: scroll horizontal disinkron via JS, tidak discroll manual.
+   Padding kanan mengikuti lebar scrollbar vertikal body yang aktual. ── */
 .inv-header-wrap {
     overflow: hidden;
     background: rgba(30,40,60,1) !important;
     padding: 0;
-    padding-right: var(--sb-w);
-    box-sizing: content-box;
+    padding-right: var(--inv-body-scrollbar-w);
+    box-sizing: border-box;
 }
 
     .inv-header-wrap table {
@@ -346,12 +347,14 @@ body.light-mode .inv-body-wrap::-webkit-scrollbar-thumb {
     overflow-y: hidden;
     background: rgba(20,30,48,1) !important;
     padding: 0;
-    padding-right: var(--sb-w);
-    box-sizing: content-box;
+    padding-right: var(--inv-body-scrollbar-w);
+    box-sizing: border-box;
 }
 
     .inv-footer-wrap table {
         table-layout: fixed;
+        /* Garis tunggal sepanjang tabel; tidak lagi tersusun dari border tiap sel. */
+        border-bottom: 2px solid rgb(105, 115, 136) !important;
     }
 
     .inv-footer-wrap::-webkit-scrollbar {
@@ -424,6 +427,8 @@ body.light-mode .inv-tbl tbody th {
     background-color: rgb(40, 55, 84) !important;
     color: #ffffff !important;
     border: 1px solid rgba(255,255,255,0.3) !important;
+    border-bottom: 0 !important;
+    box-sizing: border-box;
     padding: 5px 4px;
     font-size: 12px;
     font-weight: 700;
@@ -435,6 +440,11 @@ body.light-mode .inv-tbl tfoot th {
     background-color: rgb(240, 240, 240) !important;
     color: #1a1a2e !important;
     border: 1px solid rgba(0,0,0,0.15) !important;
+    border-bottom: 0 !important;
+}
+
+body.light-mode .inv-footer-wrap table {
+    border-bottom-color: rgb(204, 204, 204) !important;
 }
 
 /* ── Kolom Model nempel di kiri, tidak ikut ke-scroll horizontal ──

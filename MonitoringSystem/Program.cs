@@ -32,6 +32,15 @@ builder.Services.AddHostedService<PlanUpdaterService>()
 
 builder.Services.AddSignalR();
 
+// PLC ROHIB (Plclogger): dijalankan bersama Panamon & diakses lewat /plcrohib-app/ (menu More > PLC ROHIB)
+builder.Services.AddHttpClient("PlcRohib");
+builder.Services.AddHostedService<MonitoringSystem.Services.PlcRohibLauncher>();
+
+// Import SAP Plan otomatis dari "Daily prod plan" (setiap 3 jam, default DryRun) - lihat Services/SapPlanImport
+builder.Services.Configure<MonitoringSystem.Services.SapPlanImport.SapPlanImportOptions>(builder.Configuration.GetSection("SapPlanImport"));
+builder.Services.AddSingleton<MonitoringSystem.Services.SapPlanImport.SapPlanImportRunner>();
+builder.Services.AddHostedService<MonitoringSystem.Services.SapPlanImport.SapPlanImportWorker>();
+
 builder.Services.Configure<CookiePolicyOptions>(options =>
 {
     options.CheckConsentNeeded = context => true;
@@ -89,6 +98,50 @@ try
             ALTER TABLE ProductionRecords ADD QtyShiftNS INT NULL;
         END";
         await db.Database.ExecuteSqlRawAsync(addColumnsSql);
+
+        // Koreksi hasil produksi untuk PWK. Data sumber OEESN/MasterData tidak pernah diubah;
+        // hanya nilai yang berbeda dari sumber disimpan sebagai detail milik PWK_ACTUAL.
+        string createPwKProductionDetailSql = @"
+        IF OBJECT_ID('dbo.PWK_ACTUAL_ProductionDetail', 'U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.PWK_ACTUAL_ProductionDetail
+            (
+                Id                  BIGINT IDENTITY(1,1) NOT NULL
+                    CONSTRAINT PK_PWK_ACTUAL_ProductionDetail PRIMARY KEY,
+                PWKActualId         INT NOT NULL,
+                SlotStart           DATETIME2(0) NOT NULL,
+                ProductId           NVARCHAR(50) NOT NULL,
+                SourceModel         NVARCHAR(100) NOT NULL,
+                SourceSerialStart   NVARCHAR(100) NULL,
+                SourceSerialEnd     NVARCHAR(100) NULL,
+                SourceDailyPlan     INT NOT NULL,
+                SourceDailyActual   INT NOT NULL,
+                SourceDefect        INT NOT NULL,
+                Model               NVARCHAR(100) NOT NULL,
+                SerialStart         NVARCHAR(100) NULL,
+                SerialEnd           NVARCHAR(100) NULL,
+                DailyPlan           INT NOT NULL,
+                DailyActual         INT NOT NULL,
+                Defect              INT NOT NULL,
+                Keterangan          NVARCHAR(1000) NULL,
+                CreatedBy           NVARCHAR(100) NULL,
+                CreatedAt           DATETIME2(0) NOT NULL
+                    CONSTRAINT DF_PWK_ACTUAL_ProductionDetail_CreatedAt DEFAULT GETDATE(),
+                UpdatedBy           NVARCHAR(100) NULL,
+                UpdatedAt           DATETIME2(0) NULL,
+                CONSTRAINT FK_PWK_ACTUAL_ProductionDetail_Header
+                    FOREIGN KEY (PWKActualId) REFERENCES dbo.PWK_ACTUAL(Id) ON DELETE CASCADE,
+                CONSTRAINT UQ_PWK_ACTUAL_ProductionDetail
+                    UNIQUE (PWKActualId, SlotStart, ProductId)
+            );
+        END
+
+        IF COL_LENGTH('dbo.PWK_ACTUAL_ProductionDetail', 'DisplayStart') IS NULL
+            ALTER TABLE dbo.PWK_ACTUAL_ProductionDetail ADD DisplayStart TIME(0) NULL;
+
+        IF COL_LENGTH('dbo.PWK_ACTUAL_ProductionDetail', 'DisplayEnd') IS NULL
+            ALTER TABLE dbo.PWK_ACTUAL_ProductionDetail ADD DisplayEnd TIME(0) NULL;";
+        await db.Database.ExecuteSqlRawAsync(createPwKProductionDetailSql);
     }
 }
 catch (Exception ex)
@@ -123,5 +176,6 @@ app.UseAuthorization();
 app.MapHub<LossTimeHub>("/dataHub");
 app.MapControllers();
 app.MapRazorPages();
+MonitoringSystem.Services.PlcRohibProxy.MapPlcRohibProxy(app);
 
 app.Run();

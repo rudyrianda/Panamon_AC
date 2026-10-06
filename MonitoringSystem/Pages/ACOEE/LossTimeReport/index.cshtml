@@ -1,0 +1,1027 @@
+@page
+@model MonitoringSystem.Pages.ACOEE.LossTimeReport.indexModel
+@{
+    ViewData["Title"] = "Loss Time Report";
+    string[] months = { "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar" };
+    /* Pa Adan Disini */
+}
+
+<style>
+.filter-area-with-lines {
+    position: relative;
+    padding: 1px 0;
+    margin-bottom: 8px;
+    margin-top: -20px;
+    min-height: 10px;
+    width: calc(100% - 14px);
+    margin-left: 7px;
+    margin-right: 7px;
+}
+
+.panamon-bottom-line,
+.panamon-bottomm-line {
+    position: absolute !important;
+    left: 7px !important;
+    right: 7px !important;
+    height: 2px !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    z-index: 999 !important;
+    pointer-events: none !important;
+    display: block !important;
+}
+.panamon-bottom-line {
+    top: 0 !important;
+    border-top: 2px solid rgba(255, 255, 255, 0.08) !important;
+}
+.panamon-bottomm-line {
+    bottom: 0 !important;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.filter-content {
+    position: relative;
+    z-index: 2;
+    padding: 6px 0;
+    border-radius: 15px;
+    margin-left: 7px;
+    margin-right: 7px;
+}
+
+.filter-content .form-select-sm.selected {
+    font-weight: 700 !important;
+}
+
+.filter-content .form-select-sm {
+    height: 28px;
+    padding: 0;
+    padding-left: 12px;
+    padding-right: 28px;
+    padding-top: -2px;
+    font-size: 12px;
+    line-height: 16px;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    color: #ffffff;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 10px 10px;
+    text-align: center;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.filter-content label {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.filter-content .form-select-sm option {
+    background-color: rgba(50, 60, 80, 0.95);
+    color: #ffffff;
+    font-size: 12px;
+    padding: 8px;
+}
+
+.filter-content .form-select:focus {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+    box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.1);
+}
+
+.filter-content .btn {
+    border-radius: 999px !important;
+    height: 28px;
+    min-height: 20px;
+    font-size: 12px;
+    line-height: 20px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.filter-content .form-select-sm,
+.filter-content .btn-sm {
+    height: 28px;
+    min-height: 20px;
+    font-size: 12px;
+    line-height: 20px;
+}
+
+.filter-content .btn-sm {
+    padding: 0 12px;
+    border-radius: 999px;
+}
+
+.filter-content .form-check-input {
+    width: 14px;
+    height: 14px;
+    margin-top: 2px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.4);
+    border-radius: 8px;
+}
+
+.filter-content .form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.filter-content label,
+.filter-content .form-check-label {
+    font-size: 12px;
+    line-height: 20px;
+}
+
+.filter-content .btn-primary {
+    background-color: rgba(8, 65, 150, 0.95);
+    border: 2px solid rgba(100, 181, 246, 1);
+    color: rgba(100, 181, 246, 1);
+    font-weight: 600;
+}
+
+.filter-content .btn-primary:hover {
+    background-color: rgba(5, 45, 110, 1);
+    border-color: rgba(144, 202, 249, 1);
+    color: rgba(144, 202, 249, 1);
+}
+
+.filter-content .btn-success {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border: 2px solid rgba(255, 255, 255, 0.5) !important;
+    color: #ffffff !important;
+    font-weight: 600;
+}
+
+.filter-content .btn-success:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.chart-box {
+    position: relative;
+    width: calc(100% - 14px);
+    max-width: 100%;
+    height: auto;
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+    margin-left: 7px;
+    margin-right: 7px;
+    background: rgba(255, 255, 255, 0.20);
+    border-radius: 12px;
+    padding: 5px 12px 5px 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3) !important;
+    overflow: visible !important;
+}
+
+.chart-box h5 {
+    font-size: 0.85rem;
+    color: #ffffff;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.chart-canvas {
+    width: 100% !important;
+    max-width: 100%;
+    height: 550px !important;
+    margin-bottom: 6px;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+.table-responsive {
+    width: calc(100% - 14px) !important;
+    max-width: calc(100% - 14px) !important;
+    margin-left: 7px !important;
+    margin-right: 7px !important;
+    margin-top: 8px !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    max-height: none !important;
+    position: relative !important;
+    border-radius: 8px !important;
+    scroll-behavior: smooth !important;
+    padding-bottom: 2px !important;
+    margin-bottom: 3px !important;
+    box-sizing: border-box !important;
+    scrollbar-width: auto;
+    scrollbar-color: #64b5f6 rgba(0, 0, 0, 0.5);
+}
+
+.table-responsive::-webkit-scrollbar {
+    height: 14px;
+    width: 12px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 7px;
+    margin: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #64b5f6, #42a5f5);
+    border-radius: 7px;
+    border: 3px solid rgba(0, 0, 0, 0.5);
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #90caf9, #64b5f6);
+    cursor: grab;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:active {
+    cursor: grabbing;
+}
+
+.table-responsive::-webkit-scrollbar-corner {
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 7px;
+}
+
+.table th,
+.table td {
+    font-size: 12px;
+    padding: 0.1rem;
+    white-space: nowrap;
+    word-wrap: break-word;
+    vertical-align: middle;
+}
+
+.table th:first-child,
+.table td:first-child {
+    min-width: 70px !important;
+    max-width: 70px !important;
+    width: 70px !important;
+    white-space: normal;
+    text-align: left;
+    padding-left: 0.1rem;
+    padding-right: 0.1rem;
+    padding-top: 0.1rem;
+    padding-bottom: 0.1rem;
+    font-size: 12px;
+    line-height: 1.2;
+    position: sticky;
+    left: 0;
+    background-color: rgba(255, 255, 255, 0.20) !important;
+    z-index: 10;
+    box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
+    border-right: 2px solid rgba(255, 255, 255, 0.3) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.25) !important;
+}
+
+table.table thead th {
+    background-color: rgba(30, 40, 60, 1) !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    border-bottom: 2px solid rgba(100, 181, 246, 0.5) !important;
+}
+
+.table thead th:first-child {
+    background-color: rgba(20, 30, 50, 1) !important;
+    z-index: 11;
+    font-weight: 700;
+}
+
+.table thead th:first-child.toggle-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.table thead tr:nth-child(2) th {
+    min-width: 38px !important;
+    max-width: 38px !important;
+    width: 38px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    padding: 0.1rem !important;
+}
+
+.table tbody td:not(:first-child) {
+    min-width: 38px !important;
+    max-width: 38px !important;
+    width: 38px !important;
+}
+
+.table.table {
+    background-color: rgba(255, 255, 255, 0.20) !important;
+}
+
+table.table tbody td {
+    background-color: transparent !important;
+    color: #eaeaea !important;
+}
+
+table.table-bordered > :not(caption) > * {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.table-dark td{
+    background-color: rgba(0, 0, 0, 0.7) !important;
+    color: white !important;
+    font-weight: 700;
+    box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
+}
+
+.table-secondary {
+    background-color: rgba(0, 0, 0, 0.20) !important;
+}
+
+.table-secondary td:first-child {
+    background-color: rgba(0, 0, 0, 0.20) !important;
+    font-weight: 700;
+    box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
+}
+
+.extra-row {
+    display: none;
+}
+
+html, body {
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    max-width: 100vw;
+}
+
+.container-fluid {
+    max-width: 100%;
+    overflow-x: visible !important;
+    overflow-y: auto !important;
+    height: auto;
+    padding-left: 0px !important;
+    padding-right: 0px !important;
+}
+
+main.pb-5 {
+    padding-bottom: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    display: flex;
+    flex-direction: column;
+}
+
+#reportContainer {
+    height: auto !important;
+    overflow: visible !important;
+    display: flex;
+    flex-direction: column;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+#reportContainer > .container-fluid {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: visible !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.main-content-wrapper {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.main-content-wrapper .p-4 {
+    padding-left: 1px !important;
+    padding-right: 1px !important;
+}
+
+.chart-box-header {
+    position: relative;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+}
+
+.chart-box-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.3px;
+    padding-left: 2px;
+}
+
+.chart-box-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 1px;
+}
+
+.table tbody tr:not(.table-secondary):not(.table-dark):nth-of-type(odd) {
+    background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.table tbody tr:not(.table-secondary):not(.table-dark):nth-of-type(odd) td {
+    background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.table tbody tr:not(.table-secondary):not(.table-dark):nth-of-type(even) {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.table tbody tr:not(.table-secondary):not(.table-dark):nth-of-type(even) td {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.table tbody tr:not(.table-secondary):not(.table-dark):nth-of-type(odd) td:first-child {
+    background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.table tbody tr:not(.table-secondary):not(.table-dark):nth-of-type(even) td:first-child {
+    background-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+.table tbody tr:not(.table-secondary):not(.table-dark):hover td {
+    background-color: rgba(100, 181, 246, 0.15) !important;
+}
+/* ========== PASTIKAN MODAL TIDAK KENA STYLE TABLE ========== */
+.modal table.table tbody td {
+    background-color: unset !important;
+}
+
+.modal-content {
+    background-color: rgba(30, 40, 60, 0.97) !important;
+}
+
+.modal-body {
+    background-color: rgba(30, 40, 60, 0.97) !important;
+}
+
+.modal-footer {
+    background-color: rgba(20, 30, 50, 0.9) !important;
+}
+
+.extra-row td {
+    background-color: #000000 !important;
+    color: #ffffff !important; /* Warna teks jadi putih agar kontras */
+}
+/* 1. Paksa semua kolom di baris TOTAL LOSS jadi hitam pekat */
+.table-dark.extra-row td {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 2. KHUSUS kolom pertama (Loss Category) yang ada efek lengket/sticky */
+/* Ini yang paling sering bikin gagal karena dia punya background sendiri */
+.table tbody tr.table-dark td:first-child {
+    background-color: #000000 !important;
+    z-index: 15 !important;
+    box-shadow: 3px 0 8px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 3. Pastikan baris total tidak ikut hilang/transparan */
+.extra-row.table-dark {
+    opacity: 1 !important;
+    display: table-row !important; /* Paksa muncul jika sebelumnya display: none */
+}
+</style>
+
+<div id="reportContainer">
+    <div class="container-fluid">
+        <div class="filter-area-with-lines">
+            <div class="panamon-bottom-line"></div>
+            <div class="panamon-bottomm-line"></div>
+
+            <div class="filter-content">
+                <form method="get" id="filterForm" class="d-flex flex-wrap align-items-center gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <label class="mb-0 text-white small">Year</label>
+                    <select class="form-select form-select-sm" style="width: 80px;" id="SelectedYear" name="SelectedYear" asp-for="SelectedYear">
+                            @for (int i = DateTime.Now.Year; i >= 2020; i--)
+                            {
+                                            <option value="@i">@i</option>
+                            }
+                    </select>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <label class="mb-0 text-white small">Machine</label>
+                    <select name="MachineLine" class="form-select form-select-sm" style="width: 200px;" asp-for="MachineLine">
+                        <option value="Expander">Expander Kyoshin 635</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-sm btn-primary">
+                    <i class="fas fa-filter me-2"></i>Apply
+                </button>
+
+                <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                    <i class="fas fa-file-excel me-2"></i>Upload BP
+                </button>
+
+                <button type="button" id="toggleBPButton" class="btn btn-sm btn-success">
+                    <i class="fas fa-eye me-2"></i>Hide BP
+                </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100">
+            @if (TempData["Error"] != null)
+            {
+                                <div id="errorToast" class="toast align-items-center text-bg-danger border-0 shadow" role="alert">
+                                    <div class="d-flex">
+                                        <div class="toast-body">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            @TempData["Error"]
+                                        </div>
+                                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                                    </div>
+                                </div>
+            }
+            @if (TempData["Success"] != null)
+            {
+                                <div id="successToast" class="toast align-items-center text-bg-success border-0 shadow" role="alert">
+                                    <div class="d-flex">
+                                        <div class="toast-body">
+                                            <i class="fas fa-check-circle me-2"></i>
+                            @TempData["Success"]
+                                        </div>
+                                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                                    </div>
+                                </div>
+            }
+        </div>
+
+        <div class="chart-box">
+            <div class="chart-box-header">
+                <span class="chart-box-title">
+                    Actual vs BP : Expander Kyoshin 635
+                    (Apr @Model.SelectedYear - Mar @(Model.SelectedYear + 1))
+                </span>
+                <div class="chart-box-line"></div>
+            </div>
+            @if (Model.ChartDataJson == "{}" || !Model.Categories.Any())
+            {
+                                <div class="alert alert-warning text-center mt-2" style="font-size: 0.75rem;">
+                                    No data found for Fiscal Year @Model.SelectedYear. Please check if data exists in database.
+                                </div>
+            }
+            <canvas id="monthlyLossChart" class="chart-canvas"></canvas>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-bordered text-center align-middle w-100 mb-0" id="lossTimeTable">
+                <thead class="sticky-top">
+                    <tr>
+                        <th rowspan="2" class="align-middle toggle-header" id="toggleExtraRows">
+                            <div class="d-flex align-items-center">
+                                <i id="toggleIcon" class="bi bi-chevron-down me-2"></i>
+                                <span>Loss Category<br>(Min)</span>
+                            </div>
+                        </th>
+                        @foreach (var m in months)
+                        {
+                                            <th colspan="2">@m</th>
+                        }
+                    </tr>
+                    <tr>
+                        @for (int i = 0; i < 12; i++)
+                        {
+                                            <th class="fw-bold small">BP</th>
+                                            <th class="fw-bold small">Act</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Categories.Any())
+                    {
+                        string currentGroup = "";
+
+                        foreach (var cat in Model.Categories)
+                        {
+                            string groupName = Model.GetCategoryGroup(cat);
+                            bool isWorkingLoss = groupName.Equals("WORKING LOSS", StringComparison.OrdinalIgnoreCase);
+                            string rowClass = isWorkingLoss ? "" : "extra-row";
+
+                            if (groupName != currentGroup)
+                            {
+                                                                                <tr class="table-secondary @rowClass">
+                                                                                    <td colspan="25" class="text-center fw-bold text-uppercase" style="letter-spacing: 1px;">
+                                        @groupName
+                                                                                    </td>
+                                                                                </tr>
+                                currentGroup = groupName;
+                            }
+
+                                                            <tr class="@rowClass">
+                                                                <td class="text-start fw-bold">@MonitoringSystem.Pages.ACOEE.AcOeeLossCategories.DisplayName(cat)</td>
+                                @for (int i = 0; i < 12; i++)
+                                {
+                                    var planVal = Model.DetailPlans.ContainsKey(cat) ? Model.DetailPlans[cat][i] : 0;
+                                    var actVal = Model.DetailActuals.ContainsKey(cat) ? Model.DetailActuals[cat][i] : 0;
+                                    <td class="text-center fw-bold">@planVal.ToString("N1")</td>
+                                    <td class="text-center fw-bold">@actVal.ToString("N1")</td>
+                                }
+                                                            </tr>
+                        }
+                                        <tr class="table-dark fw-bold extra-row">
+                                            <td class="text-start">TOTAL LOSS</td>
+                            @for (int i = 0; i < 12; i++)
+                            {
+                                                                <td>@Model.TotalPlanPerMonth[i].ToString("N1")</td>
+                                                                <td>@Model.TotalActualPerMonth[i].ToString("N1")</td>
+                            }
+                                        </tr>
+                    }
+                    else
+                    {
+                                        <tr><td colspan="25">No Data Available</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="uploadModalLabel"><i class="fas fa-file-upload"></i> Upload BP Data</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data" asp-page-handler="ImportExcel">
+                <div class="modal-body">
+                    <input type="hidden" name="SelectedYear" value="@Model.SelectedYear" />
+                    <input type="hidden" name="MachineLine" value="@Model.MachineLine" />
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">1. Select Target Machine for Plan</label>
+                        <select name="UploadMachineLine" class="form-select" required>
+                            <option value="MCH1-01">MCH1-01 (CU)</option>
+                            <option value="MCH1-02">MCH1-02 (CS)</option>
+                        </select>
+                        <div class="form-text text-white">You must specify which machine this file belongs to.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">2. Choose Excel File</label>
+                        <input type="file" name="UploadedExcel" class="form-control" accept=".xlsx" required />
+                    </div>
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small text-muted">Need the format?</span>
+                        <a asp-page-handler="DownloadTemplate" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-download"></i> Download Template
+                        </a>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-small text-white" style="background-color: rgb(25, 135, 84);">Import BP</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="~/js/chart.umd.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+        // ============================================================
+        // TOGGLE EXTRA ROWS
+        // ============================================================
+        document.getElementById('toggleExtraRows')?.addEventListener('click', function () {
+            const extraRows = document.querySelectorAll('.extra-row');
+            const icon = document.getElementById('toggleIcon');
+            const isVisible = extraRows[0]?.style.display === 'table-row';
+            extraRows.forEach(row => row.style.display = isVisible ? 'none' : 'table-row');
+            icon?.classList.toggle('bi-chevron-down', isVisible);
+            icon?.classList.toggle('bi-chevron-up', !isVisible);
+        });
+
+        const getChartColors = () => {
+            const isLight = document.body.classList.contains('light-mode');
+            return {
+                textColor:     isLight ? '#1a1a2e'                  : '#ffffff',
+                gridColor:     isLight ? 'rgba(0, 0, 0, 0.1)'        : 'rgba(255, 255, 255, 0.15)',
+                tooltipBg:     isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.85)',
+                tooltipBorder: isLight ? 'rgba(0, 0, 0, 0.15)'       : 'rgba(255, 255, 255, 0.2)',
+                tooltipText:   isLight ? '#1a1a2e'                  : '#ffffff'
+            };
+        };
+
+        // ============================================================
+        // BUILD DATASETS
+        // ============================================================
+        var chartData = @Html.Raw(Model.ChartDataJson);
+        var ctx = document.getElementById('monthlyLossChart').getContext('2d');
+
+        const barColors = [
+            '#4e73df', 'rgba(255, 99, 132, 0.95)', '#36b9cc', '#f6c23e', '#e74a3b',
+            '#858796', '#b5b9c2', '#fd7e14', '#20c997', '#6f42c1',
+            '#c58c85', '#82b366', '#d7bde2', '#a67c52', '#7fb3d5',
+            '#f0b27a', '#76448a', '#117864', '#922b21', '#717d7e'
+        ];
+        const categoryColors = {
+            // Unknown loss records are displayed consistently with Detail Loss Time.
+            'Other': '#8e44ad'
+        };
+
+        let datasets = [];
+        let colorIdx = 0;
+        let bpDatasetIndices = [];
+        const pairedBarSizing = {
+            categoryPercentage: 0.64,
+            barPercentage: 0.91,
+            maxBarThickness: 58
+        };
+
+        const activeCategories = Object.keys(chartData.Actuals);
+
+        activeCategories.forEach((cat) => {
+            let color = (chartData.Colors && chartData.Colors[cat]) || categoryColors[cat] || barColors[colorIdx % barColors.length];
+
+            bpDatasetIndices.push(datasets.length);
+            datasets.push({
+                type: 'bar', label: ((chartData.DisplayNames && chartData.DisplayNames[cat]) || cat) + ' (Plan)',
+                data: chartData.Plans[cat],
+                backgroundColor: color,
+                borderColor: color,
+                borderWidth: 0,
+                ...pairedBarSizing,
+                stack: 'Plan', order: 2, yAxisID: 'y', hidden: false
+            });
+
+            datasets.push({
+                type: 'bar', label: ((chartData.DisplayNames && chartData.DisplayNames[cat]) || cat) + ' (Act)',
+                data: chartData.Actuals[cat],
+                backgroundColor: color,
+                borderColor: color,
+                borderWidth: 0,
+                ...pairedBarSizing,
+                stack: 'Actual', order: 2, yAxisID: 'y'
+            });
+
+            colorIdx++;
+        });
+
+        const isLight = document.body.classList.contains('light-mode');
+        datasets.push({
+            type: 'line', label: 'Act Loss vs BP Loss (%)',
+            data: chartData.RatioActualVsBp,
+            borderColor: isLight ? '#666666' : '#FFFFFF',
+            backgroundColor: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.2)',
+            tension: 0.1, spanGaps: false, yAxisID: 'y_ratio_bp', order: 1, hidden: false
+        });
+
+        // ============================================================
+        // INIT CHART
+        // ============================================================
+        const c0 = getChartColors();
+
+        Chart.Tooltip.positioners.bpRight = function (items, eventPosition) {
+            const nearestBar = items
+                .filter(item => item.element && this.chart.data.datasets[item.datasetIndex]?.type === 'bar')
+                .reduce((nearest, item) => {
+                    if (!nearest) return item;
+                    return Math.abs(item.element.x - eventPosition.x) < Math.abs(nearest.element.x - eventPosition.x)
+                        ? item
+                        : nearest;
+                }, null);
+
+            const label = nearestBar ? this.chart.data.datasets[nearestBar.datasetIndex]?.label || '' : '';
+            if (!label.endsWith(' (Plan)')) return eventPosition;
+
+            return {
+                x: nearestBar.element.x + (nearestBar.element.width / 2) + 50,
+                y: eventPosition.y,
+                xAlign: 'left'
+            };
+        };
+
+        const barRoleLabelsPlugin = {
+            id: 'barRoleLabels',
+            afterDraw(chart) {
+                const xScale = chart.scales.x;
+                const firstBpIndex = bpDatasetIndices[0];
+                if (!xScale || firstBpIndex === undefined) return;
+
+                const bpMeta = chart.getDatasetMeta(firstBpIndex);
+                const actMeta = chart.getDatasetMeta(firstBpIndex + 1);
+                const showBp = chart.isDatasetVisible(firstBpIndex);
+                const roleLabelY = chart.chartArea.bottom + 12;
+                const monthLabelY = chart.chartArea.bottom + 34;
+                const colors = getChartColors();
+
+                chart.ctx.save();
+                chart.ctx.textAlign = 'center';
+                chart.ctx.textBaseline = 'middle';
+                chart.ctx.font = '600 13px "Segoe UI", Arial, sans-serif';
+
+                chart.data.labels.forEach((_, dataIndex) => {
+                    const bpX = bpMeta.data[dataIndex]?.x;
+                    const actX = actMeta.data[dataIndex]?.x;
+
+                    if (showBp && Number.isFinite(bpX)) {
+                        chart.ctx.fillStyle = colors.textColor;
+                        chart.ctx.fillText('BP', bpX, roleLabelY);
+                    }
+
+                    if (Number.isFinite(actX)) {
+                        chart.ctx.fillStyle = colors.textColor;
+                        chart.ctx.fillText('Act', actX, roleLabelY);
+                    }
+                });
+
+                chart.ctx.font = '600 14px "Segoe UI", Arial, sans-serif';
+                chart.data.labels.forEach((month, dataIndex) => {
+                    chart.ctx.fillStyle = colors.textColor;
+                    chart.ctx.fillText(month, xScale.getPixelForTick(dataIndex), monthLabelY);
+                });
+
+                chart.ctx.restore();
+            }
+        };
+
+        const monthlyChart = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: chartData.Labels, datasets: datasets },
+            plugins: [barRoleLabelsPlugin],
+            options: {
+                devicePixelRatio: 3,
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 500 },
+                layout: { padding: { bottom: 0, top: 0, left: 5, right: 5 } },
+                plugins: {
+                    tooltip: {
+                        mode: 'index', intersect: false,
+                        position: 'bpRight',
+                        caretSize: 8,
+                        caretPadding: 40,
+                        backgroundColor: c0.tooltipBg,
+                        borderColor: c0.tooltipBorder,
+                        borderWidth: 1,
+                        padding: { top: 15, right: 18, bottom: 15, left: 18 },
+                        titleFont: { weight: '700', size: 17, lineHeight: 1.3 },
+                        bodyFont: { weight: '600', size: 15, lineHeight: 1.35 },
+                        footerFont: { weight: '700', size: 15, lineHeight: 1.35 },
+                        titleMarginBottom: 8,
+                        bodySpacing: 3,
+                        footerMarginTop: 9,
+                        boxWidth: 12,
+                        boxHeight: 12,
+                        titleColor: c0.tooltipText,   // ✅ FIX: property langsung, bukan callback
+                        bodyColor:  c0.tooltipText,   // ✅ FIX: property langsung, bukan callback
+                        footerColor: c0.tooltipText,  // ✅ FIX: property langsung, bukan callback
+                        itemSort: function(a, b) {
+                            if (a.dataset.type === 'line') return 1;
+                            if (b.dataset.type === 'line') return -1;
+                            return b.parsed.y - a.parsed.y; 
+                        },
+                        callbacks: {
+                            label: function (context) {
+                                const label = context.dataset.label || '';
+                                if (context.dataset.type === 'line') {
+                                    if (context.parsed.y === null || context.parsed.y === undefined) return null;
+                                    return label + ': ' + context.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%';
+                                }
+                                if (!label.includes('(Act)')) return null;
+                                if (!context.parsed.y || context.parsed.y === 0) return null;
+                                return label.replace(' (Act)', '') + ': ' + context.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1}) + ' min';
+                            },
+                            footer: function (tooltipItems) {
+                                if (!tooltipItems.length) return [];
+                                const dataIndex = tooltipItems[0].dataIndex;
+                                const chart = tooltipItems[0].chart;
+                                let totalAct = 0, totalBP = 0;
+                                chart.data.datasets.forEach((ds) => {
+                                    const val = ds.data[dataIndex] || 0;
+                                    if (ds.label?.includes('(Act)') && !ds.label?.includes('Ratio')) totalAct += val;
+                                    else if (ds.label?.includes('(Plan)') && !ds.label?.includes('Ratio')) totalBP += val;
+                                });
+                                return [
+                                    '─────────────────',
+                                    'Total Actual : ' + totalAct.toLocaleString() + ' min',
+                                    'Total BP     : ' + totalBP.toLocaleString() + ' min'
+                                ];
+                            }
+                        }
+                    },
+                    legend: {
+                        labels: {
+                            color: c0.textColor,
+                            usePointStyle: false,
+                            generateLabels: function (chart) {
+                                const original = Chart.defaults.plugins.legend.labels.generateLabels;
+                                const labels = original.call(this, chart);
+                                return labels.filter(l => l.text.includes('(Act)') || chart.data.datasets[l.datasetIndex]?.type === 'line')
+                                             .map(l => { l.text = l.text.replace(' (Act)', ''); return l; });
+                            }
+                        },
+                        onClick: (e, item, legend) => {
+                            const chart = legend.chart;
+                            if (chart.isDatasetVisible(item.datasetIndex)) chart.hide(item.datasetIndex);
+                            else chart.show(item.datasetIndex);
+                        },
+                        onHover: (e) => { e.native.target.style.cursor = 'pointer'; },
+                        onLeave: (e) => { e.native.target.style.cursor = 'default'; }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        title: { display: false },
+                        ticks: { display: false, color: c0.textColor },
+                        grid:  { color: c0.gridColor },
+                        afterFit: (scale) => { scale.height = 48; }
+                    },
+                    y: {
+                        type: 'linear', display: true, position: 'left', stacked: true,
+                        title: { display: true, text: 'Loss Time (Min)', color: c0.textColor },
+                        ticks: { color: c0.textColor },
+                        grid:  { color: c0.gridColor }
+                    },
+                    y_ratio_bp: {
+                        type: 'linear', display: true, position: 'right',
+                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: 'Act Loss vs BP Loss (%)', color: c0.textColor },
+                        ticks: { color: c0.textColor, callback: v => v + '%' },
+                        beginAtZero: true,
+                        suggestedMax: 100
+                    }
+                }
+            }
+        });
+
+        let bpVisible = true;
+        const toggleBPBtn = document.getElementById('toggleBPButton');
+
+        toggleBPBtn?.addEventListener('click', function () {
+            bpVisible = !bpVisible;
+            bpDatasetIndices.forEach(i => { if (bpVisible) monthlyChart.show(i); else monthlyChart.hide(i); });
+            if (bpVisible) {
+                toggleBPBtn.innerHTML = '<i class="fas fa-eye me-1"></i> Hide BP';
+                toggleBPBtn.style.borderColor = 'rgba(231, 74, 59, 0.6)';
+                toggleBPBtn.style.color       = 'rgba(231, 74, 59, 1)';
+            } else {
+                toggleBPBtn.innerHTML = '<i class="fas fa-eye-slash me-1"></i> Show BP';
+                toggleBPBtn.style.borderColor = 'rgba(100, 181, 246, 0.6)';
+                toggleBPBtn.style.color       = 'rgba(100, 181, 246, 1)';
+            }
+            monthlyChart.update();
+        });
+
+        // ============================================================
+        // SYNC TOOLTIP + CHART COLORS SAAT THEME TOGGLE
+        // ============================================================
+        document.getElementById('themeToggle')?.addEventListener('click', function () {
+            setTimeout(() => {
+                const c = getChartColors();
+                monthlyChart.options.plugins.tooltip.backgroundColor  = c.tooltipBg;
+                monthlyChart.options.plugins.tooltip.borderColor       = c.tooltipBorder;
+                monthlyChart.options.plugins.tooltip.titleColor        = c.tooltipText;   // ✅ sync saat theme toggle
+                monthlyChart.options.plugins.tooltip.bodyColor         = c.tooltipText;   // ✅ sync saat theme toggle
+                monthlyChart.options.plugins.tooltip.footerColor       = c.tooltipText;   // ✅ sync saat theme toggle
+                monthlyChart.options.plugins.legend.labels.color       = c.textColor;
+                monthlyChart.options.scales.x.ticks.color              = c.textColor;
+                monthlyChart.options.scales.x.grid.color               = c.gridColor;
+                monthlyChart.options.scales.x.title.color              = c.textColor;
+                monthlyChart.options.scales.y.ticks.color              = c.textColor;
+                monthlyChart.options.scales.y.grid.color               = c.gridColor;
+                monthlyChart.options.scales.y.title.color              = c.textColor;
+                monthlyChart.update('none');
+            }, 50);
+        });
+
+    }); // END DOMContentLoaded
+
+    // ============================================================
+    // DROPDOWN STYLING
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', function () {
+        function updateDropdownStyle() {
+            document.querySelectorAll('.filter-content .form-select-sm').forEach(dropdown => {
+                if (dropdown.id === 'SelectedYear') {
+                    if (dropdown.value) dropdown.classList.add('selected');
+                } else if (dropdown.name === 'MachineLine') {
+                    if (dropdown.value && dropdown.value !== 'All') dropdown.classList.add('selected');
+                    else dropdown.classList.remove('selected');
+                }
+            });
+        }
+        updateDropdownStyle();
+        document.querySelectorAll('.filter-content .form-select-sm').forEach(d => d.addEventListener('change', updateDropdownStyle));
+    });
+</script>

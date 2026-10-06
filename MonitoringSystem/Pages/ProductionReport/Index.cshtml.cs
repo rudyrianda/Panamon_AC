@@ -37,6 +37,9 @@ namespace MonitoringSystem.Pages.ProductionReport
         public List<int?> PlanOvertimeData { get; private set; } = new List<int?>();
         public List<int> EffectivePlanData { get; private set; } = new List<int>();
         public List<int> EffectivePlanOvertimeData { get; private set; } = new List<int>();
+        // Tabel "Plan Forecast": Change Plan bila ada, selain itu SAP Plan (semua tanggal, tanpa batas "sampai besok")
+        public List<int> TablePlanData { get; private set; } = new List<int>();
+        public List<int> TablePlanOvertimeData { get; private set; } = new List<int>();
         public List<double> DailyNetManHours { get; private set; } = new List<double>();
 
         private class DailyData
@@ -141,6 +144,8 @@ namespace MonitoringSystem.Pages.ProductionReport
                 originalPlanOvertimeData = OriginalPlanOvertimeData,
                 effectivePlanData = EffectivePlanData,
                 effectivePlanOtData = EffectivePlanOvertimeData,
+                tablePlanData = TablePlanData,
+                tablePlanOtData = TablePlanOvertimeData,
                 chartLabels = ChartLabels,
                 noOfDirectWorkers = NoOfDirectWorkers,
                 overtimeOperators = OvertimeOperators,
@@ -824,7 +829,10 @@ GROUP BY DAY(pp.CurrentDate)";
             {
                 var data = combinedData[i];
                 bool isUpToTomorrow = new DateTime(SelectedYear, SelectedMonth, data.Day).Date <= DateTime.Now.Date.AddDays(1);
-                
+
+                TablePlanData.Add(PlanData[i].HasValue ? PlanData[i].Value : OriginalPlanData[i]);
+                TablePlanOvertimeData.Add(PlanOvertimeData[i].HasValue ? PlanOvertimeData[i].Value : OriginalPlanOvertimeData[i]);
+
                 if (isAugust2026)
                 {
                     int effectiveNormal = PlanData[i].HasValue ? PlanData[i].Value : 0;

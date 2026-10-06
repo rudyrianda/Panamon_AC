@@ -685,6 +685,14 @@
         color: #ffffff !important;
     }
 
+    /* Samakan posisi semua label pada kolom Production Result. */
+    #productionTable tbody td.production-result-label {
+        text-align: left !important;
+        padding: clamp(0.1rem, 0.175vh, 0.125rem) 0.75rem !important;
+        vertical-align: middle !important;
+        white-space: nowrap;
+    }
+
     /* ========================================
        HEADER TETAP DI TOP (UPDATE)
        ======================================== */
@@ -931,34 +939,34 @@
                     <!-- PLAN FORECAST -->
                     <tr>
                         <td rowspan="3" style="vertical-align: middle; text-align: center; font-weight: 700;">Plan Forecast</td>
-                        <td style="text-align: left;">Normal</td>
-                        @for (int i = 0; i < Model.EffectivePlanData.Count; i++)
+                        <td class="production-result-label">Normal</td>
+                        @for (int i = 0; i < Model.TablePlanData.Count; i++)
                         {
-                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.EffectivePlanData[i].ToString("N0")</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.TablePlanData[i].ToString("N0")</td>
                         }
-                        <td style="font-weight: 700;">@Model.EffectivePlanData.Sum().ToString("N0")</td>
+                        <td style="font-weight: 700;">@Model.TablePlanData.Sum().ToString("N0")</td>
                     </tr>
                     <tr>
-                        <td style="text-align: left;">Overtime</td>
-                        @for (int i = 0; i < Model.EffectivePlanOvertimeData.Count; i++)
+                        <td class="production-result-label">Overtime</td>
+                        @for (int i = 0; i < Model.TablePlanOvertimeData.Count; i++)
                         {
-                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.EffectivePlanOvertimeData[i].ToString("N0")</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.TablePlanOvertimeData[i].ToString("N0")</td>
                         }
-                        <td style="font-weight: 700;">@Model.EffectivePlanOvertimeData.Sum().ToString("N0")</td>
+                        <td style="font-weight: 700;">@Model.TablePlanOvertimeData.Sum().ToString("N0")</td>
                     </tr>
                     <tr class="bg-row-total">
-                        <td style="text-align: left;"><b>Total Plan</b></td>
-                        @for (int i = 0; i < Model.PlanData.Count; i++)
+                        <td class="production-result-label"><b>Total Plan</b></td>
+                        @for (int i = 0; i < Model.TablePlanData.Count; i++)
                         {
-                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@((Model.EffectivePlanData[i] + Model.EffectivePlanOvertimeData[i]).ToString("N0"))</td>
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@((Model.TablePlanData[i] + Model.TablePlanOvertimeData[i]).ToString("N0"))</td>
                         }
-                        <td style="font-weight: 700;">@((Model.EffectivePlanData.Sum() + Model.EffectivePlanOvertimeData.Sum()).ToString("N0"))</td>
+                        <td style="font-weight: 700;">@((Model.TablePlanData.Sum() + Model.TablePlanOvertimeData.Sum()).ToString("N0"))</td>
                     </tr>
 
                     <!-- ACTUAL -->
                     <tr>
                         <td rowspan="3" style="vertical-align: middle; text-align: center; font-weight: 700;">Actual</td>
-                        <td style="text-align: left;">Normal</td>
+                        <td class="production-result-label">Normal</td>
                         @for (int i = 0; i < Model.NormalData.Count; i++)
                         {
                             <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.NormalData[i].ToString("N0")</td>
@@ -966,7 +974,7 @@
                         <td style="font-weight: 700;">@Model.NormalData.Sum().ToString("N0")</td>
                     </tr>
                     <tr>
-                        <td style="text-align: left;">Overtime</td>
+                        <td class="production-result-label">Overtime</td>
                         @for (int i = 0; i < Model.OvertimeData.Count; i++)
                         {
                             <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.OvertimeData[i].ToString("N0")</td>
@@ -974,7 +982,7 @@
                         <td style="font-weight: 700;">@Model.OvertimeData.Sum().ToString("N0")</td>
                     </tr>
                     <tr class="bg-row-total">
-                        <td style="text-align: left;"><b>Total Actual</b></td>
+                        <td class="production-result-label"><b>Total Actual</b></td>
                         @for (int i = 0; i < Model.NormalData.Count; i++)
                         {
                             <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@((Model.NormalData[i] + Model.OvertimeData[i]).ToString("N0"))</td>
@@ -984,7 +992,7 @@
 
                     <!-- DIFFERENCE - SATU KOLOM PENUH -->
                     <tr>
-                        <td colspan="2" style="text-align: left; font-weight: 700;">Difference (Actual - Plan)</td>
+                        <td colspan="2" class="production-result-label" style="font-weight: 700;">Difference (Actual - Plan)</td>
                         @for (int i = 0; i < Model.NormalData.Count; i++)
                         {
                             <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(((Model.NormalData[i] + Model.OvertimeData[i]) - (Model.EffectivePlanData[i] + Model.EffectivePlanOvertimeData[i])).ToString("N0"))</td>
@@ -994,7 +1002,7 @@
 
                     <!-- ACHIEVEMENT RATIO - SATU KOLOM PENUH, DIBAWAH DIFFERENCE -->
                     <tr>
-                        <td colspan="2" style="text-align: left; font-weight: 700;">Achievement Ratio</td>
+                        <td colspan="2" class="production-result-label" style="font-weight: 700;">Achievement Ratio</td>
                         @for (int i = 0; i < Model.PlanData.Count; i++)
                         {
                             decimal totalActual = Model.NormalData[i] + Model.OvertimeData[i];
@@ -1034,7 +1042,7 @@
 
                     <!-- NO. OF DIRECT WORKERS - SATU KOLOM PENUH, DIBAWAH ACHIEVEMENT RATIO -->
                     <tr>
-                        <td colspan="2" style="text-align: left; font-weight: 700;">No. of Direct Workers</td>
+                        <td colspan="2" class="production-result-label" style="font-weight: 700;">No. of Direct Workers</td>
                         @for (int i = 0; i < Model.NoOfDirectWorkers.Count; i++)
                         {
                             <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.NoOfDirectWorkers[i] > 0 ? Model.NoOfDirectWorkers[i].ToString() : "0")</td>
@@ -1045,7 +1053,7 @@
                     <!-- WORKFORCE -->
                     <tr>
                         <td rowspan="1" style="vertical-align: middle; text-align: center; font-weight: 700;">Workforce</td>
-                        <td style="text-align: left;">Overtime - No. of Operator</td>
+                        <td class="production-result-label">Overtime - No. of Operator</td>
                         @for (int i = 0; i < Model.OvertimeOperators.Count; i++)
                         {
                             <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.OvertimeOperators[i] > 0 ? Model.OvertimeOperators[i] : "0")</td>
@@ -1056,7 +1064,7 @@
                     <!-- TIME MANAGEMENT -->
                     <tr>
                         <td rowspan="2" style="vertical-align: middle; text-align: center; font-weight: 700;">Time Management</td>
-                        <td style="text-align: left;">Overtime - Minutes</td>
+                        <td class="production-result-label">Overtime - Minutes</td>
                         @for (int i = 0; i < Model.OvertimeMinutes.Count; i++)
                         {
                             <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.OvertimeMinutes[i] > 0 ? Model.OvertimeMinutes[i].ToString("N0") : "0")</td>
@@ -1064,7 +1072,7 @@
                         <td style="font-weight: 700;">@Model.OvertimeMinutes.Sum().ToString("N0")</td>
                     </tr>
                     <tr>
-                        <td style="text-align: left;">Loss Time</td>
+                        <td class="production-result-label">Loss Time</td>
                         @for (int i = 0; i < Model.DailyLossTime.Count; i++)
                         {
                             <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.DailyLossTime[i] > 0 ? Model.DailyLossTime[i].ToString("0.##") : "0")</td>
@@ -1074,7 +1082,7 @@
 
                     <!-- TOTAL LOAD TIME - SATU KOLOM PENUH, DIBAWAH LOSS TIME -->
                     <tr>
-                        <td colspan="2" style="text-align: left; font-weight: 700;">Total Load Time</td>
+                        <td colspan="2" class="production-result-label" style="font-weight: 700;">Total Load Time</td>
                         @for (int i = 0; i < Model.DailyWorkTime.Count; i++)
                         {
                             <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.DailyWorkTime[i] > 0 ? Model.DailyWorkTime[i].ToString("N0") : "0")</td>
@@ -1084,7 +1092,7 @@
 
                     <!-- PROD. QTY / HEAD / HOUR - SATU KOLOM PENUH, DIBAWAH TOTAL LOAD TIME -->
                     <tr>
-                        <td colspan="2" style="text-align: left; font-weight: 700;">Production Qty. / Head / Hour</td>
+                        <td colspan="2" class="production-result-label" style="font-weight: 700;">Production Qty. / Head / Hour</td>
                         @for (int i = 0; i < Model.PlanData.Count; i++)
                         {
                             <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">
@@ -1517,27 +1525,35 @@
                     return { textContent: '' }; // safe fallback
                 };
 
+                // Plan Forecast (tabel): Change Plan bila ada, selain itu SAP Plan untuk semua tanggal
+                const tablePlan = data.tablePlanData || data.effectivePlanData;
+                const tablePlanOt = data.tablePlanOtData || data.effectivePlanOtData;
+
                 let sumPlanNormal = 0;
                 for(let i=0; i<daysInMonth; i++) {
-                    getCell(0, i+2).textContent = formatN0(data.effectivePlanData[i]);
-                    sumPlanNormal += data.effectivePlanData[i] || 0;
+                    getCell(0, i+2).textContent = formatN0(tablePlan[i]);
+                    sumPlanNormal += tablePlan[i] || 0;
                 }
                 getCell(0, daysInMonth+2).textContent = formatN0(sumPlanNormal);
 
                 let sumPlanOvt = 0;
                 for(let i=0; i<daysInMonth; i++) {
-                    getCell(1, i+1).textContent = formatN0(data.effectivePlanOtData[i]);
-                    sumPlanOvt += data.effectivePlanOtData[i] || 0;
+                    getCell(1, i+1).textContent = formatN0(tablePlanOt[i]);
+                    sumPlanOvt += tablePlanOt[i] || 0;
                 }
                 getCell(1, daysInMonth+1).textContent = formatN0(sumPlanOvt);
 
-                let sumPlanTotal = 0;
+                let sumPlanTableTotal = 0;
                 for(let i=0; i<daysInMonth; i++) {
-                    const val = (data.effectivePlanData[i] || 0) + (data.effectivePlanOtData[i] || 0);
+                    const val = (tablePlan[i] || 0) + (tablePlanOt[i] || 0);
                     getCell(2, i+1).textContent = formatN0(val);
-                    sumPlanTotal += val;
+                    sumPlanTableTotal += val;
                 }
-                getCell(2, daysInMonth+1).textContent = formatN0(sumPlanTotal);
+                getCell(2, daysInMonth+1).textContent = formatN0(sumPlanTableTotal);
+
+                // Achievement Ratio bulanan tetap memakai plan efektif (aturan lama)
+                let sumPlanTotal = 0;
+                for(let i=0; i<daysInMonth; i++) sumPlanTotal += (data.effectivePlanData[i] || 0) + (data.effectivePlanOtData[i] || 0);
 
                 let sumActNormal = 0;
                 for(let i=0; i<daysInMonth; i++) {

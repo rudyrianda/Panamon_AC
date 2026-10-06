@@ -1,0 +1,170 @@
+@page
+@model MonitoringSystem.Pages.ACOEE.Inventory.indexModel
+@{
+    ViewData["Title"] = "Inventory";
+
+    int daysInMonth = DateTime.DaysInMonth(Model.ActiveYear, Model.ActiveBulan);
+
+    string[] namaBulan = new[]
+    {
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    };
+
+    // ── Hitung Total per tanggal dari listData ──
+    var dailyTotals = new Dictionary<int, decimal>();
+    for (int d = 1; d <= daysInMonth; d++)
+    {
+        decimal sum = 0;
+        if (Model.listData != null)
+        {
+            foreach (var item in Model.listData)
+            {
+                if (item.DailyValues != null && item.DailyValues.TryGetValue(d, out var v) && v.HasValue)
+                {
+                    sum += v.Value;
+                }
+            }
+        }
+        dailyTotals[d] = sum;
+    }
+}
+
+<link rel="stylesheet" href="~/css/inventory.css" asp-append-version="true" />
+
+<div class="inventory-dashboard">
+<div class="filter-area-with-lines">
+    <div class="panamon-bottom-line"></div>
+    <div class="panamon-bottomm-line"></div>
+    <div class="filter-content">
+        <div class="row g-3 align-items-center justify-content-between flex-wrap">
+            <div class="col-auto">
+                <form method="get" class="d-flex flex-wrap align-items-center gap-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="mb-0">Bulan</label>
+                        <select class="form-select" style="width: 130px;" name="FilterBulan">
+                            @for (int b = 1; b <= 12; b++)
+                            {
+                                <option value="@b" selected="@(b == Model.ActiveBulan)">@namaBulan[b - 1]</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="mb-0">Tahun</label>
+                        <input type="number" class="form-control" style="width: 90px;"
+                               name="FilterTahun" value="@Model.ActiveYear" min="2000" max="2100" />
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="mb-0">Machine</label>
+                        <select class="form-select" style="width: 200px;" name="FilterMachineLine">
+                            <option value="Expander" selected>Expander Kyoshin 635</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Search</button>
+                    <a href="/ACOEE/Inventory" class="btn btn-danger">Reset</a>
+                    <button type="button" class="btn btn-success" id="btn-export-csv">Save Excel</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="inv-card">
+    <div id="inventory-report">
+
+        <div class="inv-table-container">
+
+            <!-- HEADER -->
+            <div class="inv-header-wrap">
+                <table class="table table-bordered mb-0 inv-tbl">
+                    <colgroup>
+                        <col class="col-model" />
+                        @for (int d = 1; d <= daysInMonth; d++)
+                        {
+                            <col class="col-day" />
+                        }
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th class="col-model">Model</th>
+                            @for (int d = 1; d <= daysInMonth; d++)
+                            {
+                                <th class="col-day text-center">@d</th>
+                            }
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+
+            <!-- BODY -->
+            <div class="inv-body-wrap">
+                <table class="table table-bordered mb-0 inv-tbl">
+                    <colgroup>
+                        <col class="col-model" />
+                        @for (int d = 1; d <= daysInMonth; d++)
+                        {
+                            <col class="col-day" />
+                        }
+                    </colgroup>
+                    <tbody id="inventory-table-body">
+                        @{
+                            int minRows = 15;
+                            int dataCount = Model.listData?.Count ?? 0;
+                            int totalRows = Math.Max(dataCount, minRows);
+                        }
+
+                        @for (int i = 0; i < totalRows; i++)
+                        {
+                            var item = dataCount > i ? Model.listData[i] : null;
+
+                            <tr>
+                                <td class="col-model">@(item?.Model ?? "")</td>
+
+                                @for (int d = 1; d <= daysInMonth; d++)
+                                {
+                                    decimal? dayValue = null;
+                                    if (item?.DailyValues != null && item.DailyValues.ContainsKey(d))
+                                    {
+                                        dayValue = item.DailyValues[d];
+                                    }
+
+                                    <td class="col-day text-center">@(dayValue?.ToString() ?? "")</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- FOOTER: TOTAL (scroll horizontal disinkron dengan body via JS, sama seperti header) -->
+            <div class="inv-footer-wrap">
+                <table class="table table-bordered mb-0 inv-tbl">
+                    <colgroup>
+                        <col class="col-model" />
+                        @for (int d = 1; d <= daysInMonth; d++)
+                        {
+                            <col class="col-day" />
+                        }
+                    </colgroup>
+                    <tfoot>
+                        <tr>
+                            <td class="col-model">Total</td>
+                            @for (int d = 1; d <= daysInMonth; d++)
+                            {
+                                <td class="col-day text-center">@(dailyTotals[d] == 0 ? "" : dailyTotals[d].ToString("0.##"))</td>
+                            }
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+    window.__invStatusMessage = '@TempData["StatusMessage"]';
+    window.__invMessage = '@TempData["Message"]';
+</script>
+<script src="~/js/inventory-export.js" asp-append-version="true"></script>

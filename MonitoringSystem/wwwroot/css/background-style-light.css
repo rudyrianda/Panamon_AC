@@ -70,6 +70,21 @@ body.light-mode {
                 border-radius: 8px;
             }
 
+    body.light-mode #bdSidebar .sidebar-menu-popup {
+        background: #ffffff !important;
+        border-color: rgba(26, 26, 46, 0.2);
+        box-shadow: 0 8px 24px rgba(26, 26, 46, 0.25);
+    }
+
+        body.light-mode #bdSidebar .nav-item .sidebar-menu-popup a {
+            color: #1a1a2e !important;
+        }
+
+            body.light-mode #bdSidebar .nav-item .sidebar-menu-popup a:hover {
+                background: rgba(26, 115, 232, 0.12) !important;
+                color: #0b3d91 !important;
+            }
+
     body.light-mode .logout-btn {
         color: #1a1a2e !important;
     }

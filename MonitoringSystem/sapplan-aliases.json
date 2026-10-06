@@ -1,0 +1,345 @@
+{
+    "_Keterangan":  [
+                        "Tabel alias nama model Excel \"Daily prod plan\" -\u003e ProductName di MasterData (untuk SUT).",
+                        "Hanya dipakai bila nama Excel tidak ada persis di MasterData. Tidak ada pencocokan nama mirip otomatis.",
+                        "Tambahkan entri baru di sini bila worker melaporkan model tanpa SUT/alias; berlaku pada siklus berikutnya tanpa restart."
+                    ],
+    "Aliases":  [
+                    {
+                        "ExcelName":  "CS-PN12AKJ-E",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-PN12AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-PN12AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-PN12AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-PN18AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-PN18AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-PN24AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-PN24AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-PN5AKJ-E",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-PN5AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-PN5AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-PN5AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-PN7AKJ-E",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-PN7AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-PN7AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-PN7AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-PN9AKJ-E",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-PN9AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-PN9AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-PN9AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-RU12AKJ-E",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-RU12AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-RU12AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-RU12AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-RU18AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-RU18AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-RU24AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-RU24AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-RU5AKJ-E",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-RU5AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-RU5AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-RU5AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-RU7AKJ-E",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-RU7AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-RU7AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-RU7AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-RU9AKJ-E",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-RU9AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-RU9AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-RU9AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-YN12AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-YN12AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-YN18AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-YN18AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-YN24AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-YN24AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CS-YN9AKJ-P",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "CS-YN9AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-PN12AKJ-E",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-PN12AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-PN12AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-PN12AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-PN18AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-PN18AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-PN24AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-PN24AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-PN5AKJ-E",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-PN5AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-PN5AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-PN5AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-PN7AKJ-E",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-PN7AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-PN7AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-PN7AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-PN9AKJ-E",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-PN9AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-PN9AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-PN9AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-RU12AKJ-E",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-RU12AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-RU12AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-RU12AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-RU18AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-RU18AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-RU24AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-RU24AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-RU5AKJ-E",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-RU5AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-RU5AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-RU5AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-RU7AKJ-E",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-RU7AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-RU7AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-RU7AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-RU9AKJ-E",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-RU9AKJ",
+                        "Note":  "Varian -E memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-RU9AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-RU9AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-YN12AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-YN12AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-YN18AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-YN18AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-YN24AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-YN24AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "CU-YN9AKJ-P",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "CU-YN9AKJ",
+                        "Note":  "Varian -P memakai SUT model dasar (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "KIOS 5 R32 MD0-O",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "KIOS-5-MDO",
+                        "Note":  "Nama KIOS di Excel berbeda dengan MasterData (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "KIOS 9 R32 MD1-O",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "KIOS-9-MDO",
+                        "Note":  "Nama KIOS di Excel berbeda dengan MasterData (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "KIOS 12 R32 MD1-O",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "KIOS-12-MDO",
+                        "Note":  "Nama KIOS di Excel berbeda dengan MasterData (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "KIOS 18 R32 MD0-O",
+                        "MachineCode":  "MCH1-01",
+                        "MasterDataName":  "KIOS-18-MDO",
+                        "Note":  "Nama KIOS di Excel berbeda dengan MasterData (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "KIOS 5 R32 UD0-I",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "KIOS-5-UDO",
+                        "Note":  "Nama KIOS di Excel berbeda dengan MasterData (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "KIOS 9 R32 UD1-I",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "KIOS-9-UD1-I",
+                        "Note":  "Nama KIOS di Excel berbeda dengan MasterData (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "KIOS 12 R32 UD1-I",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "KIOS-12-UD1",
+                        "Note":  "Nama KIOS di Excel berbeda dengan MasterData (disetujui user 2026-09-29)"
+                    },
+                    {
+                        "ExcelName":  "KIOS 18 R32 UD0-I",
+                        "MachineCode":  "MCH1-02",
+                        "MasterDataName":  "KIOS-18-UDO",
+                        "Note":  "Nama KIOS di Excel berbeda dengan MasterData (disetujui user 2026-09-29)"
+                    }
+                ]
+}

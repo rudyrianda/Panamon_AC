@@ -341,53 +341,74 @@ body.reusable-bg * {
             line-height: 1.1 !important;
         }
 
-/* More Menu Popup */
-#moreMenuPopup {
+/* Sidebar flyout menus */
+.sidebar-menu-popup {
     display: none;
     position: absolute;
     left: 100%;
     top: 0;
     margin-left: 8px;
-    background: rgba(255, 255, 255, 0.20) !important;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    /* Solid agar menu tetap terbaca di atas tabel/grafik di belakangnya. */
+    background: #1c2440 !important;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
     min-width: 160px;
     z-index: 9999;
-    padding: 4px 0;
+    padding: 6px;
+    gap: 2px;
 }
 
-    #moreMenuPopup a {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 4px;
-        padding: 12px 14px;
-        color: rgba(255, 255, 255, 0.5) !important;
-        text-decoration: none;
-        border-radius: 6px;
-        transition: all 0.2s ease;
-        margin: 0 4px;
+    /* Diawali #bdSidebar agar menang dari rule "#bdSidebar .nav-item a"
+       yang membuat link popup redup (opacity 0.5) dan berukuran tetap. */
+    .sidebar-menu-popup a,
+    #bdSidebar .nav-item .sidebar-menu-popup a {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px;
+        width: auto !important;
+        min-width: 76px;
+        height: auto !important;
+        min-height: 64px;
+        padding: 10px 10px !important;
+        background: transparent !important;
+        color: rgba(255, 255, 255, 0.9) !important;
+        text-decoration: none !important;
+        border-radius: 8px !important;
+        transition: all 0.2s ease !important;
     }
 
-        #moreMenuPopup a:hover {
-            background: rgba(255, 255, 255, 0.1) !important;
+        .sidebar-menu-popup a:hover,
+        #bdSidebar .nav-item .sidebar-menu-popup a:hover {
+            background: rgba(77, 163, 255, 0.25) !important;
             color: #ffffff !important;
         }
 
-        #moreMenuPopup a i {
-            font-size: 18px;
+        .sidebar-menu-popup a i,
+        #bdSidebar .nav-item .sidebar-menu-popup a i {
+            font-size: 20px;
+            color: inherit !important;
         }
 
-        #moreMenuPopup a span {
-            font-size: 8.5px;
-            font-weight: 500;
+        .sidebar-menu-popup a span,
+        #bdSidebar .nav-item .sidebar-menu-popup a span {
+            font-size: 11px;
+            font-weight: 600;
             text-align: center;
-            line-height: 1.1;
+            line-height: 1.2;
         }
+
+        .sidebar-menu-popup a.machine-menu-placeholder {
+            cursor: default;
+        }
+
+#machineNavItem:hover #machineMenuBtn.active ~ #machineMenuPopup,
+#machineNavItem:focus-within #machineMenuBtn.active ~ #machineMenuPopup,
+#machineNavItem.menu-open #machineMenuPopup {
+    display: flex;
+}
 
 /* ====================================================
    7. MAIN CONTENT AREA

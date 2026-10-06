@@ -810,7 +810,8 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
 
                 foreach (var record in mttRecords)
                 {
-                    string subCat = ExtractMttSubCategory(record.DetailedReason, allMttSubCategories);
+                    string subCat = ExtractMttSubCategory(record.DetailedReason, record.Location, allMttSubCategories);
+                    record.MttSubCategory = subCat;
                     if (!mttDailySubData.ContainsKey(subCat))
                         mttDailySubData[subCat] = new Dictionary<int, double>();
 
@@ -881,7 +882,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
         }
 
         // ? NEW: Helper untuk extract sub-category MTT dari DetailedReason
-        private string ExtractMttSubCategory(string detailedReason, List<string> knownSubCategories)
+        private string ExtractMttSubCategory(string detailedReason, string machineCode, List<string> knownSubCategories)
         {
             if (string.IsNullOrEmpty(detailedReason)) return "Other MTT";
 
@@ -895,7 +896,26 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
             // Cek keywords umum
             var dr = detailedReason.ToLower();
             if (dr.Contains("vaccum") || dr.Contains("vacuum")) return "Vaccum";
-            if (dr.Contains("scanner")) return "Scanner FM CU"; // default scanner
+            if (dr.Contains("scanner"))
+            {
+                // Database sering menyimpan deskripsi alami (contoh: "Scanner Nameplate error tidak record")
+                // tanpa suffix line. Kenali jenis scanner dari deskripsi, lalu tentukan CU/CS dari MachineCode.
+                var scannerTokens = dr.Split(
+                    new[] { ' ', '|', ':', '-', '_', '/', '\\', '(', ')', '[', ']', ',', '.', '\r', '\n', '\t' },
+                    StringSplitOptions.RemoveEmptyEntries);
+                bool HasScannerToken(params string[] values) =>
+                    scannerTokens.Any(token => values.Any(value => token.Equals(value, StringComparison.OrdinalIgnoreCase)));
+
+                string scannerType = dr.Contains("nameplate") ? "Nameplate"
+                    : HasScannerToken("comp", "component") ? "Comp"
+                    : dr.Contains("robot") ? "Robot"
+                    : dr.Contains("label") ? "Label"
+                    : dr.Contains("final") ? "Final"
+                    : "FM";
+
+                string scannerLine = ResolveScannerLine(detailedReason, machineCode);
+                return $"Scanner {scannerType} {scannerLine}";
+            }
             if (dr.Contains("laser")) return "Laser";
             if (dr.Contains("dummy") || dr.Contains("dumy")) return "Dummy NG";
             if (dr.Contains("conveyor")) return "Conveyor";
@@ -917,6 +937,27 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
             }
 
             return "Other MTT";
+        }
+
+        private static string ResolveScannerLine(string detailedReason, string machineCode)
+        {
+            // Hormati suffix eksplisit pada detailed reason bila operator sudah menuliskannya.
+            var reasonTokens = (detailedReason ?? string.Empty)
+                .Split(new[] { ' ', '|', ':', '-', '_', '/', '\\', '(', ')', '[', ']', ',', '.', '\r', '\n', '\t' },
+                    StringSplitOptions.RemoveEmptyEntries);
+
+            if (reasonTokens.Any(token => token.Equals("CS", StringComparison.OrdinalIgnoreCase))) return "CS";
+            if (reasonTokens.Any(token => token.Equals("CU", StringComparison.OrdinalIgnoreCase))) return "CU";
+
+            // Mapping line Assembly: MCH1-01 = CU, MCH1-02 = CS.
+            var normalizedMachine = (machineCode ?? string.Empty).Trim();
+            if (normalizedMachine.Equals("MCH1-02", StringComparison.OrdinalIgnoreCase) ||
+                normalizedMachine.Equals("CS", StringComparison.OrdinalIgnoreCase)) return "CS";
+            if (normalizedMachine.Equals("MCH1-01", StringComparison.OrdinalIgnoreCase) ||
+                normalizedMachine.Equals("CU", StringComparison.OrdinalIgnoreCase)) return "CU";
+
+            // Pertahankan perilaku lama untuk sumber data yang tidak mempunyai identitas line.
+            return "CU";
         }
 
         private void LoadPaginatedData(List<(TimeSpan Start, TimeSpan End)> breakTimes)
@@ -1624,6 +1665,7 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
         public string Shift { get; set; }
         public string Category { get; set; }
         public string DetailedReason { get; set; }
+        public string MttSubCategory { get; set; } = string.Empty;
         public bool HasAttachment { get; set; }
     }
 }  // ← tutup namespace

@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panasonic - Production Plan &amp; PLC Dispatcher</title>
+  <meta name="description" content="Dashboard Ceklist Shift dan Editor 9 Baris Production Plan PLC HMI B-5">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <style>
+    .r-register-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;
+      background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; cursor: default;
+    }
+    .r-register-pill.overtime {
+      background: #fee2e2; color: #dc2626; border-color: #fca5a5;
+      animation: pulseBadge 1.5s ease-in-out infinite;
+    }
+    .r-register-pill.normal { background: #dcfce7; color: #16a34a; border-color: #bbf7d0; }
+    .r-register-pill.libur  { background: #fef3c7; color: #d97706; border-color: #fde68a; }
+    @keyframes pulseBadge { 0%,100%{opacity:1} 50%{opacity:0.65} }
+    .shift-schedule-card {
+      background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+      padding: 14px 18px; margin: 12px 0 0 0;
+    }
+    .shift-schedule-card h3 { font-size: 13px; font-weight: 800; color: #0f172a; margin: 0 0 10px; }
+    .shift-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .shift-table th {
+      background: #f1f5f9; color: #475569; font-weight: 700; padding: 6px 10px;
+      text-align: left; border-bottom: 2px solid #e2e8f0;
+    }
+    .shift-table td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+    .shift-table tr.shift-row-active td { background: #eff6ff; font-weight: 700; color: #1d4ed8; }
+    .shift-badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700; }
+    .shift-badge.s1 { background:#dbeafe; color:#1d4ed8; }
+    .shift-badge.s2 { background:#fef3c7; color:#b45309; }
+    .shift-badge.s3 { background:#f3e8ff; color:#7c3aed; }
+    .shift-badge.ns { background:#dcfce7; color:#16a34a; }
+    #shiftEndModalBackdrop {
+      display: none; position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.55); align-items: center; justify-content: center;
+    }
+    #shiftEndModalBackdrop.show { display: flex !important; }
+    .shift-end-modal {
+      background: #fff; border-radius: 14px; padding: 30px 32px; max-width: 480px; width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
+      animation: slideInModal 0.3s ease;
+    }
+    @keyframes slideInModal { from{transform:translateY(-30px);opacity:0} to{transform:translateY(0);opacity:1} }
+    .shift-end-modal .modal-icon { font-size: 48px; margin-bottom: 10px; }
+    .shift-end-modal h2 { font-size: 20px; font-weight: 800; color: #dc2626; margin: 0 0 8px; }
+    .shift-end-modal p  { font-size: 14px; color: #475569; margin: 0 0 20px; line-height: 1.6; }
+    .modal-countdown { font-size: 36px; font-weight: 900; color: #dc2626; margin-bottom: 16px; }
+    .modal-shift-info {
+      background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;
+      padding: 10px 16px; margin-bottom: 16px; font-size: 13px; color: #1d4ed8;
+      font-weight: 600; text-align: left;
+    }
+    .btn-modal-ok {
+      background: #004098; color: #fff; border: none; border-radius: 8px;
+      padding: 12px 32px; font-size: 15px; font-weight: 700; cursor: pointer;
+      width: 100%; transition: background 0.2s;
+    }
+    .btn-modal-ok:hover { background: #002d6b; }
+    .btn-modal-ok:disabled { background: #94a3b8; cursor: not-allowed; }
+    .btn-modal-dismiss {
+      background: none; border: none; color: #94a3b8; font-size: 12px;
+      cursor: pointer; margin-top: 10px; display: block; width: 100%;
+    }
+
+    /* APP CUSTOM NOTIFICATION & ERROR MODAL */
+    #appModalBackdrop {
+      display: none; position: fixed; inset: 0; z-index: 10001;
+      background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(6px);
+      align-items: center; justify-content: center; opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    #appModalBackdrop.show { display: flex !important; opacity: 1; }
+    .app-modal-dialog {
+      background: #ffffff; border-radius: 16px; width: 92%; max-width: 500px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.06);
+      overflow: hidden; transform: scale(0.93) translateY(8px);
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    #appModalBackdrop.show .app-modal-dialog { transform: scale(1) translateY(0); }
+    .app-modal-header {
+      display: flex; align-items: center; gap: 14px; padding: 18px 22px;
+      border-bottom: 1px solid #f1f5f9; position: relative;
+    }
+    .app-modal-icon {
+      width: 44px; height: 44px; border-radius: 12px; display: flex;
+      align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;
+    }
+    .app-modal-title-box { flex: 1; min-width: 0; }
+    .app-modal-title-box h3 { margin: 0; font-size: 16px; font-weight: 800; color: #1e293b; line-height: 1.3; }
+    .app-modal-badge {
+      display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 700;
+      padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .app-modal-close-btn {
+      background: none; border: none; font-size: 18px; color: #94a3b8;
+      cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1;
+      transition: all 0.15s;
+    }
+    .app-modal-close-btn:hover { background: #f1f5f9; color: #334155; }
+    .app-modal-body { padding: 20px 22px; font-size: 14px; color: #334155; line-height: 1.6; }
+    .app-modal-main-message { margin: 0 0 14px; font-size: 14.5px; }
+    .app-modal-tip-box {
+      display: flex; gap: 10px; padding: 12px 14px; border-radius: 10px;
+      font-size: 12.5px; line-height: 1.5; align-items: flex-start;
+    }
+    .app-modal-tip-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .app-modal-tip-text { flex: 1; }
+    .app-modal-footer {
+      padding: 14px 22px 18px; display: flex; justify-content: flex-end;
+      gap: 10px; background: #fafafa; border-top: 1px solid #f1f5f9;
+    }
+    .btn-app-modal-primary {
+      background: #004098; color: #ffffff; border: none; border-radius: 8px;
+      padding: 10px 24px; font-size: 13.5px; font-weight: 700; cursor: pointer;
+      transition: all 0.15s; box-shadow: 0 2px 8px rgba(0, 64, 152, 0.25);
+    }
+    .btn-app-modal-primary:hover { background: #002d6b; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 64, 152, 0.35); }
+
+    /* Modal Type Variants */
+    .app-modal-dialog.type-warning .app-modal-icon { background: #fffbeb; border: 1px solid #fde68a; }
+    .app-modal-dialog.type-warning .app-modal-badge { background: #fef3c7; color: #b45309; }
+    .app-modal-dialog.type-warning .app-modal-tip-box { background: #fffbeb; border: 1px solid #fef08a; color: #92400e; }
+    .app-modal-dialog.type-warning .btn-app-modal-primary { background: #d97706; }
+    .app-modal-dialog.type-warning .btn-app-modal-primary:hover { background: #b45309; }
+
+    .app-modal-dialog.type-error .app-modal-icon { background: #fef2f2; border: 1px solid #fecaca; }
+    .app-modal-dialog.type-error .app-modal-badge { background: #fee2e2; color: #b91c1c; }
+    .app-modal-dialog.type-error .app-modal-tip-box { background: #fef2f2; border: 1px solid #fee2e2; color: #991b1b; }
+    .app-modal-dialog.type-error .btn-app-modal-primary { background: #dc2626; }
+    .app-modal-dialog.type-error .btn-app-modal-primary:hover { background: #b91c1c; }
+
+    .app-modal-dialog.type-success .app-modal-icon { background: #ecfdf5; border: 1px solid #a7f3d0; }
+    .app-modal-dialog.type-success .app-modal-badge { background: #d1fae5; color: #047857; }
+    .app-modal-dialog.type-success .app-modal-tip-box { background: #ecfdf5; border: 1px solid #d1fae5; color: #065f46; }
+    .app-modal-dialog.type-success .btn-app-modal-primary { background: #059669; }
+    .app-modal-dialog.type-success .btn-app-modal-primary:hover { background: #047857; }
+
+    .app-modal-dialog.type-info .app-modal-icon { background: #eff6ff; border: 1px solid #bfdbfe; }
+    .app-modal-dialog.type-info .app-modal-badge { background: #dbeafe; color: #1d4ed8; }
+    .app-modal-dialog.type-info .app-modal-tip-box { background: #eff6ff; border: 1px solid #dbeafe; color: #1e40af; }
+    .app-modal-dialog.type-info .btn-app-modal-primary { background: #2563eb; }
+    .app-modal-dialog.type-info .btn-app-modal-primary:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- LEFT SIDEBAR -->
+    <aside class="app-sidebar">
+      <div class="sidebar-header">
+        <div class="brand-title">PLC Dispatcher</div>
+        <div class="brand-subtitle">Air Conditioner Business Unit</div>
+      </div>
+      <div class="sidebar-menu">
+        <div class="sidebar-menu-title">MENU UTAMA</div>
+        <button class="nav-item active" id="navDispatcher" onclick="switchView('dispatcher')">
+          <span class="nav-icon">▣</span>
+          <span>Production Plan</span>
+        </button>
+        <button class="nav-item" id="navMasterProduct" onclick="switchView('masterproduct')">
+          <span class="nav-icon">◈</span>
+          <span>Master Data Produk</span>
+        </button>
+        <button class="nav-item" id="navApProduct" onclick="switchView('approduct')">
+          <span class="nav-icon">≡</span>
+          <span>Data APproduct</span>
+        </button>
+        <button class="nav-item" id="navMasterMachine" onclick="switchView('mastermachine')">
+          <span class="nav-icon">⚙</span>
+          <span>Master Data Machine</span>
+        </button>
+      </div>
+      <div class="sidebar-footer">
+        <div class="sidebar-status-pill">
+          <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;"></span>
+          <span>System: Online</span>
+        </div>
+        <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">Standalone Web HMI v2.0</div>
+      </div>
+    </aside>
+
+    <!-- MAIN APP CONTENT AREA -->
+    <div class="app-main-area">
+      <!-- VIEW 1: DISPATCHER & HMI (DEFAULT) -->
+      <div id="viewDispatcher" class="page-view active">
+        <div class="app-container">
+    <header class="top-navbar">
+      <div class="brand-section">
+        <div class="control-sub-group" style="display: flex; align-items: center; gap: 8px;">
+          <label for="machineSelectFilter" class="sub-label" style="font-weight: 700; color: #1d4ed8; font-size: 13px; letter-spacing: 0.3px;">LINE MESIN:</label>
+          <select id="machineSelectFilter" class="modern-filter-select" style="min-width: 170px; font-weight: 700; background: #eff6ff; color: #1d4ed8; border: 1.5px solid #3b82f6;" title="Mesin ini terhubung ke PLC Expander Kyoshin 6.35">
+            <option value="MCH1-01" selected>Expander Kyoshin 6.35</option>
+          </select>
+        </div>
+      </div>
+      <div class="status-indicators">
+        <span id="draftSaveStatus" title="Isi editor disimpan otomatis ke tabel dbo.PlcRohibEditorRow (PROMOSYS) dan dimuat lagi saat halaman dibuka" style="font-size:12px; font-weight:700; color:#475569; white-space:nowrap;">⏳ Memuat isi editor dari DB...</span>
+        <button class="btn-sub-action" id="btnSubmitDispatch" onclick="submitAndDispatch()" title="Simpan isi editor ke database lalu kirim 120 baris (Plan 1 - 15) ke PLC. Sama dengan tombol KONFIRMASI & KIRIM KE PLC." style="background:#0f172a; color:#fff; border-color:#0f172a; font-weight:700;">
+          <span>📤 Submit &amp; Kirim ke PLC</span>
+        </button>
+        <!-- Isi editor dari list mingguan satu bulan penuh (dbo.PsiWeeklyPlan, diisi worker SAP Plan Panamon) -->
+        <select id="psiMonthSelect" class="modern-filter-select" title="Bulan list rencana yang diisikan ke editor" style="font-weight:700; color:#065f46; border:1.5px solid #059669; background:#ecfdf5;"></select>
+        <button class="btn-sub-action" id="btnResetToDb"
+                title="Isi editor dengan list rencana bulan terpilih (semua minggu, dbo.PsiWeeklyPlan) sesuai urutan list; SUT dari Master Data Produk. Belum dikirim ke PLC."
+                style="background:#059669; color:#fff; border-color:#059669; font-weight:700;">
+          <span>📋 Isi dari Rencana Database</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- BLOK SHIFT CHECKLIST & JADWAL SHIFT DINONAKTIFKAN (DISEMBUNYIKAN) -->
+    <!--
+    <section class="shift-checklist-card">
+      <div class="checklist-header">
+        <div class="checklist-title">
+          <span>CEKLIST SHIFT KERJA (DIPILIH OLEH OPERATOR)</span>
+        </div>
+        <div class="badge-active-shift" id="activeShiftIndicatorBadge">
+          Shift Aktif Terpilih: <strong>Non-Shift (NS)</strong>
+        </div>
+      </div>
+      <div class="checklist-options" id="shiftChecklistContainer">
+        <label class="shift-check-item selected" data-shift="NS" id="shiftCard_NS">
+          <input type="radio" name="operatorShiftRadio" value="NS" class="shift-check-input" checked>
+          <div class="shift-text-box">
+            <span class="shift-title-text">Non-Shift (NS)</span>
+            <span class="shift-hours-text">07:00 – 16:00 WIB</span>
+          </div>
+        </label>
+        <label class="shift-check-item" data-shift="1" id="shiftCard_1">
+          <input type="radio" name="operatorShiftRadio" value="1" class="shift-check-input">
+          <div class="shift-text-box">
+            <span class="shift-title-text">Shift 1 (Pagi)</span>
+            <span class="shift-hours-text">07:00 – 15:45 WIB</span>
+          </div>
+        </label>
+        <label class="shift-check-item" data-shift="2" id="shiftCard_2">
+          <input type="radio" name="operatorShiftRadio" value="2" class="shift-check-input">
+          <div class="shift-text-box">
+            <span class="shift-title-text">Shift 2 (Sore)</span>
+            <span class="shift-hours-text">15:45 – 23:15 WIB</span>
+          </div>
+        </label>
+        <label class="shift-check-item" data-shift="3" id="shiftCard_3">
+          <input type="radio" name="operatorShiftRadio" value="3" class="shift-check-input">
+          <div class="shift-text-box">
+            <span class="shift-title-text">Shift 3 (Malam)</span>
+            <span class="shift-hours-text">23:15 – 07:00 WIB</span>
+          </div>
+        </label>
+      </div>
+
+      <div class="shift-schedule-card">
+        <h3>Jadwal Shift Operasional Panasonic</h3>
+        <table class="shift-table">
+          <thead>
+            <tr>
+              <th>Nama Shift</th>
+              <th>Jam Kerja</th>
+              <th>Kode</th>
+              <th>Hari Kerja</th>
+              <th>Hari Libur</th>
+              <th>Status Sekarang</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr id="shiftRow_1">
+              <td><span class="shift-badge s1">Shift 1 (Pagi)</span></td>
+              <td>07:00 - 15:45</td>
+              <td><code>1</code></td>
+              <td>Normal</td>
+              <td>Overtime</td>
+              <td id="shiftStatus_1"><span class="shift-status-pill standby">Standby</span></td>
+            </tr>
+            <tr id="shiftRow_2">
+              <td><span class="shift-badge s2">Shift 2 (Sore)</span></td>
+              <td>15:45 - 23:15</td>
+              <td><code>2</code></td>
+              <td>Normal</td>
+              <td>Overtime</td>
+              <td id="shiftStatus_2"><span class="shift-status-pill standby">Standby</span></td>
+            </tr>
+            <tr id="shiftRow_3">
+              <td><span class="shift-badge s3">Shift 3 (Malam)</span></td>
+              <td>23:15 - 07:00</td>
+              <td><code>3</code></td>
+              <td>Normal</td>
+              <td>Overtime</td>
+              <td id="shiftStatus_3"><span class="shift-status-pill standby">Standby</span></td>
+            </tr>
+            <tr id="shiftRow_4">
+              <td><span class="shift-badge ns">Non-Shift (NS)</span></td>
+              <td>07:00 - 16:00</td>
+              <td><code>4</code></td>
+              <td>Normal</td>
+              <td>Overtime</td>
+              <td id="shiftStatus_4"><span class="shift-status-pill standby">Standby</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    -->
+
+    <main class="dashboard-grid">
+      <section class="card-panel-white">
+        <div class="table-responsive-white">
+          <table class="edit-table-white" style="table-layout: fixed; width: 100%;">
+            <thead>
+              <tr>
+                <th style="width: 80px;">Baris</th>
+                <th style="width: 240px; max-width: 240px;">Model Name (Ketik / Pilih Bebas)</th>
+                <th style="width: 100px; text-align:right;">Prod. Plan</th>
+                <th style="width: 80px; text-align:center;">SUT (s)</th>
+                <th style="width: 80px; text-align:right;">Actual</th>
+                <th style="width: 80px; text-align:right;">Defect</th>
+                <th style="width: 195px; text-align:center;" title="Tanggal = tanggal plan dari list rencana. Tahan & geser kotak urutan untuk memindah baris.">Tanggal / Urutan Antrian</th>
+              </tr>
+            </thead>
+            <tbody id="editableTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card-panel-white">
+        <div class="panel-header-white">
+          <div>
+            <h2 class="panel-title-white">Live Preview Layar HMI GOT (Plan 1 - 15)</h2>
+          </div>
+          <span id="hmiMirrorStatus" title="Preview ini membaca langsung register PLC (Model, Plan, SUT, Actual, Defect) setiap 3 detik" style="font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px; background:#e2e8f0; color:#334155;">● Menghubungkan ke PLC...</span>
+        </div>
+
+        <div class="hmi-frame-white">
+          <div class="hmi-screen-box">
+            <!-- HEADER BANNER EXACT TO GT DESIGNER SCREEN B-5 -->
+            <div class="hmi-exact-header-banner">
+              <div class="hmi-exact-logo">Panasonic</div>
+              <div class="hmi-exact-title" id="hmiExactTitleText">PLAN PRODUCTION 1</div>
+              <div class="hmi-exact-sys-stamp">
+                <div>10101 100099</div>
+                <div>D2100 D2100</div>
+                <div>10101 10104</div>
+                <div>D2102 D2105</div>
+              </div>
+            </div>
+
+            <!-- TABLE EXACT TO GT DESIGNER -->
+            <div style="overflow-x: auto;">
+              <table class="hmi-exact-table">
+                <thead>
+                  <tr>
+                    <th style="width: 58px;">NO</th>
+                    <th>MODEL NAME</th>
+                    <th style="width: 130px;">PROD. PLAN</th>
+                    <th style="width: 100px;">SUT</th>
+                    <th style="width: 130px;">ACTUAL</th>
+                    <th style="width: 120px;">DEFECT</th>
+                  </tr>
+                </thead>
+                <tbody id="hmiPreviewBody"></tbody>
+              </table>
+            </div>
+
+            <!-- BOTTOM NAVIGATION (HOME + ARROW EXACT TO SCREEN B-5 & B-?) -->
+            <div class="hmi-bottom-bar-got" id="hmiBottomNavBar" style="padding: 4px 12px;">
+              <div style="width: 80px;"></div>
+              <div class="hmi-home-center" style="display: flex; flex-direction: column; align-items: center;">
+                <span class="hmi-home-tag">10096</span>
+                <button type="button" class="hmi-btn-home-got" disabled title="Fitur HOME dinonaktifkan" style="opacity: 0.5; cursor: not-allowed;">HOME</button>
+              </div>
+              <div class="hmi-nav-right" style="display: flex; flex-direction: column; align-items: center;">
+                <span class="hmi-home-tag">10109</span>
+                <button type="button" class="hmi-btn-arrow-got" onclick="switchHmiPage(2)" title="Lanjut ke Layar PLAN PRODUCTION 2" style="background:#0284c7; color:white; border:2px solid #38bdf8; border-radius:4px; padding:3px 14px; font-weight:bold; cursor:pointer; font-size:14px;">▶</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dispatch-actions-card">
+          <button class="btn-big-confirm" id="btnConfirmDispatchAll">
+            <span>KONFIRMASI &amp; KIRIM KE PLC (120 BARIS: PLAN 1 - 15)</span>
+          </button>
+          <div class="btn-sub-actions">
+            <button class="btn-sub-action" id="btnConfirmDispatchP1">
+              <span>Kirim Hanya Row 1 (Prioritas)</span>
+            </button>
+            <button class="btn-sub-action" id="btnReadPlcNow">
+              <span>Tarik Nilai Aktual dari PLC</span>
+            </button>
+          </div>
+          <div class="log-box-white" id="feedbackLogBox">
+            <div class="log-info">[SYSTEM] Sistem siap. Menghubungkan ke API...</div>
+          </div>
+        </div>
+      </section>
+    </main>
+        </div>
+      </div><!-- /viewDispatcher -->
+
+      <!-- VIEW 2: DATA APPRODUCT -->
+      <div id="viewApProduct" class="page-view">
+        <div class="app-container">
+          <div class="data-mgmt-card">
+            <div class="data-mgmt-header">
+              <div class="data-mgmt-title">
+                <h2>Data APproduct</h2>
+                <p>Pencatatan produksi harian mesin &amp; model (Total Act, Plan, Prod/Day). Operator dapat mencari, menambah, dan mengubah data langsung dari sini tanpa query SQL.</p>
+              </div>
+              <div>
+                <button class="btn-clean-primary" id="btnApOpenAddModal" onclick="openApModal()">
+                  <span>Tambah Data APproduct</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- SEARCH & FILTER BAR -->
+            <div class="search-filter-bar">
+              <input type="text" id="apSearchInput" class="simple-search-box" placeholder="Cari Model atau Mesin..." oninput="onApSearchChanged()">
+              
+              <select id="apMachineFilter" class="simple-select-box" onchange="onApSearchChanged()">
+                <option value="">Semua Mesin</option>
+                <option value="400 Ton New">400 Ton New</option>
+                <option value="300 Ton New">300 Ton New</option>
+                <option value="300 Ton Old">300 Ton Old</option>
+                <option value="200 Ton">200 Ton</option>
+                <option value="110 Ton Amada">110 Ton Amada</option>
+                <option value="110 Ton Komatsu">110 Ton Komatsu</option>
+                <option value="Hairpin Bender 7row">Hairpin Bender 7row</option>
+                <option value="Hairpin Bender 14row">Hairpin Bender 14row</option>
+                <option value="Fix 80">Fix 80</option>
+                <option value="Fix 36">Fix 36</option>
+                <option value="Fix 12">Fix 12</option>
+                <option value="SF-250">SF-250</option>
+                <option value="Expander Kyoshin 7">Expander Kyoshin 7</option>
+                <option value="Expander Kyoshin 6.35">Expander Kyoshin 6.35</option>
+                <option value="Expander Li-chin">Expander Li-chin</option>
+                <option value="Evaporator">Evaporator</option>
+                <option value="Condenser">Condenser</option>
+              </select>
+
+              <input type="date" id="apDateFilter" class="simple-date-box" onchange="onApSearchChanged()" title="Filter berdasarkan tanggal">
+
+              <button class="btn-clean-secondary" id="btnApResetFilter" onclick="resetApFilter()" title="Hapus filter">
+                <span>Reset Filter</span>
+              </button>
+
+              <span class="badge-record-count" id="apRecordCountBadge">0 Data Ditemukan</span>
+            </div>
+
+            <!-- DATA TABLE -->
+            <div style="overflow-x: auto; background:#ffffff; border-radius:8px; border:1px solid var(--border-light);">
+              <table class="simple-data-table" id="apProductTable">
+                <thead>
+                  <tr>
+                    <th style="width: 50px; text-align:center;">No</th>
+                    <th style="width: 155px;">Tanggal &amp; Waktu</th>
+                    <th style="width: 150px; text-align:center;">Shift</th>
+                    <th style="width: 140px;">Mesin</th>
+                    <th>Model</th>
+                    <th style="width: 100px; text-align:right;">Total Act</th>
+                    <th style="width: 100px; text-align:right;">Plan</th>
+                    <th style="width: 110px; text-align:right;">Prod / Day</th>
+                    <th style="width: 130px; text-align:center;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="apProductTableBody">
+                  <tr>
+                    <td colspan="9" style="text-align:center; padding: 24px; color: #94a3b8;">
+                      Memuat data APproduct...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div><!-- /viewApProduct -->
+
+      <!-- VIEW 3: MASTER DATA MACHINE -->
+      <div id="viewMasterMachine" class="page-view">
+        <div class="app-container">
+          <div class="data-mgmt-card">
+            <div class="data-mgmt-header">
+              <div class="data-mgmt-title">
+                <h2>Master Data Machine</h2>
+                <p>Data acuan model, mesin, SUT, jumlah operator, dan target output Qty / Hour. Operator dapat mencari, menambah, dan mengubah data langsung dari sini tanpa query SQL.</p>
+              </div>
+              <div>
+                <button class="btn-clean-primary" id="btnMachMasterOpenAddModal" onclick="openMasterDataModal('machine')">
+                  <span>Tambah Master Data</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- SEARCH & FILTER BAR -->
+            <div class="search-filter-bar">
+              <input type="text" id="machMasterSearchInput" class="simple-search-box" placeholder="Cari Model atau Mesin..." oninput="onMasterDataSearchChanged('machine')">
+              
+              <select id="machMasterMachineFilter" class="simple-select-box" onchange="onMasterDataSearchChanged('machine')">
+                <option value="">Semua Mesin</option>
+                <option value="400 Ton New">400 Ton New</option>
+                <option value="300 Ton New">300 Ton New</option>
+                <option value="300 Ton Old">300 Ton Old</option>
+                <option value="200 Ton">200 Ton</option>
+                <option value="110 Ton Amada">110 Ton Amada</option>
+                <option value="110 Ton Komatsu">110 Ton Komatsu</option>
+                <option value="Hairpin Bender 7row">Hairpin Bender 7row</option>
+                <option value="Hairpin Bender 14row">Hairpin Bender 14row</option>
+                <option value="Fix 80">Fix 80</option>
+                <option value="Fix 36">Fix 36</option>
+                <option value="Fix 12">Fix 12</option>
+                <option value="SF-250">SF-250</option>
+                <option value="Expander Kyoshin 7">Expander Kyoshin 7</option>
+                <option value="Expander Kyoshin 6.35">Expander Kyoshin 6.35</option>
+                <option value="Expander Li-chin">Expander Li-chin</option>
+                <option value="Evaporator">Evaporator</option>
+                <option value="Condenser">Condenser</option>
+              </select>
+
+              <button class="btn-clean-secondary" id="btnMachMasterResetFilter" onclick="resetMasterDataFilter('machine')" title="Hapus filter">
+                <span>Reset Filter</span>
+              </button>
+
+              <span class="badge-record-count" id="machMasterRecordCountBadge">0 Data Ditemukan</span>
+            </div>
+
+            <!-- DATA TABLE -->
+            <div style="overflow-x: auto; background:#ffffff; border-radius:8px; border:1px solid var(--border-light);">
+              <table class="simple-data-table" id="machMasterTable">
+                <thead>
+                  <tr>
+                    <th style="width: 50px; text-align:center;">No</th>
+                    <th>Model</th>
+                    <th style="width: 160px;">Mesin</th>
+                    <th style="width: 120px; text-align:right;">SUT (detik)</th>
+                    <th style="width: 140px; text-align:right;">No Of Operator</th>
+                    <th style="width: 140px; text-align:right;">Qty / Hour</th>
+                    <th style="width: 130px; text-align:center;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="machMasterTableBody">
+                  <tr>
+                    <td colspan="7" style="text-align:center; padding: 24px; color: #94a3b8;">
+                      Memuat Master Data...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div><!-- /viewMasterMachine -->
+
+      <!-- VIEW 3: MASTER DATA PRODUK -->
+      <div id="viewMasterProduct" class="page-view">
+        <div class="app-container">
+          <div class="data-mgmt-card">
+            <div class="data-mgmt-header">
+              <div class="data-mgmt-title">
+                <h2>Master Data Produk</h2>
+                <p>Data acuan model, Machine, SUT. Operator dapat mencari, menambah, dan mengubah data langsung dari sini.</p>
+              </div>
+              <div>
+                <button class="btn-clean-primary" id="btnMasterOpenAddModal" onclick="openMasterModal()">
+                  <span>Tambah Master Data</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- SEARCH & FILTER BAR -->
+            <div class="search-filter-bar">
+              <input type="text" id="masterSearchInput" class="simple-search-box" placeholder="Cari Model..." oninput="onMasterSearchChanged()">
+              
+              <select id="masterMachineSelect" class="simple-select-box" onchange="onMasterSearchChanged()" title="Filter berdasarkan Machine (daftar diambil dari data)">
+                <option value="" selected>All Machine</option>
+              </select>
+
+              <button class="btn-clean-secondary" id="btnMasterResetFilter" onclick="resetMasterFilter()" title="Hapus filter">
+                <span>Reset Filter</span>
+              </button>
+
+              <span class="badge-record-count" id="masterRecordCountBadge">0 Data Ditemukan</span>
+            </div>
+
+            <!-- DATA TABLE -->
+            <div style="overflow-x: auto; background:#ffffff; border-radius:8px; border:1px solid var(--border-light);">
+              <table class="simple-data-table" id="masterProductTable">
+                <thead>
+                  <tr>
+                    <th style="width: 50px; text-align:center;">No</th>
+                    <th>Model</th>
+                    <th style="width: 160px;">Machine</th>
+                    <th style="width: 120px; text-align:right;">SUT (detik)</th>
+                    <th style="width: 130px; text-align:center;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="masterProductTableBody">
+                  <tr>
+                    <td colspan="5" style="text-align:center; padding: 24px; color: #94a3b8;">
+                      Memuat Master Data...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div><!-- /viewMasterProduct -->
+
+    </div><!-- /app-main-area -->
+  </div><!-- /app-layout -->
+
+  <!-- MODAL FORM APPRODUCT -->
+  <div id="modalApProductBackdrop" class="data-modal-backdrop">
+    <div class="form-modal-dialog">
+      <div class="data-modal-header">
+        <h3 id="modalApTitle">Tambah Data APproduct</h3>
+        <button class="data-modal-close" onclick="closeApModal()" type="button">✕</button>
+      </div>
+      <form id="formApProduct" onsubmit="saveApProduct(event)">
+        <input type="hidden" id="apFormId" value="0">
+        
+        <div class="form-row-two">
+          <div class="form-group-simple">
+            <label for="apFormDate">Tanggal &amp; Waktu Pencatatan *</label>
+            <input type="datetime-local" id="apFormDate" required step="1" oninput="onApModalDateChanged()">
+          </div>
+          <div class="form-group-simple">
+            <label for="apFormMachine">Mesin (Machine) *</label>
+            <select id="apFormMachine" required>
+              <option value="Condenser">Condenser</option>
+              <option value="Evaporator">Evaporator</option>
+              <option value="400 Ton New">400 Ton New</option>
+              <option value="300 Ton New">300 Ton New</option>
+              <option value="300 Ton Old">300 Ton Old</option>
+              <option value="200 Ton">200 Ton</option>
+              <option value="110 Ton Amada">110 Ton Amada</option>
+              <option value="110 Ton Komatsu">110 Ton Komatsu</option>
+              <option value="Hairpin Bender 7row">Hairpin Bender 7row</option>
+              <option value="Hairpin Bender 14row">Hairpin Bender 14row</option>
+              <option value="Fix 80">Fix 80</option>
+              <option value="Fix 36">Fix 36</option>
+              <option value="Fix 12">Fix 12</option>
+              <option value="SF-250">SF-250</option>
+              <option value="Expander Kyoshin 7">Expander Kyoshin 7</option>
+              <option value="Expander Kyoshin 6.35">Expander Kyoshin 6.35</option>
+              <option value="Expander Li-chin">Expander Li-chin</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- LIVE SHIFT PREVIEW -->
+        <div class="shift-preview-banner" id="apShiftPreviewBanner">
+          <span class="preview-label">Shift:</span>
+          <span class="shift-badge s1" id="apModalShiftBadge">Shift 1</span>
+        </div>
+
+        <div class="form-group-simple" style="margin-top: 10px;">
+          <label for="apFormModel">Nama Model *</label>
+          <input type="text" id="apFormModel" placeholder="Contoh: CU-YN7AKJ" required maxlength="50">
+        </div>
+
+        <div class="form-row-three">
+          <div class="form-group-simple">
+            <label for="apFormTotalAct">Total Act</label>
+            <input type="number" id="apFormTotalAct" min="0" value="0" required>
+          </div>
+          <div class="form-group-simple">
+            <label for="apFormPlan">Plan</label>
+            <input type="number" id="apFormPlan" min="0" value="0" required>
+          </div>
+          <div class="form-group-simple">
+            <label for="apFormProdPerDay">Prod / Day</label>
+            <input type="number" id="apFormProdPerDay" min="0" value="0" required>
+          </div>
+        </div>
+
+        <div class="form-group-simple" id="apSaveAsNewRowGroup" style="margin-top: 12px; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; display: none;">
+          <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: #1e293b; cursor: pointer; margin: 0;">
+            <input type="checkbox" id="apSaveAsNewRow" checked style="width: 16px; height: 16px; cursor: pointer;">
+            <span>Simpan sebagai Baris Riwayat Baru (Catat 1 Row Baru saat Data Berubah)</span>
+          </label>
+          <p style="margin: 4px 0 0 24px; font-size: 11px; color: #64748b; line-height: 1.4;">
+            Jika dicentang, perubahan nilai Plan, Actual, atau Prod/Day akan disimpan sebagai baris baru dengan waktu terkini untuk jejak audit produksi.
+          </p>
+        </div>
+
+        <div class="data-modal-footer">
+          <button type="button" class="btn-clean-secondary" onclick="closeApModal()">Batal</button>
+          <button type="submit" class="btn-clean-primary" id="btnApSubmit">Simpan Data</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL FORM MASTER MACHINE -->
+  <div id="machMasterModalBackdrop" class="data-modal-backdrop">
+    <div class="form-modal-dialog">
+      <div class="data-modal-header">
+        <h3 id="machMasterModalTitle">Tambah Master Data Machine</h3>
+        <button class="data-modal-close" onclick="closeMasterDataModal('machine')" type="button">✕</button>
+      </div>
+      <form id="formMachMaster" onsubmit="saveMasterData('machine', event)">
+        <input type="hidden" id="machMasterFormId" value="0">
+        
+        <div class="form-group-simple">
+          <label for="machMasterFormModel">Nama Model *</label>
+          <input type="text" id="machMasterFormModel" placeholder="Contoh: CU-PN9WKJ" required maxlength="50">
+        </div>
+
+        <div class="form-group-simple">
+          <label for="machMasterFormMachine">Mesin (Machine) *</label>
+          <select id="machMasterFormMachine" required>
+            <option value="Condenser">Condenser</option>
+            <option value="Evaporator">Evaporator</option>
+            <option value="400 Ton New">400 Ton New</option>
+            <option value="300 Ton New">300 Ton New</option>
+            <option value="300 Ton Old">300 Ton Old</option>
+            <option value="200 Ton">200 Ton</option>
+            <option value="110 Ton Amada">110 Ton Amada</option>
+            <option value="110 Ton Komatsu">110 Ton Komatsu</option>
+            <option value="Hairpin Bender 7row">Hairpin Bender 7row</option>
+            <option value="Hairpin Bender 14row">Hairpin Bender 14row</option>
+            <option value="Fix 80">Fix 80</option>
+            <option value="Fix 36">Fix 36</option>
+            <option value="Fix 12">Fix 12</option>
+            <option value="SF-250">SF-250</option>
+            <option value="Expander Kyoshin 7">Expander Kyoshin 7</option>
+            <option value="Expander Kyoshin 6.35">Expander Kyoshin 6.35</option>
+            <option value="Expander Li-chin">Expander Li-chin</option>
+          </select>
+        </div>
+
+        <div class="form-row-three">
+          <div class="form-group-simple">
+            <label for="machMasterFormSut">SUT (detik) *</label>
+            <input type="number" id="machMasterFormSut" step="0.1" min="0" value="23.0" required>
+          </div>
+          <div class="form-group-simple">
+            <label for="machMasterFormNoOfOperator">No Of Operator *</label>
+            <input type="number" id="machMasterFormNoOfOperator" min="1" value="14" required>
+          </div>
+          <div class="form-group-simple">
+            <label for="machMasterFormQtyPerHour">Qty / Hour *</label>
+            <input type="number" id="machMasterFormQtyPerHour" step="0.1" min="0" value="156.0" required>
+          </div>
+        </div>
+
+        <div class="data-modal-footer">
+          <button type="button" class="btn-clean-secondary" onclick="closeMasterDataModal('machine')">Batal</button>
+          <button type="submit" class="btn-clean-primary" id="btnMachMasterSubmit">Simpan Data</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL FORM MASTER PRODUCT -->
+  <div id="modalMasterBackdrop" class="data-modal-backdrop">
+    <div class="form-modal-dialog">
+      <div class="data-modal-header">
+        <h3 id="modalMasterTitle">Tambah Master Data Produk</h3>
+        <button class="data-modal-close" onclick="closeMasterModal()" type="button">✕</button>
+      </div>
+      <form id="formMasterProduct" onsubmit="saveMasterProduct(event)">
+        <input type="hidden" id="masterFormId" value="0">
+        
+        <div class="form-group-simple">
+          <label for="masterFormModel">Nama Model *</label>
+          <input type="text" id="masterFormModel" placeholder="Contoh: CU-PN9WKJ" required maxlength="50">
+        </div>
+
+        <div class="form-group-simple">
+          <label for="masterFormMachine">Machine *</label>
+          <select id="masterFormMachine" required>
+            <option value="Condenser">Condenser</option>
+            <option value="Evaporator">Evaporator</option>
+            <option value="400 Ton New">400 Ton New</option>
+            <option value="300 Ton New">300 Ton New</option>
+            <option value="300 Ton Old">300 Ton Old</option>
+            <option value="200 Ton">200 Ton</option>
+            <option value="110 Ton Amada">110 Ton Amada</option>
+            <option value="110 Ton Komatsu">110 Ton Komatsu</option>
+            <option value="Hairpin Bender 7row">Hairpin Bender 7row</option>
+            <option value="Hairpin Bender 14row">Hairpin Bender 14row</option>
+            <option value="Fix 80">Fix 80</option>
+            <option value="Fix 36">Fix 36</option>
+            <option value="Fix 12">Fix 12</option>
+            <option value="SF-250">SF-250</option>
+            <option value="Expander Kyoshin 7">Expander Kyoshin 7</option>
+            <option value="Expander Kyoshin 6.35">Expander Kyoshin 6.35</option>
+            <option value="Expander Li-chin">Expander Li-chin</option>
+          </select>
+        </div>
+
+        <div class="form-group-simple">
+          <label for="masterFormSut">SUT (detik) *</label>
+          <input type="number" id="masterFormSut" step="0.1" min="0" value="23.0" required>
+        </div>
+
+        <div class="data-modal-footer">
+          <button type="button" class="btn-clean-secondary" onclick="closeMasterModal()">Batal</button>
+          <button type="submit" class="btn-clean-primary" id="btnMasterSubmit">Simpan Data</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- END-OF-SHIFT POPUP MODAL -->
+  <div id="shiftEndModalBackdrop">
+    <div class="shift-end-modal">
+      <div class="modal-icon">⏰</div>
+      <h2>Pergantian Shift!</h2>
+      <div class="modal-countdown" id="modalCountdown">5:00</div>
+      <div class="modal-shift-info" id="modalShiftInfo">Shift aktif akan segera berakhir.</div>
+      <p>
+        Klik <strong>OK – Kirim ke HMI</strong> untuk mengirim perintah ke PLC agar
+        layar GOT kembali ke halaman <strong>B-0 (Home)</strong> via <code>D1000 = 0</code>.
+      </p>
+      <button class="btn-modal-ok" id="btnModalSendD1000" disabled title="Fitur kirim D1000 ke HMI dinonaktifkan" style="opacity: 0.5; cursor: not-allowed;">
+        ✅ OK – Kirim ke HMI (D1000 = 0)
+      </button>
+      <button class="btn-modal-dismiss" id="btnModalDismiss">
+        Tutup (Jangan kirim ke HMI)
+      </button>
+    </div>
+  </div>
+
+  <!-- CUSTOM APP NOTIFICATION & ERROR MODAL -->
+  <div id="appModalBackdrop" class="app-modal-backdrop">
+    <div class="app-modal-dialog type-warning" id="appModalDialog">
+      <div class="app-modal-header">
+        <div class="app-modal-icon" id="appModalIcon">⚠️</div>
+        <div class="app-modal-title-box">
+          <h3 id="appModalTitle">Peringatan Input Model</h3>
+          <span class="app-modal-badge" id="appModalBadge">Peringatan Duplikat</span>
+        </div>
+        <button class="app-modal-close-btn" id="appModalCloseBtn" title="Tutup">✕</button>
+      </div>
+      <div class="app-modal-body">
+        <div class="app-modal-main-message" id="appModalMainMessage">
+          Pesan penjelasan utama.
+        </div>
+        <div class="app-modal-tip-box" id="appModalTipBox">
+          <span class="app-modal-tip-icon">💡</span>
+          <div class="app-modal-tip-text" id="appModalTipText">
+            Tips praktis untuk operator.
+          </div>
+        </div>
+      </div>
+      <div class="app-modal-footer">
+        <button class="btn-app-modal-primary" id="appModalPrimaryBtn">
+          Saya Mengerti
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

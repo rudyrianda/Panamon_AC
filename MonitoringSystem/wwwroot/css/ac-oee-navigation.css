@@ -1,0 +1,15 @@
+/* AC OEE replaces the PANAMON wordmark throughout the machine section. */
+.ac-oee-layout-title {
+    color: #fff !important;
+    font-family: "DINPro", Arial, sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+html.light-mode .ac-oee-layout-title,
+body.light-mode .ac-oee-layout-title {
+    color: #1a1a2e !important;
+}

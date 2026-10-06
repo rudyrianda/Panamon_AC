@@ -1,0 +1,553 @@
+﻿@page
+@model PWK_ACTUAL.Pages.PwkModel
+@{
+    ViewData["Title"] = "Pengawasan Waktu Kerja";
+}
+
+<style>
+    /* Meniru lembar Excel PWK: garis tipis, header hijau muda, font kecil. */
+    .pwk {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11px;
+        color: #000;
+    }
+
+        .pwk table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        .pwk th, .pwk td {
+            border: 1px solid #000;
+            padding: 2px 4px;
+            vertical-align: middle;
+        }
+
+        .pwk th {
+            background: #d9f2d9;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .pwk .title {
+            background: #d9f2d9;
+            font-weight: bold;
+            text-align: center;
+            padding: 6px;
+        }
+
+        .pwk h3 {
+            font-size: 12px;
+            margin: 14px 0 3px;
+        }
+
+        .pwk .num {
+            text-align: right;
+        }
+
+        .pwk .ctr {
+            text-align: center;
+        }
+
+        .pwk input, .pwk select {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            font: inherit;
+            text-align: center;
+        }
+
+        .pwk .filter input, .pwk .filter select {
+            border: 1px solid #7a7a7a;
+            background: #fff;
+            padding: 2px;
+        }
+
+        .pwk .rot {
+            height: 150px;
+            vertical-align: bottom;
+            padding: 0;
+        }
+
+            .pwk .rot > div {
+                writing-mode: vertical-rl;
+                transform: rotate(180deg);
+                white-space: nowrap;
+                padding: 4px 2px;
+                font-weight: normal;
+                font-size: 10px;
+            }
+
+        .pwk .grp {
+            border-left: 2px solid #000;
+        }
+
+        .pwk .scroll {
+            overflow-x: auto;
+        }
+
+        .pwk .msg {
+            background: #eef7ee;
+            border: 1px solid #6aa84f;
+            padding: 6px;
+            margin-bottom: 8px;
+        }
+
+        .pwk .err {
+            background: #fdecea;
+            border: 1px solid #c0392b;
+            padding: 6px;
+            margin-bottom: 8px;
+        }
+
+        .pwk .bar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: end;
+            margin-bottom: 10px;
+        }
+
+            .pwk .bar label {
+                display: block;
+                font-weight: bold;
+                margin-bottom: 2px;
+            }
+
+        .pwk button {
+            padding: 5px 14px;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .pwk .rekap {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+            .pwk .rekap .box {
+                border: 1px solid #000;
+                padding: 10px 16px;
+                min-width: 190px;
+            }
+
+        .pwk .warn {
+            font-size: 9px;
+            color: #a33;
+        }
+</style>
+
+<div class="pwk">
+
+    <table style="margin-bottom:10px">
+        <tr>
+            <td class="title" style="width:210px">
+                PENGAWASAN WAKTU KERJA<br />(TIME CONTROL)<br />FOR LINE
+            </td>
+            <td style="width:520px">
+                <table>
+                    <tr>
+                        <th>HARI</th>
+                        <th>SEN-KAM</th>
+                        <th>JUMAT</th>
+                        <th>SHIFT 1</th>
+                        <th>SHIFT 2</th>
+                        <th>SHIFT 3</th>
+                    </tr>
+                    <tr>
+                        <td class="ctr">A : WORKING TIME</td>
+                        <td class="ctr">@Model.HdrNonShift</td>
+                        <td class="ctr">@Model.HdrNonShiftJumat</td>
+                        <td class="ctr">@Model.HdrShift1</td>
+                        <td class="ctr">@Model.HdrShift2</td>
+                        <td class="ctr">@Model.HdrShift3</td>
+                    </tr>
+                </table>
+            </td>
+            <td>
+                <table>
+                    <tr><th>MANAGER</th><th>S-CHIEF</th><th>G.CHIEF</th><th>LEADER</th></tr>
+                    <tr><td style="height:42px"></td><td></td><td></td><td></td></tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    @if (!string.IsNullOrEmpty(Model.Pesan))
+    {
+        <div class="msg">@Model.Pesan</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="err">@Model.Error</div>
+    }
+
+    <form method="post" id="pwkForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="Ctx" value="@Model.Ctx" />
+        <input type="hidden" name="lossId" id="lossId" />
+        <input type="hidden" name="reasonId" id="reasonId" />
+
+        <div class="bar filter">
+            <div>
+                <label>Tanggal</label>
+                <input type="date" name="Tanggal" value="@Model.Tanggal.ToString("yyyy-MM-dd")" onchange="reload()" />
+            </div>
+            <div>
+                <label>Line</label>
+                <input type="text" value="@PWK_ACTUAL.Pages.PwkModel.LineName" readonly />
+            </div>
+            <div>
+                <label>Group</label>
+                <select name="GroupName" onchange="reload()">
+                    @foreach (var g in Model.GroupNames)
+                    {
+                        <option value="@g" selected="@(g == Model.GroupName)">@g</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label>Machine Code</label>
+                <input type="text" value="@Model.MachineCode" readonly />
+            </div>
+            <div>
+                <label>Shift</label>
+                <select name="Shift" onchange="reload()">
+                    @foreach (var s in Model.Shifts)
+                    {
+                        <option value="@s" selected="@(s == Model.Shift)">@s</option>
+                    }
+                </select>
+            </div>
+            @if (Model.IsSabtu)
+            {
+                <div>
+                    <label>Sabtu</label>
+                    <select name="SabtuMode" onchange="reload()">
+                        @foreach (var s in Model.SabtuModes)
+                        {
+                            <option value="@s" selected="@(s == Model.SabtuMode)">@s</option>
+                        }
+                    </select>
+                </div>
+            }
+            else
+            {
+                <input type="hidden" name="SabtuMode" value="@Model.SabtuMode" />
+            }
+            <div>
+                <label>Jumlah OPR</label>
+                <input type="number" min="0" id="jumlahOpr" name="JumlahOpr" value="@Model.JumlahOpr"
+                       oninput="oprManual = true; hitungRekap();" />
+                <div style="font-size:9px;color:#555">kosongkan untuk ikut Given Time</div>
+            </div>
+            <div>
+                <label>Waktu Kerja (A)</label>
+                <input type="text" value="@Model.WorkingTime menit" readonly />
+            </div>
+            <div>
+                <button type="submit">Muat data</button>
+                <button type="submit" asp-page-handler="Save">Simpan PWK</button>
+            </div>
+        </div>
+
+        <h3>A. GIVEN TIME</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:200px">ITEM</th>
+                    <th>TERDAFTAR</th>
+                    <th>ABSENSI</th>
+                    <th>WAKTU KERJA</th>
+                    <th>LEMBUR</th>
+                    <th>TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < Model.Given.Count; i++)
+                {
+                    <tr class="gt-row" data-idx="@i">
+                        <td>@Model.Given[i].Item</td>
+                        <td><input type="number" min="0" class="gt-terdaftar" name="Given[@i].Terdaftar" value="@Model.Given[i].Terdaftar" /></td>
+                        <td><input type="number" min="0" class="gt-absensi" name="Given[@i].Absensi" value="@Model.Given[i].Absensi" /></td>
+                        <td class="ctr">
+                            <span class="gt-wk">@Model.Given[i].WaktuKerja</span>
+                            <input type="hidden" name="Given[@i].WaktuKerja" value="@Model.Given[i].WaktuKerja" />
+                        </td>
+                        <td><input type="number" min="0" class="gt-lembur" name="Given[@i].Lembur" value="@Model.Given[i].Lembur" /></td>
+                        <td class="ctr gt-rowtotal">@Model.Given[i].Total</td>
+                    </tr>
+                }
+                <tr>
+                    <th>TOTAL</th>
+                    <th id="sumTerdaftar">@Model.Given.Sum(g => g.Terdaftar)</th>
+                    <th id="sumAbsensi">@Model.Given.Sum(g => g.Absensi)</th>
+                    <th id="sumWk">@Model.Given.Sum(g => g.WaktuKerja)</th>
+                    <th id="sumLembur">@Model.Given.Sum(g => g.Lembur)</th>
+                    <th id="sumTotal">@Model.TotalGiven</th>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>B. LOSE TIME</h3>
+        <div class="scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="width:150px">ITEM TIME LOSS</th>
+                        @foreach (var k in PWK_ACTUAL.Pages.PwkModel.KategoriList)
+                        {
+                            <th colspan="@Model.ReasonsOf(k).Count()" class="grp">@k</th>
+                        }
+                        <th rowspan="2" style="width:60px">TOTAL</th>
+                    </tr>
+                    <tr>
+                        @foreach (var k in PWK_ACTUAL.Pages.PwkModel.KategoriList)
+                        {
+                            var first = true;
+                            foreach (var r in Model.ReasonsOf(k))
+                            {
+                                <th class="@(first ? "rot grp" : "rot")"><div>@r.Name</div></th>
+                                first = false;
+                            }
+                        }
+                    </tr>
+                    <tr>
+                        <th>JAM</th>
+                        @foreach (var k in PWK_ACTUAL.Pages.PwkModel.KategoriList)
+                        {
+                            foreach (var r in Model.ReasonsOf(k))
+                            {
+                                <th style="font-size:9px">@r.Id</th>
+                            }
+                        }
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var jam in Model.JamRows())
+                    {
+                        var belum = Model.BelumAdaReason(jam);
+                        <tr>
+                            <td class="ctr">
+                                @if (string.IsNullOrEmpty(jam))
+                                {
+                                    <text>s/d</text>
+                                }
+                                else
+                                {
+                                    <text>@jam</text>
+                                    if (belum != null)
+                                    {
+                                        if (!string.IsNullOrWhiteSpace(belum.RawReason))
+                                        {
+                                            <div class="warn">belum cocok: @belum.RawReason</div>
+                                        }
+                                        <select onchange="setReason(@belum.Id, this.value)">
+                                            <option value="">-- pilih reason --</option>
+                                            @foreach (var r in Model.Reasons)
+                                            {
+                                                <option value="@r.Id">@r.Id - @r.Name</option>
+                                            }
+                                        </select>
+                                    }
+                                }
+                            </td>
+                            @foreach (var k in PWK_ACTUAL.Pages.PwkModel.KategoriList)
+                            {
+                                foreach (var r in Model.ReasonsOf(k))
+                                {
+                                    <td class="num">@Model.N(Model.Cell(jam, r.Id))</td>
+                                }
+                            }
+                            <td class="num">@Model.N(Model.RowTotal(jam))</td>
+                        </tr>
+                    }
+                    <tr>
+                        <th>TOTAL</th>
+                        @foreach (var k in PWK_ACTUAL.Pages.PwkModel.KategoriList)
+                        {
+                            foreach (var r in Model.ReasonsOf(k))
+                            {
+                                <th class="num">@Model.N(Model.ColTotal(r.Id))</th>
+                            }
+                        }
+                        <th class="num">@Model.TotalLoss</th>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>C. HASIL PRODUKSI</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2">MODEL</th>
+                    <th rowspan="2">TIME</th>
+                    <th rowspan="2">NO. SERI AWAL</th>
+                    <th rowspan="2">NO. SERI AKHIR</th>
+                    <th colspan="3">DAILY</th>
+                    <th colspan="3">ACCM</th>
+                    <th rowspan="2">DEFECT QTY</th>
+                    <th rowspan="2">KETERANGAN</th>
+                </tr>
+                <tr>
+                    <th>PLAN</th>
+                    <th>ACTUAL</th>
+                    <th>+/-</th>
+                    <th>PLAN</th>
+                    <th>ACTUAL</th>
+                    <th>+/-</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Prods.Any())
+                {
+                    <tr><td colspan="12" class="ctr">Belum ada data produksi untuk tanggal, line, dan shift ini.</td></tr>
+                }
+                @for (int i = 0; i < Model.Prods.Count; i++)
+                {
+                    var p = Model.Prods[i];
+                    <tr>
+                        <td>@p.Model</td>
+                        <td class="ctr">@p.Time</td>
+                        <td class="ctr">@p.SeriAwal</td>
+                        <td class="ctr">@p.SeriAkhir</td>
+                        <td class="num">@p.DailyPlan</td>
+                        <td class="num">@p.DailyActual</td>
+                        <td class="num">@(p.DailyActual - p.DailyPlan)</td>
+                        <td class="num">@p.AccmPlan</td>
+                        <td class="num">@p.AccmActual</td>
+                        <td class="num">@(p.AccmActual - p.AccmPlan)</td>
+                        <td class="num">@p.Defect</td>
+                        <td><input type="text" name="Keterangan[@i]" value="@p.Keterangan" /></td>
+                    </tr>
+                }
+                <tr>
+                    <th colspan="4">TOTAL</th>
+                    <th class="num">@Model.TotalPlan</th>
+                    <th class="num">@Model.HasilProd</th>
+                    <th class="num">@(Model.HasilProd - Model.TotalPlan)</th>
+                    <th colspan="3"></th>
+                    <th class="num">@Model.TotalDefect</th>
+                    <th></th>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>D. CATATAN MASALAH</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:20%">HAMBATAN</th>
+                    <th style="width:33%">ANALISA MASALAH</th>
+                    <th style="width:33%">TINDAKAN</th>
+                    <th style="width:14%">PIC</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < Model.Catatan.Count; i++)
+                {
+                    <tr>
+                        <td><input type="text" name="Catatan[@i].Hambatan" value="@Model.Catatan[i].Hambatan" style="text-align:left" /></td>
+                        <td><input type="text" name="Catatan[@i].Analisa" value="@Model.Catatan[i].Analisa" style="text-align:left" /></td>
+                        <td><input type="text" name="Catatan[@i].Tindakan" value="@Model.Catatan[i].Tindakan" style="text-align:left" /></td>
+                        <td><input type="text" name="Catatan[@i].Pic" value="@Model.Catatan[i].Pic" /></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="rekap">
+            <div class="box"><b>( J ) HASIL PROD</b><br />@Model.HasilProd pcs</div>
+            <div class="box">
+                <b>( K ) AVAILABLE WORKING TIME</b><br />
+                ( A ) x Jumlah Operator<br />
+                @Model.WorkingTime x <span id="kOpr">@Model.JumlahOpr</span> = <span id="kNilai">@Model.AvailableWT</span>
+            </div>
+            <div class="box">
+                <b>PROD / HEAD / HOUR</b><br />
+                ( J x 60 ) / ( K )<br />
+                (@Model.HasilProd x 60) / <span id="phhK">@Model.AvailableWT</span> = <b><span id="phhNilai">@Model.ProdHeadHour</span></b>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    function reload() { document.getElementById('pwkForm').submit(); }
+
+    var WORKING_TIME = @Model.WorkingTime;
+    var HASIL_PROD = @Model.HasilProd;
+
+    function angka(el) { var v = parseInt(el && el.value, 10); return isNaN(v) ? 0 : v; }
+
+    // Baris TOTAL di Given Time dihitung langsung di browser supaya tidak perlu
+    // menekan "Muat data" dulu. Nilai resminya tetap dihitung ulang di server saat disimpan.
+    function hitungGiven() {
+        var t = 0, a = 0, wk = 0, lb = 0, tot = 0;
+        document.querySelectorAll('.gt-row').forEach(function (row) {
+            var terdaftar = angka(row.querySelector('.gt-terdaftar'));
+            var absensi = angka(row.querySelector('.gt-absensi'));
+            var lembur = angka(row.querySelector('.gt-lembur'));
+            var waktu = parseInt(row.querySelector('.gt-wk').textContent, 10) || 0;
+            var rowTotal = waktu + lembur;
+
+            row.querySelector('.gt-rowtotal').textContent = rowTotal;
+            t += terdaftar; a += absensi; wk += waktu; lb += lembur; tot += rowTotal;
+        });
+        document.getElementById('sumTerdaftar').textContent = t;
+        document.getElementById('sumAbsensi').textContent = a;
+        document.getElementById('sumWk').textContent = wk;
+        document.getElementById('sumLembur').textContent = lb;
+        document.getElementById('sumTotal').textContent = tot;
+        hitungRekap();
+    }
+
+    // Jumlah OPR default mengikuti jumlah orang yang hadir di Given Time:
+    // (Karyawan Permanent + KWT + Magang) + Bantuan Masuk - Bantuan Keluar - DT/PC/KP/CT.
+    // Kalau operator mengetik sendiri di kolom Jumlah OPR, angka manual itu yang dipakai.
+    var oprManual = @(Model.JumlahOpr > 0 ? "true" : "false");   // ikut isian tersimpan bila ada
+
+    function oprDariGivenTime() {
+        var total = 0;
+        document.querySelectorAll('.gt-row').forEach(function (row) {
+            var idx = parseInt(row.getAttribute('data-idx'), 10);
+            var hadir = angka(row.querySelector('.gt-terdaftar')) - angka(row.querySelector('.gt-absensi'));
+            if (hadir < 0) hadir = 0;
+            if (idx <= 2) total += hadir;            // Permanent, KWT, Magang
+            else if (idx === 3) total += hadir;      // Bantuan Masuk
+            else total -= hadir;                     // Bantuan Keluar, DT/PC/KP/CT
+        });
+        return total < 0 ? 0 : total;
+    }
+
+    function hitungRekap() {
+        var field = document.getElementById('jumlahOpr');
+        if (!oprManual) field.value = oprDariGivenTime();
+        var opr = angka(field);
+        var k = WORKING_TIME * opr;
+        document.getElementById('kOpr').textContent = opr;
+        document.getElementById('kNilai').textContent = k;
+        document.getElementById('phhK').textContent = k;
+        document.getElementById('phhNilai').textContent =
+            k === 0 ? '0' : (HASIL_PROD * 60 / k).toFixed(2);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.gt-terdaftar, .gt-absensi, .gt-lembur')
+            .forEach(function (el) { el.addEventListener('input', hitungGiven); });
+        hitungGiven();
+        hitungRekap();
+    });
+    function setReason(lossId, reasonId) {
+        if (!reasonId) return;
+        var f = document.getElementById('pwkForm');
+        document.getElementById('lossId').value = lossId;
+        document.getElementById('reasonId').value = reasonId;
+        f.action = '?handler=SetReason';
+        f.submit();
+    }
+</script>
