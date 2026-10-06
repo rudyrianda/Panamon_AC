@@ -1,0 +1,266 @@
+﻿@using MonitoringSystem.Data
+
+@{
+    string layoutMenu = ViewContext.HttpContext.Request.Cookies["layoutType"];
+    string baseColor = "linear-gradient(109.6deg, rgb(61, 121, 176) 11.3%, rgb(35, 66, 164) 91.1%);";
+    var title = ViewData["Title"] as string;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - MonitoringSystem CAC</title>
+
+    <script>
+        (function () {
+            var m = document.cookie.match(/(?:^|; )(?:themeMode|layoutType)=([^;]*)/);
+            if (m && m[1] === 'light') {
+                document.documentElement.classList.add('light-mode');
+            }
+        })();
+    </script>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/fontawesome/css/all.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/sweetalert2.css" />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/Sidebar.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/Navbar.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site-identity.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/MonitoringSystem.styles.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/background-style.css?v=1000" />
+    <link rel="stylesheet" href="~/css/background-style-light.css" asp-append-version="true" />
+
+    <!-- Flatpickr LOCAL -->
+    <link href="~/lib/flatpickr/flatpickr.min.css" rel="stylesheet">
+    <link href="~/lib/flatpickr/dark.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="~/css/fonts.css" asp-append-version="true" />
+
+</head>
+
+<body class="reusable-bg @(title == "Machine" ? "machine-production-layout" : null)">
+    <script>
+        (function () {
+            var m = document.cookie.match(/(?:^|; )(?:themeMode|layoutType)=([^;]*)/);
+            if (m && m[1] === 'light') {
+                document.body.classList.add('light-mode');
+            }
+        })();
+    </script>
+
+    <!-- Header -->
+    <header class="main-header">
+        <div class="header-content">
+            <div class="header-left">
+                <img src="~/assets/PanasonicIcon.png" alt="Panasonic" />
+            </div>
+            <div class="header-center">
+                <img src="~/assets/Panamon.png" alt="Panamon" class="logo-panamon" style="height: 15px;" />
+                <span style="margin-left: 8px; padding: 1px 8px; border-radius: 6px; background: #f39c12; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 1px; vertical-align: middle;">CAC</span>
+            </div>
+            <div class="header-right">
+                <p id="current-date"></p>
+                <p id="current-time"></p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    @* <div class="container-fluid p-0 d-flex" style="height: calc(100vh - 45px); margin-top:45px;"> *@
+    <div class="container-fluid p-0 d-flex" style="height: calc(100vh - 45px); margin-top:45px;">
+
+        <!-- Sidebar -->
+        <div id="bdSidebar" class="d-flex flex-column flex-shrink-0 text-white offcanvas-md offcanvas-start">
+            <ul class="mynav nav nav-pills flex-column">
+                <li class="nav-item">
+                    <a href="http://10.83.33.103:5009/">
+                        <i class="fa-solid fa-house"></i>
+                        <span class="nav-label">Home</span>
+                    </a>
+                </li>
+                @* <li class="nav-item">
+                    <a href="/CAC/BusinessUnitReport/Index">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <span class="nav-label">BU<br>Report</span>
+                    </a>
+                </li> *@
+                <li class="nav-item">
+                    <a href="/CAC/ProductionReport/index">
+                        <i class="fa-solid fa-industry"></i>
+                        <span class="nav-label">Production<br>Achievement</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/CAC/LossTimeReport/index">
+                        <i class="fa-solid fa-arrow-trend-down"></i>
+                        <span class="nav-label">Trend Loss<br>Time</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/CAC/LossTime/index">
+                        <i class="fa-solid  fa-file-lines"></i>
+                        <span class="nav-label">Detail Loss<br>Time</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/CAC/Perfomance/index">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <span class="nav-label">Performance</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/CAC/Quality/index">
+                        <i class="fa-solid fa-check-circle"></i>
+                        <span class="nav-label">Quality</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/CAC/Inventory/index">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                        <span class="nav-label">Inventory</span>
+                    </a>
+                </li>
+              @*   <li class="nav-item">
+    <a href="/CAC/Inventory/index">
+        <i class="fa-solid fa-boxes-stacked"></i>
+        <span class="nav-label">Inventory</span>
+    </a>
+</li> *@
+                <!-- MORE MENU -->
+                <li class="nav-item" style="position: relative;">
+                    <a href="#" id="moreMenuBtn">
+                        <i class="fa-solid fa-ellipsis-vertical"></i>
+                        <span class="nav-label">More</span>
+                    </a>
+                    <div id="moreMenuPopup" class="sidebar-menu-popup">
+                        <a href="/CAC/Summary/ProductionPlan">
+                            <i class="fa-solid fa-clipboard-list"></i>
+                            <span>Production<br>Plan</span>
+                        </a>
+                        <a href="/CAC/Summary/MachineEfficiency">
+                            <i class="fa-solid fa-microchip"></i>
+                            <span>Machine<br>Efficiency</span>
+                        </a>
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#breakTimeFilterModal">
+                            <i class="fa-solid fa-clock"></i>
+                            <span>Break<br>Time</span>
+                        </a>
+                        <a href="/CAC/Summary/Sut">
+                            <i class="fa-solid fa-table-list"></i>
+                            <span>SUT</span>
+                        </a>
+                        <a href="/CAC/Summary/Pwk">
+                            <i class="fa-solid fa-square-poll-vertical"></i>
+                            <span>PWK</span>
+                        </a>
+                        <a asp-page="/CAC/PWKActual/Index">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            <span>PWK<br>Actual</span>
+                        </a>
+                    </div>
+                </li>
+            </ul>
+            <div class="align-items-center center">
+                <button id="themeToggle" title="Toggle Theme" style="
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        color: #ffffff;
+        font-size: 12px;
+        padding: 4px 8px;
+        width: 100%;
+    ">
+                    <i id="themeIcon" class="fa-solid fa-sun"></i>
+                    <span class="nav-label">Theme</span>
+                </button>
+            </div>
+
+            <!-- Logout Section -->
+            <div class="align-items-center center">
+                <form method="post"
+                      asp-area="Identity"
+                      asp-page="/Account/Logout"
+                      asp-route-returnUrl="@Url.Page("/Index", new { area = "" })">
+                    <button type="submit" class="logout-btn">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span class="nav-label">Log Out</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content-wrapper">
+            @* @if (title == "Machine")
+            {
+                <div class="p-0">
+                    <main role="main">
+                        @RenderBody()
+                    </main>
+                </div>
+            }
+            else
+            {
+                <div class="p-4">
+                    <main role="main" class="pb-2">
+                        @RenderBody()
+                    </main>
+                    <div class="footer-copyright text-white text-center">
+                        <p class="m-0 opacity-75">&copy; 2026 - Panasonic Manufacturing Indonesia (PMI) - AC BU</p>
+                    </div>
+                </div>
+            } *@
+
+            <div class="p-4">
+                <main role="main" class="pb-2">
+                    @RenderBody()
+                </main>
+
+                <div class="footer-copyright text-white text-center">
+                    <p class="m-0 opacity-75">&copy; 2026 - Panasonic Manufacturing Indonesia (PMI) - AC BU</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Break Time Filter Modal -->
+    <div class="modal fade" id="breakTimeFilterModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 700px;">
+            <div class="modal-content">
+                @{
+                    var models = new MonitoringSystem.Pages.Shared.ApplyBreakFilterModel(
+                    (ApplicationDbContext)Context.RequestServices.GetService(typeof(ApplicationDbContext)),
+                    (IConfiguration)Context.RequestServices.GetService(typeof(IConfiguration)));
+                    await models.LoadBreakTimesAsync();
+                    await Html.RenderPartialAsync("_BreakTimeFilterPartial", models);
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. Library utama -->
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/sweetalert2.min.js"></script>
+    <script src="~/js/chart.umd.min.js"></script>
+    <script src="~/lib/flatpickr/flatpickr.min.js"></script>
+
+    <!-- 2. Validation -->
+    <script src="~/js/jquery.validate.min.js"></script>
+    <script src="~/js/jquery.validate.unobtrusive.min.js"></script>
+
+    <!-- 3. Layout script -->
+    <script src="~/js/layout.js" asp-append-version="true"></script>
+
+    <!-- 4. Page-specific scripts -->
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

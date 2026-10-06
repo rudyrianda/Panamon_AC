@@ -1,0 +1,333 @@
+﻿@page "/CAC/prodreason"
+@model MonitoringSystem.Pages.CAC.ProdReason.IndexModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Production Reason";
+    var chartLabels = Model.ChartModels.Select(x => x.ModelName).ToList();
+    var chartSap = Model.ChartModels.Select(x => x.SapPlan).ToList();
+    var chartChange = Model.ChartModels.Select(x => x.ChangePlan).ToList();
+    var chartActual = Model.ChartModels.Select(x => x.Actual).ToList();
+}
+
+<link rel="stylesheet" href="~/css/prod-reason.css" asp-append-version="true" />
+
+<div class="prod-reason-page">
+    <section class="pr-hero">
+        <div>
+            <div class="pr-eyebrow">MODEL ACHIEVEMENT</div>
+            <h1>Production Reason</h1>
+            <p>SAP Plan, Change Plan, dan Actual per model dari @Model.StartDate.ToString("dd MMM yyyy") sampai @Model.EndDate.ToString("dd MMM yyyy").</p>
+        </div>
+        <form method="get" class="pr-filter">
+            <label>
+                <span>Mulai</span>
+                <input type="date" asp-for="StartDate" min="2026-08-01" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+            </label>
+            <label>
+                <span>Sampai</span>
+                <input type="date" asp-for="EndDate" min="2026-08-01" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+            </label>
+            <label>
+                <span>Line</span>
+                <select asp-for="MachineLine">
+                    <option value="CAC">CAC</option>
+                    <option value="SKD">SKD</option>
+                    <option value="STANDING FLOOR">Standing Floor</option>
+                </select>
+            </label>
+            <button type="submit"><i class="fa-solid fa-filter"></i> Terapkan</button>
+        </form>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger pr-error" role="alert">@Model.ErrorMessage</div>
+    }
+    else
+    {
+        <section class="pr-kpis" aria-label="Ringkasan produksi">
+            <article class="pr-kpi pr-kpi-blue">
+                <span>Actual vs SAP</span>
+                <strong>@Model.TotalActualVsSapPct.ToString("N1")%</strong>
+                <small>@Model.TotalActualForSap.ToString("N0") actual model SAP / @Model.TotalSapPlan.ToString("N0") SAP</small>
+            </article>
+            <article class="pr-kpi pr-kpi-green">
+                <span>Model konsisten</span>
+                <strong>@Model.StrongActualModels / @Model.SapPlannedModels</strong>
+                <small>≥80% hari mencapai SAP</small>
+            </article>
+            <article class="pr-kpi pr-kpi-purple">
+                <span>Change Plan terpenuhi</span>
+                <strong>@Model.ReliableChangeModels</strong>
+                <small>model dengan ≥80% hari tercapai</small>
+            </article>
+            <article class="pr-kpi pr-kpi-orange">
+                <span>Total Change Plan</span>
+                <strong>@Model.TotalChangePlan.ToString("N0")</strong>
+                <small>@Model.Models.Count model terdeteksi</small>
+            </article>
+        </section>
+
+        <section class="pr-panel pr-chart-panel">
+            <div class="pr-panel-heading">
+                <div>
+                    <h2>Volume model utama</h2>
+                    <p>12 model dengan rencana terbesar pada periode terpilih.</p>
+                </div>
+                <div class="pr-legend">
+                    <span><i class="sap"></i>SAP Plan</span>
+                    <span><i class="change"></i>Change Plan</span>
+                    <span><i class="actual"></i>Actual</span>
+                </div>
+            </div>
+            <div class="pr-chart-wrap">
+                <canvas id="modelVolumeChart"></canvas>
+            </div>
+        </section>
+
+        <section class="pr-leaderboards">
+            <article class="pr-panel pr-ranking">
+                <div class="pr-panel-heading">
+                    <div><h2>Paling sering capai SAP</h2><p>Actual ≥ SAP Plan per hari.</p></div>
+                </div>
+                <ol>
+                    @foreach (var item in Model.TopSapModels.Take(5))
+                    {
+                        <li>
+                            <div class="pr-rank-model"><strong>@item.ModelName</strong><span>@item.MachineCode · @item.ActualMeetsSapDays/@item.SapDays hari</span></div>
+                            <b>@item.SapHitRate.ToString("N0")%</b>
+                        </li>
+                    }
+                </ol>
+            </article>
+
+            <article class="pr-panel pr-ranking">
+                <div class="pr-panel-heading">
+                    <div><h2>Change Plan paling terpenuhi</h2><p>Actual ≥ Change Plan per hari.</p></div>
+                </div>
+                <ol>
+                    @foreach (var item in Model.TopChangeModels.Take(5))
+                    {
+                        <li>
+                            <div class="pr-rank-model"><strong>@item.ModelName</strong><span>@item.MachineCode · @item.ActualMeetsChangeDays/@item.ChangeDays hari</span></div>
+                            <b>@item.ChangeHitRate.ToString("N0")%</b>
+                        </li>
+                    }
+                </ol>
+            </article>
+
+            <article class="pr-panel pr-ranking">
+                <div class="pr-panel-heading">
+                    <div><h2>Change Plan menutup SAP</h2><p>Change Plan ≥ SAP Plan per hari.</p></div>
+                </div>
+                <ol>
+                    @foreach (var item in Model.TopChangeVsSapModels.Take(5))
+                    {
+                        <li>
+                            <div class="pr-rank-model"><strong>@item.ModelName</strong><span>@item.MachineCode · @item.ChangeMeetsSapDays/@item.SapDays hari</span></div>
+                            <b>@item.ChangeMeetsSapRate.ToString("N0")%</b>
+                        </li>
+                    }
+                </ol>
+            </article>
+
+            <article class="pr-panel pr-ranking">
+                <div class="pr-panel-heading">
+                    <div><h2>Prioritas produksi</h2><p>Paling sering diproduksi pertama setiap hari.</p></div>
+                </div>
+                <ol>
+                    @foreach (var item in Model.PriorityModels.Take(5))
+                    {
+                        <li>
+                            <div class="pr-rank-model"><strong>@item.ModelName</strong><span>@item.MachineCode · rata-rata urutan @(item.AverageActualOrder?.ToString("N1") ?? "-")</span></div>
+                            <b>@item.FirstProducedDays×</b>
+                        </li>
+                    }
+                </ol>
+            </article>
+        </section>
+
+        <section class="pr-panel pr-table-panel">
+            <div class="pr-panel-heading pr-table-heading">
+                <div>
+                    <h2>Performa semua model</h2>
+                    <p>Frekuensi tercapai dihitung hanya pada hari ketika plan model tersebut tersedia.</p>
+                </div>
+                <div class="pr-table-tools">
+                    <input id="modelSearch" type="search" placeholder="Cari model..." aria-label="Cari model" />
+                    <select id="statusFilter" aria-label="Filter status">
+                        <option value="all">Semua status</option>
+                        <option value="strong">Konsisten</option>
+                        <option value="watch">Pantau</option>
+                        <option value="attention">Perlu perhatian</option>
+                        <option value="no-sap">Tanpa SAP</option>
+                    </select>
+                </div>
+            </div>
+            <div class="pr-table-scroll">
+                <table class="pr-table" id="modelTable">
+                    <thead>
+                        <tr>
+                            <th>Prioritas</th>
+                            <th>Model</th>
+                            <th>Line</th>
+                            <th class="num">SAP</th>
+                            <th class="num">Change</th>
+                            <th class="num">Actual</th>
+                            <th>Actual / SAP</th>
+                            <th>Actual capai SAP</th>
+                            <th>Change / SAP</th>
+                            <th>Actual capai Change</th>
+                            <th>Urutan produksi</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Models)
+                        {
+                            var actualSapWidth = Math.Min(item.ActualVsSapPct, 100m);
+                            <tr data-model="@item.ModelName.ToLowerInvariant()" data-status="@item.StatusKey">
+                                <td><span class="pr-priority">@(item.PriorityRank > 0 ? $"#{item.PriorityRank}" : "-")</span></td>
+                                <td><strong>@item.ModelName</strong></td>
+                                <td><span class="pr-line">@item.MachineCode</span></td>
+                                <td class="num">@item.SapPlan.ToString("N0")</td>
+                                <td class="num">@item.ChangePlan.ToString("N0")</td>
+                                <td class="num actual-number">@item.Actual.ToString("N0")</td>
+                                <td>
+                                    @if (item.SapPlan > 0)
+                                    {
+                                        <div class="pr-progress"><i style="width:@actualSapWidth.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%"></i></div>
+                                        <span class="pr-ratio">@item.ActualVsSapPct.ToString("N1")%</span>
+                                    }
+                                    else { <span class="pr-muted">n.a.</span> }
+                                </td>
+                                <td><strong>@item.SapHitRate.ToString("N0")%</strong><small>@item.ActualMeetsSapDays/@item.SapDays hari</small></td>
+                                <td><strong>@item.ChangeVsSapPct.ToString("N1")%</strong><small>@item.ChangeMeetsSapRate.ToString("N0")% hari Change ≥ SAP</small></td>
+                                <td><strong>@item.ChangeHitRate.ToString("N0")%</strong><small>@item.ActualMeetsChangeDays/@item.ChangeDays hari</small></td>
+                                <td><strong>@(item.AverageActualOrder?.ToString("N1") ?? "-")</strong><small>@item.FirstProducedDays× urutan pertama</small></td>
+                                <td><span class="pr-status @item.StatusKey">@item.Status</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div id="emptyModelState" class="pr-empty" hidden>Tidak ada model yang cocok dengan filter.</div>
+        </section>
+
+        <section class="pr-panel pr-table-panel">
+            <div class="pr-panel-heading">
+                <div>
+                    <h2>Urutan produksi harian</h2>
+                    <p>Urutan berdasarkan waktu scan Actual pertama pada setiap line dan hari.</p>
+                </div>
+            </div>
+            <div class="pr-table-scroll pr-daily-scroll">
+                <table class="pr-table pr-daily-table">
+                    <thead>
+                        <tr>
+                            <th>Tanggal</th>
+                            <th>Line</th>
+                            <th>Urutan actual</th>
+                            <th>Model</th>
+                            <th>Mulai produksi</th>
+                            <th class="num">SAP</th>
+                            <th class="num">Change</th>
+                            <th class="num">Actual</th>
+                            <th>Capaian</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Model.DailyRows)
+                        {
+                            <tr>
+                                <td>@row.ProductionDate.ToString("dd MMM yyyy")</td>
+                                <td><span class="pr-line">@row.MachineCode</span></td>
+                                <td><span class="pr-order">@(row.ActualOrder?.ToString() ?? "-")</span></td>
+                                <td><strong>@row.ModelName</strong></td>
+                                <td>@(row.FirstScan?.ToString("HH:mm") ?? "-")</td>
+                                <td class="num">@row.SapPlan.ToString("N0")</td>
+                                <td class="num">@row.ChangePlan.ToString("N0")</td>
+                                <td class="num actual-number">@row.Actual.ToString("N0")</td>
+                                <td>
+                                    @if (row.MeetsSap)
+                                    { <span class="pr-status strong">SAP tercapai</span> }
+                                    else if (row.MeetsChange)
+                                    { <span class="pr-status watch">Change tercapai</span> }
+                                    else if (row.Actual > 0)
+                                    { <span class="pr-status attention">Belum tercapai</span> }
+                                    else
+                                    { <span class="pr-status no-sap">Belum produksi</span> }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="pr-method-note">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>Actual dipetakan dari <strong>OEESN → MasterData</strong>. Produksi sebelum pukul 07.00 masuk ke tanggal produksi sebelumnya. Nama KIOS digabung berdasarkan kapasitas dan line karena format nama SAP, Change Plan, dan MasterData berbeda.</span>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const labels = @Html.Raw(JsonSerializer.Serialize(chartLabels));
+            const sap = @Html.Raw(JsonSerializer.Serialize(chartSap));
+            const change = @Html.Raw(JsonSerializer.Serialize(chartChange));
+            const actual = @Html.Raw(JsonSerializer.Serialize(chartActual));
+            const canvas = document.getElementById('modelVolumeChart');
+
+            if (canvas && labels.length && window.Chart) {
+                new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: 'SAP Plan', data: sap, backgroundColor: '#4b8df8', borderRadius: 5 },
+                            { label: 'Change Plan', data: change, backgroundColor: '#a855f7', borderRadius: 5 },
+                            { label: 'Actual', data: actual, backgroundColor: '#2dd4a3', borderRadius: 5 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: c => `${c.dataset.label}: ${Number(c.raw).toLocaleString('id-ID')}` } }
+                        },
+                        scales: {
+                            x: { ticks: { color: '#dbe8ff', maxRotation: 35, minRotation: 0 }, grid: { display: false } },
+                            y: { beginAtZero: true, ticks: { color: '#b9cae5', callback: value => Number(value).toLocaleString('id-ID') }, grid: { color: 'rgba(255,255,255,.09)' } }
+                        }
+                    }
+                });
+            }
+
+            const search = document.getElementById('modelSearch');
+            const status = document.getElementById('statusFilter');
+            const rows = [...document.querySelectorAll('#modelTable tbody tr')];
+            const empty = document.getElementById('emptyModelState');
+
+            const applyTableFilter = () => {
+                const term = (search?.value || '').trim().toLowerCase();
+                const selectedStatus = status?.value || 'all';
+                let visible = 0;
+                rows.forEach(row => {
+                    const show = (!term || row.dataset.model.includes(term)) &&
+                        (selectedStatus === 'all' || row.dataset.status === selectedStatus);
+                    row.hidden = !show;
+                    if (show) visible++;
+                });
+                if (empty) empty.hidden = visible !== 0;
+            };
+
+            search?.addEventListener('input', applyTableFilter);
+            status?.addEventListener('change', applyTableFilter);
+        })();
+    </script>
+}

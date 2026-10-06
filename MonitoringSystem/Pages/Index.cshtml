@@ -1,4 +1,4 @@
-@page
+﻿@page
 @model IndexModel
 @{
     Layout = null;
@@ -40,7 +40,7 @@
 
         .chooser-modal {
             width: 100%;
-            max-width: 720px;
+            max-width: 960px;
             background: rgba(30, 38, 72, 0.96);
             border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: 16px;
@@ -75,7 +75,7 @@
 
         .chooser-options {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
         }
 
@@ -130,7 +130,14 @@
             box-shadow: 0 10px 28px rgba(46, 204, 113, 0.25);
         }
 
-        @@media (max-width: 560px) {
+        .chooser-cac i { color: #f39c12; }
+        .chooser-cac:hover, .chooser-cac:focus-visible {
+            border-color: #f39c12;
+            background: rgba(243, 156, 18, 0.12);
+            box-shadow: 0 10px 28px rgba(243, 156, 18, 0.25);
+        }
+
+        @@media (max-width: 760px) {
             .chooser-modal { padding: 24px 16px; }
             .chooser-options { grid-template-columns: 1fr; }
             .chooser-card { min-height: 150px; }
@@ -149,6 +156,11 @@
                     <i class="fa-solid fa-snowflake"></i>
                     <span class="chooser-name">RAC</span>
                     <span class="chooser-desc">Production Monitoring (Panamon)</span>
+                </a>
+                <a class="chooser-card chooser-cac" href="/CAC/ProductionReport/index">
+                    <i class="fa-solid fa-wind"></i>
+                    <span class="chooser-name">CAC</span>
+                    <span class="chooser-desc">Production Monitoring CAC</span>
                 </a>
                 <a class="chooser-card chooser-machine" href="/ACOEE/dashboard">
                     <i class="fa-solid fa-gears"></i>

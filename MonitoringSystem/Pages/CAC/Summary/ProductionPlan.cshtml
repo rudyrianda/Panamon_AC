@@ -1,0 +1,1765 @@
+﻿    @page
+    @model MonitoringSystem.Pages.CAC.Shared.ProductionPlanModel
+    @{
+        ViewData["Title"] = "Production Plan";
+        string formattedDate = DateTime.Now.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("en-US"));
+    }
+
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>@ViewData["Title"]</title>
+        <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+        <link href="~/css/Sidebar.css" rel="stylesheet" />
+        <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+
+        @* SweetAlert2 *@
+        <link rel="stylesheet" href="~/css/sweetalert2.css" />
+
+        <style>
+            /* Pastikan parent container punya position relative */
+            .input-group.position-relative {
+                position: relative !important;
+            }
+
+            /* ===== DROPDOWN CUSTOM - DARK MODE DEFAULT ===== */
+            .dropdown.custom-dropdown {
+                position: absolute !important;
+                top: calc(100% + 2px) !important;
+                left: 0 !important;
+                right: 0 !important;
+                width: 100% !important;
+                z-index: 99999 !important;
+                display: none;
+                background-color: rgba(30, 40, 60, 0.98) !important;
+                border: 2px solid rgba(100, 181, 246, 0.5) !important;
+                border-radius: 8px;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+                max-height: 200px;
+                overflow-y: auto;
+                margin-top: 0;
+            }
+
+            .dropdown.custom-dropdown div {
+                padding: 10px;
+                cursor: pointer;
+                color: #ffffff !important;
+                background-color: transparent !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .dropdown.custom-dropdown div:hover {
+                background-color: rgba(100, 181, 246, 0.2) !important;
+                color: #ffffff !important;
+            }
+
+            .dropdown.custom-dropdown div:last-child {
+                border-bottom: none;
+            }
+
+            .dropdown.custom-dropdown::-webkit-scrollbar { width: 6px; }
+            .dropdown.custom-dropdown::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 3px; }
+            .dropdown.custom-dropdown::-webkit-scrollbar-thumb { background: rgba(100,181,246,0.3); border-radius: 3px; }
+            .dropdown.custom-dropdown::-webkit-scrollbar-thumb:hover { background: rgba(100,181,246,0.5); }
+
+            td .dropdown.custom-dropdown {
+                position: absolute !important;
+                top: calc(100% + 2px) !important;
+                left: 0 !important;
+                width: 100% !important;
+                z-index: 99999 !important;
+            }
+
+            /* ===== LIGHT MODE - DROPDOWN ===== */
+            body.light-mode .dropdown.custom-dropdown {
+                background-color: rgba(245, 250, 255, 0.98) !important;
+                border: 2px solid rgba(61, 121, 176, 0.4) !important;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+            }
+
+            body.light-mode .dropdown.custom-dropdown div {
+                color: #1a1a2e !important;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.07) !important;
+            }
+
+            body.light-mode .dropdown.custom-dropdown div:hover {
+                background-color: rgba(61, 121, 176, 0.12) !important;
+                color: #1a1a2e !important;
+            }
+
+            body.light-mode .dropdown.custom-dropdown::-webkit-scrollbar-track {
+                background: rgba(0, 0, 0, 0.04);
+            }
+
+            body.light-mode .dropdown.custom-dropdown::-webkit-scrollbar-thumb {
+                background: rgba(61, 121, 176, 0.25);
+            }
+
+            body.light-mode .dropdown.custom-dropdown::-webkit-scrollbar-thumb:hover {
+                background: rgba(61, 121, 176, 0.45);
+            }
+
+            /* Perampingan kotak input per shift */
+            .shift-qty-input, .ovt-shift-qty-input, .edit-shift-qty, .edit-ovt-shift-qty {
+                height: 27px !important;
+                padding: 3px 8px !important;
+                font-size: 13.5px !important;
+                border-radius: 4px !important;
+            }
+
+            /* ===== FILTER AREA ===== */
+            .filter-area-with-lines {
+                position: relative;
+                padding: 1px 0;
+                margin-bottom: -63px !important;
+                margin-top: -20px;
+                min-height: 10px;
+                width: calc(100% - 14px);
+                margin-left: 7px;
+                margin-right: 7px;
+            }
+
+            .panamon-bottom-line,
+            .panamon-bottomm-line {
+                position: absolute !important;
+                left: -13px !important;
+                right: -13px !important;
+                height: 2px !important;
+                background: rgba(255, 255, 255, 0.04) !important;
+                z-index: 999 !important;
+                pointer-events: none !important;
+                display: block !important;
+            }
+
+            .panamon-bottom-line { top: 0 !important; border-top: 2px solid rgba(255, 255, 255, 0.08) !important; }
+            .panamon-bottomm-line { bottom: 0 !important; border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important; }
+
+            /* ===== LIGHT MODE - PANAMON LINES ===== */
+            body.light-mode .panamon-bottom-line {
+                border-top-color: rgba(0, 0, 0, 0.10) !important;
+                background: rgba(0, 0, 0, 0.03) !important;
+            }
+
+            body.light-mode .panamon-bottomm-line {
+                border-bottom-color: rgba(0, 0, 0, 0.10) !important;
+                background: rgba(0, 0, 0, 0.03) !important;
+            }
+
+            .filter-content {
+                position: relative;
+                z-index: 2;
+                padding: 6px 0;
+                border-radius: 15px;
+                margin-left: -8px;
+                margin-right: 7px;
+            }
+
+            .filter-content .form-select.selected { font-weight: 700 !important; }
+
+            .filter-content .form-select,
+            .filter-content .form-control {
+                height: 28px;
+                padding: 0 22px 0 8px;
+                font-size: 12px;
+                line-height: 20px;
+                border-radius: 999px;
+                background-color: rgba(255, 255, 255, 0.05);
+                border: 2px solid rgba(255, 255, 255, 0.5);
+                color: #ffffff;
+                text-align: center;
+                appearance: none;
+                -webkit-appearance: none;
+                -moz-appearance: none;
+                padding-top: 0;
+                padding-bottom: 0;
+                vertical-align: middle;
+            }
+
+            .filter-content .form-select {
+                height: 28px;
+                padding: 0 !important;
+                padding-left: 12px !important;
+                padding-right: 28px !important;
+                font-size: 12px;
+                line-height: 16px;
+                border-radius: 999px;
+                background-color: rgba(255, 255, 255, 0.05);
+                border: 2px solid rgba(255, 255, 255, 0.5);
+                color: #ffffff;
+                background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+                background-repeat: no-repeat;
+                background-position: right 8px center;
+                background-size: 10px 10px;
+            }
+
+            .filter-content .form-select option {
+                background-color: rgb(30, 40, 60);
+                color: #ffffff;
+                font-size: 12px;
+                padding: 8px;
+            }
+
+            .filter-content .form-select-sm {
+                height: 28px;
+                padding: 0 !important;
+                padding-left: 12px !important;
+                padding-right: 28px !important;
+                font-size: 12px;
+                line-height: 16px;
+                border-radius: 999px;
+                background-color: rgba(255, 255, 255, 0.05);
+                border: 2px solid rgba(255, 255, 255, 0.5);
+                color: #ffffff;
+                text-align: center;
+                appearance: none;
+                -webkit-appearance: none;
+                -moz-appearance: none;
+                background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+                background-repeat: no-repeat;
+                background-position: right 8px center;
+                background-size: 10px 10px;
+            }
+
+            .filter-content .form-select-sm option {
+                background-color: rgb(30, 40, 60);
+                color: #ffffff;
+                font-size: 12px;
+                padding: 8px;
+            }
+
+            .filter-content .form-select-sm.selected { font-weight: 700 !important; }
+
+            .filter-content .form-select:focus,
+            .filter-content .form-control:focus {
+                background-color: rgba(255, 255, 255, 0.20);
+                border-color: rgba(255, 255, 255, 0.3);
+                color: #ffffff;
+                box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.1);
+            }
+
+            .filter-content label {
+                color: rgba(255, 255, 255, 0.85);
+                font-size: 12px;
+                line-height: 20px;
+            }
+
+            .filter-content .btn {
+                height: 28px;
+                min-height: 20px;
+                padding: 0 12px;
+                font-size: 12px;
+                line-height: 20px;
+                border-radius: 999px !important;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .filter-content .btn-primary {
+                background-color: rgba(8, 65, 150, 0.95);
+                border: 2px solid rgba(100, 181, 246, 1);
+                color: rgba(100, 181, 246, 1);
+            }
+
+            .filter-content .btn-primary:hover {
+                background-color: rgba(5, 45, 110, 1);
+                border-color: rgba(144, 202, 249, 1);
+                color: rgba(144, 202, 249, 1);
+            }
+
+            .filter-content .btn-danger {
+                background-color: rgba(140, 30, 40, 0.95);
+                border: 2px solid rgba(239, 154, 154, 1);
+                color: rgba(239, 154, 154, 1);
+            }
+
+            .filter-content .btn-danger:hover {
+                background-color: rgba(110, 20, 30, 1);
+                border-color: rgba(244, 143, 177, 1);
+                color: rgba(244, 143, 177, 1);
+            }
+
+            /* ===== LIGHT MODE - FILTER ===== */
+            body.light-mode .filter-content label { color: #1a1a2e !important; }
+
+            body.light-mode .filter-content .form-control {
+                background-color: rgba(255, 255, 255, 0.65) !important;
+                border-color: rgba(0, 0, 0, 0.25) !important;
+                color: #1a1a2e !important;
+            }
+
+            body.light-mode .filter-content .form-select,
+            body.light-mode .filter-content .form-select-sm {
+                background-color: rgba(255, 255, 255, 0.5) !important;
+                border-color: rgba(0, 0, 0, 0.2) !important;
+                color: #1a1a2e !important;
+                background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+            }
+
+            body.light-mode .filter-content .form-select option,
+            body.light-mode .filter-content .form-select-sm option {
+                background-color: #ffffff !important;
+                color: #1a1a2e !important;
+            }
+
+            body.light-mode .filter-content .btn-primary {
+                background-color: rgba(61, 121, 176, 0.85) !important;
+                border-color: rgba(61, 121, 176, 0.9) !important;
+                color: #ffffff !important;
+            }
+
+            body.light-mode .filter-content .btn-primary:hover {
+                background-color: rgba(35, 90, 150, 0.95) !important;
+                color: #ffffff !important;
+            }
+
+            body.light-mode .filter-content .btn-danger {
+                background-color: rgba(180, 40, 50, 0.85) !important;
+                border-color: rgba(200, 60, 70, 0.9) !important;
+                color: #ffffff !important;
+            }
+
+            /* ===== TABLE SPACING ===== */
+            .table tbody td,
+            .table tbody th {
+                padding: 3px 5px;
+                vertical-align: middle;
+            }
+
+            .table td input.form-control { padding: 6px 10px; }
+            .table td .d-flex { gap: 4px; }
+            .table .form-check { margin-bottom: 0; }
+
+            /* ===== CARD - DARK MODE DEFAULT ===== */
+            .card {
+                margin-left: 12px;
+                margin-right: 12px;
+                margin-top: 15px;
+                margin-bottom: 8px;
+                background: rgba(255, 255, 255, 0.20) !important;
+                border-radius: 12px;
+                border: 2px solid rgba(255, 255, 255, 0.3) !important;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+                color: #ffffff !important;
+            }
+
+            .card * { color: #ffffff !important; }
+            .card .btn-warning, .card .btn-warning * { color: #000000 !important; }
+
+            .card-header {
+                background: transparent !important;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+                padding: 12px;
+            }
+
+            .card-header .card {
+                background: rgba(30, 40, 60, 0.9) !important;
+                border: 2px solid rgba(100, 181, 246, 0.5) !important;
+                color: #ffffff !important;
+                border-radius: 8px;
+                padding: 8px;
+            }
+
+            .card-header .card p { color: #ffffff !important; margin-bottom: 4px; }
+
+            /* ===== LIGHT MODE - CARD ===== */
+            body.light-mode .card {
+                background: rgba(255, 255, 255, 0.55) !important;
+                border: 2px solid rgba(200, 215, 235, 0.80) !important;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.10) !important;
+                color: #1a1a2e !important;
+            }
+
+            body.light-mode .card * { color: #1a1a2e !important; }
+            body.light-mode .card .btn-warning, body.light-mode .card .btn-warning * { color: #1a1a2e !important; }
+            body.light-mode .card .btn-success, body.light-mode .card .btn-success * { color: #ffffff !important; }
+            body.light-mode .card .btn-danger, body.light-mode .card .btn-danger * { color: #ffffff !important; }
+            body.light-mode .card .btn-primary, body.light-mode .card .btn-primary * { color: #ffffff !important; }
+
+            body.light-mode .card-header {
+                background-color: rgba(255, 255, 255, 0.35) !important;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+            }
+
+            body.light-mode .card-header .card {
+                background: rgba(230, 240, 255, 0.85) !important;
+                border: 2px solid rgba(61, 121, 176, 0.4) !important;
+                color: #1a1a2e !important;
+            }
+
+            body.light-mode .card-header .card p { color: #1a1a2e !important; }
+
+            /* ===== TABLE - DARK MODE DEFAULT ===== */
+            .table {
+                background-color: rgba(255, 255, 255, 0.08) !important;
+                color: #ffffff !important;
+            }
+
+            .table thead th,
+            .table > thead > tr > th {
+                background-color: rgba(30, 40, 60, 1) !important;
+                color: #ffffff !important;
+                border-color: rgba(255, 255, 255, 0.3) !important;
+                text-align: center !important;
+                vertical-align: middle !important;
+            }
+
+            .table tbody td,
+            .table tbody th {
+                background-color: rgba(255, 255, 255, 0.08) !important;
+                color: #ffffff !important;
+                border-color: rgba(255, 255, 255, 0.3) !important;
+            }
+
+            .table tbody input[type="text"],
+            .table tbody input[type="number"] { color: #ffffff !important; }
+
+            .table .form-check-label { color: #ffffff !important; }
+
+            .table td input.form-control,
+            .table td textarea.form-control {
+                background-color: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                color: #ffffff;
+            }
+
+            .table td input.form-control:focus,
+            .table td textarea.form-control:focus {
+                background-color: rgba(255, 255, 255, 0.15);
+                border-color: rgba(100, 181, 246, 0.5);
+                color: #ffffff;
+            }
+
+            .table td input.form-control::placeholder,
+            .table td textarea.form-control::placeholder { color: rgba(255, 255, 255, 0.5); }
+
+            .table td input:disabled {
+                background-color: rgba(255, 255, 255, 0.05);
+                color: rgba(255, 255, 255, 0.6);
+            }
+
+            /* ===== LIGHT MODE - TABLE ===== */
+            body.light-mode .table {
+                background-color: transparent !important;
+                color: #1a1a2e !important;
+            }
+
+            body.light-mode .table thead th,
+            body.light-mode .table > thead > tr > th {
+                background-color: rgba(25, 35, 58, 0.92) !important;
+                color: #ffffff !important;
+                border-color: rgba(255, 255, 255, 0.25) !important;
+            }
+
+            body.light-mode .table tbody td,
+            body.light-mode .table tbody th {
+                background-color: rgba(255, 255, 255, 0.50) !important;
+                color: #1a1a2e !important;
+                border-color: rgba(0, 0, 0, 0.07) !important;
+            }
+
+            body.light-mode .table tbody input[type="text"],
+            body.light-mode .table tbody input[type="number"] { color: #1a1a2e !important; }
+
+            body.light-mode .table .form-check-label { color: #1a1a2e !important; }
+
+            body.light-mode .table td input.form-control,
+            body.light-mode .table td textarea.form-control {
+                background-color: rgba(255, 255, 255, 0.85) !important;
+                border: 1px solid rgba(0, 0, 0, 0.18) !important;
+                color: #1a1a2e !important;
+            }
+
+            body.light-mode .table td input.form-control:focus,
+            body.light-mode .table td textarea.form-control:focus {
+                background-color: rgba(255, 255, 255, 0.98) !important;
+                border-color: rgba(61, 121, 176, 0.55) !important;
+                color: #1a1a2e !important;
+            }
+
+            body.light-mode .table td input.form-control::placeholder,
+            body.light-mode .table td textarea.form-control::placeholder { color: rgba(26, 26, 46, 0.38) !important; }
+
+            body.light-mode .table td input:disabled {
+                background-color: rgba(220, 228, 240, 0.60) !important;
+                color: rgba(26, 26, 46, 0.55) !important;
+            }
+
+            /* ===== TEXTAREA COMMENT - DARK ===== */
+            textarea#comment {
+                background-color: rgba(255, 255, 255, 0.1) !important;
+                border: 1px solid rgba(255, 255, 255, 0.3) !important;
+                color: #ffffff !important;
+            }
+
+            textarea#comment:focus {
+                background-color: rgba(255, 255, 255, 0.15) !important;
+                border-color: rgba(100, 181, 246, 0.5) !important;
+                color: #ffffff !important;
+            }
+
+            textarea#comment::placeholder { color: rgba(255, 255, 255, 0.5) !important; }
+
+            /* ===== LIGHT MODE - TEXTAREA COMMENT ===== */
+            body.light-mode textarea#comment {
+                background-color: rgba(255, 255, 255, 0.85) !important;
+                border: 1px solid rgba(0, 0, 0, 0.18) !important;
+                color: #1a1a2e !important;
+            }
+
+            body.light-mode textarea#comment::placeholder { color: rgba(26, 26, 46, 0.38) !important; }
+
+            /* ===== SUBMIT COUNTER ===== */
+            #submitCounter, #submitCounter span { color: #ffffff !important; }
+            body.light-mode #submitCounter, body.light-mode #submitCounter span { color: #1a1a2e !important; }
+
+            /* ===== BUTTON OPSI DI TABEL - DARK ===== */
+            .table .input-group .btn-primary {
+                background-color: rgba(8, 65, 150, 0.95) !important;
+                border: 2px solid rgba(100, 181, 246, 1) !important;
+                color: rgba(100, 181, 246, 1) !important;
+            }
+
+            .table .input-group .btn-primary:hover {
+                background-color: rgba(5, 45, 110, 1) !important;
+                border-color: rgba(144, 202, 249, 1) !important;
+                color: rgba(144, 202, 249, 1) !important;
+            }
+
+            /* ===== LIGHT MODE - BUTTON OPSI ===== */
+            body.light-mode .table .input-group .btn-primary {
+                background-color: rgba(61, 121, 176, 0.90) !important;
+                border: 2px solid rgba(61, 121, 176, 0.75) !important;
+                color: #ffffff !important;
+            }
+
+            body.light-mode .table .input-group .btn-primary:hover {
+                background-color: rgba(35, 90, 150, 1) !important;
+                color: #ffffff !important;
+            }
+
+            /* ===== ADD ROW BUTTON ===== */
+            body.light-mode .btn-success.btn-sm {
+                background-color: rgba(25, 135, 84, 0.90) !important;
+                border: 1.5px solid rgba(25, 135, 84, 0.75) !important;
+                color: #ffffff !important;
+            }
+
+            /* ===== SUBMIT & RESET BAWAH FORM - LIGHT ===== */
+            body.light-mode #btn-validate-submit {
+                background-color: rgba(61, 121, 176, 0.90) !important;
+                border: 1.5px solid rgba(61, 121, 176, 0.75) !important;
+                color: #ffffff !important;
+                border-radius: 999px !important;
+            }
+
+            body.light-mode .d-flex.align-middle.justify-content-center .btn-danger {
+                background-color: rgba(180, 40, 50, 0.88) !important;
+                border-color: rgba(180, 40, 50, 0.75) !important;
+                color: #ffffff !important;
+                border-radius: 999px !important;
+            }
+
+            /* ===== EDIT & DEL BUTTONS DI TABEL - LIGHT ===== */
+            body.light-mode .table .btn-warning {
+                background-color: rgba(255, 193, 7, 0.90) !important;
+                border-color: rgba(200, 150, 0, 0.7) !important;
+                color: #1a1a2e !important;
+            }
+
+            body.light-mode .table .btn-danger {
+                background-color: rgba(180, 40, 50, 0.88) !important;
+                border-color: rgba(180, 40, 50, 0.75) !important;
+                color: #ffffff !important;
+            }
+
+            /* ===== UPLOAD MONTHLY PLAN BUTTON - LIGHT ===== */
+            body.light-mode .col-auto.ms-auto .btn-primary {
+                background-color: rgba(61, 121, 176, 0.85) !important;
+                border-color: rgba(61, 121, 176, 0.9) !important;
+                color: #ffffff !important;
+            }
+        </style>
+    </head>
+    <body>
+    <div class="filter-area-with-lines">    
+        <div class="panamon-bottom-line"></div>
+        <div class="panamon-bottomm-line"></div>
+
+        <div class="filter-content">
+            <div class="row g-3 align-items-center justify-content-between flex-wrap">
+                <div class="col-auto">
+                    <form method="get" class="d-flex flex-wrap align-items-center gap-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="mb-0">Date</label>
+                            <input type="date" class="form-control" style="width: 140px;"
+                                   name="FilterDate"
+                                   value="@Model.CurrentDate.ToString("yyyy-MM-dd")" />
+                        </div>
+
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="mb-0">Machine</label>
+                           <select class="form-select-sm" style="width: 150px;" name="FilterMachineCode" asp-for="FilterMachineCode">
+                                <option value="CAC">CAC</option>
+                                <option value="SKD">SKD</option>
+                                <option value="STANDING FLOOR">Standing Floor</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Search</button>
+                        <a href="/CAC/Summary/ProductionPlan" class="btn btn-danger">Reset</a>
+                    </form>
+                </div>
+
+                <div class="col-auto ms-auto">
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                        Upload Monthly Plan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+            <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header d-flex justify-content-between align-items-center">
+                            <h5 class="modal-title" id="uploadModalLabel">Upload Monthly Plan</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3 text-center">
+                                <div class="d-flex justify-content-center gap-2">
+                                    <a asp-page-handler="DownloadTemplate" asp-route-type="cu" class="btn btn-sm btn-outline-success d-flex align-items-center gap-1">
+                                        <i class="bi bi-file-earmark-excel-fill"></i>
+                                        Template
+                                    </a>
+                                </div>
+                            </div>
+                            <hr />
+
+                            <form method="post" enctype="multipart/form-data" asp-page-handler="Upload">
+                                <div class="form-group mb-3">
+                                    <label for="UploadedFile" class="form-label fw-bold">Pilih File Excel:</label>
+                                    <input type="file" id="UploadedFile" name="UploadedFile" class="form-control" accept=".xlsx, .xls" required>
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="TargetMachine" class="form-label fw-bold">Untuk Mesin:</label>
+                                    <select id="TargetMachine" name="TargetMachine" class="form-select" required>
+                                        <option value="CAC">CAC</option>
+                                        <option value="SKD">SKD</option>
+                                        <option value="STANDING FLOOR">Standing Floor</option>
+                                    </select>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 form-group mb-3">
+                                        <label for="TargetMonth" class="form-label fw-bold">Bulan:</label>
+                                        <select id="TargetMonth" name="TargetMonth" class="form-select" required>
+                                        @for (int i = 1; i <= 12; i++)
+                                        {
+                                                                <option value="@i" selected="@(i == DateTime.Now.Month ? "selected" : null)">
+                                                @System.Globalization.CultureInfo.GetCultureInfo("en-US").DateTimeFormat.GetMonthName(i)
+                                                                </option>
+                                        }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 form-group mb-3">
+                                        <label for="TargetYear" class="form-label fw-bold">Tahun:</label>
+                                        <select id="TargetYear" name="TargetYear" class="form-select" required>
+                                        @for (int i = DateTime.Now.Year - 3; i <= DateTime.Now.Year + 1; i++)
+                                        {
+                                                                <option value="@i" selected="@(i == DateTime.Now.Year ? "selected" : null)">@i</option>
+                                        }
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="d-grid gap-2 mt-3">
+                                    <button type="submit" class="btn btn-success fw-bold">
+                                        <i class="bi bi-upload"></i> Upload
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <form id="form-production-plan" method="post" asp-page-handler="InsertProductionRecord">
+                <input type="hidden" name="FilterMachineCode" value="@Model.FilterMachineCode" />
+                <input type="hidden" name="TargetDate" value="@Model.CurrentDate.ToString("yyyy-MM-dd")" />
+                <div class="card-header">
+                    <div class="row"> 
+                        <div class="col-6">
+                          <div class="card text-center">
+                                <p class="pt-2 fs-7">Date :</p>
+                                <p class="fs-4 fw-bold">
+                                    @Model.CurrentDate.ToString("dd MMM yyyy", new System.Globalization.CultureInfo("en-US"))
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="card text-center">
+                                <p class="pt-2 fs-7">Total Quantity :</p>
+                                <p class="fs-4 fw-bold">@(Model.GrandTotal != null ? Model.GrandTotal : "0")</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <table class="table table-bordered" style="border-width: 3px !important;">
+                    <thead>
+                        <tr class="text-center">
+                            <th colspan="3">Original</th>
+                            <th colspan="7">Current</th>
+                             <th rowspan="3">Action</th>
+                        </tr>
+
+                        <tr class="text-center">
+                            <th rowspan="2">No</th>
+                            <th rowspan="2">Model Name</th>
+                            <th rowspan="2">Quantity</th>
+                            <th rowspan="2">Model Name</th>
+
+                            <th colspan="2">Plan</th>
+
+                            <th colspan="2">No Of Direct Worker</th>
+
+                            <th rowspan="2">Qty/Hour</th>
+                            <th rowspan="2">Hour</th>
+
+                        </tr>
+
+                        <tr class="text-center">
+                            <th>Quantity</th>
+                            <th>Overtime</th>
+                            <th>Normal</th>
+                            <th>Overtime</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="production-table-body">
+                    @{
+                        int minRows = 5;
+                        int sapCount = Model.listSapPlans.Count;
+                        int dataCount = Model.listRecords.Count;
+                        int totalRows = Math.Max(Math.Max(sapCount, dataCount), minRows);
+                        // Track records yang sudah ditampilkan
+                        var usedRecordIds = new HashSet<int>();
+                    }
+
+                    @for (int i = 0; i < totalRows; i++)
+                    {
+                        var sapPlan = sapCount > i ? Model.listSapPlans[i] : null;
+                        var record = dataCount > i ? Model.listRecords[i] : null;
+
+                        // Pastikan record belum dipakai di row sebelumnya
+                        if (record != null && usedRecordIds.Contains(record.Id))
+                        {
+                            record = Model.listRecords.FirstOrDefault(r => !usedRecordIds.Contains(r.Id));
+                        }
+                        if (record != null) usedRecordIds.Add(record.Id);
+
+                        int? originalQty = sapPlan != null ? (sapPlan.SapPlanNormal + sapPlan.SapPlanOvertime) : (int?)null;
+
+                <tr style="border-bottom-width: 2px !important;">
+                    <th scope="row" class="text-center align-middle row-number">@(i + 1)</th>
+
+                    <td>
+                        <input type="hidden" name="OriginalModelName[@i]" value="@(sapPlan?.ModelName)" />
+                        <input disabled type="text" class="form-control"
+                               value="@(sapPlan?.ModelName)" placeholder="-" />
+                    </td>
+
+                    <td>
+                        <input type="hidden" name="OriginalQuantity[@i]" value="@(originalQty?.ToString())" />
+                        <input disabled type="text" class="form-control"
+                               value="@(originalQty?.ToString())" placeholder="-" />
+                    </td>
+
+                    <td>
+                        <div class="input-group position-relative">
+                                    <input type="hidden" name="IdModel[@i]" value="@(record != null ? record.Id.ToString() : "")" />
+                            <input type="text" class="form-control productInput"
+                                   name="ModelName[@i]"
+                                      value="@(record?.ModelName)"
+                                   placeholder="Pilih Model" autocomplete="off" />
+                            <a class="btn btn-primary input-group-text"
+                               data-bs-toggle="modal" data-bs-target="#new-model-modal">Opsi</a>
+                            <div class="dropdown custom-dropdown"></div>
+                        </div>
+                    </td>
+
+                    <td style="min-width: 150px;">
+                        <input type="hidden" class="row-total-qty" name="Quantity[@i]"
+                                  value="@(record?.Quantity?.ToString())" />
+                        <div class="d-flex align-items-center mb-1 mt-1">
+                            <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="1" name="Shift[@i]" value="1" @(record?.Shift?.Contains("1") == true ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">S1</label>
+                            <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="1" name="QtyShift1[@i]" value="@(record?.QtyShift1)" placeholder="Qty" @(record?.Shift?.Contains("1") == true ? "" : "disabled") />
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="2" name="Shift[@i]" value="2" @(record?.Shift?.Contains("2") == true ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">S2</label>
+                            <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="2" name="QtyShift2[@i]" value="@(record?.QtyShift2)" placeholder="Qty" @(record?.Shift?.Contains("2") == true ? "" : "disabled") />
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="3" name="Shift[@i]" value="3" @(record?.Shift?.Contains("3") == true ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">S3</label>
+                            <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="3" name="QtyShift3[@i]" value="@(record?.QtyShift3)" placeholder="Qty" @(record?.Shift?.Contains("3") == true ? "" : "disabled") />
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="NS" name="Shift[@i]" value="NS" @(record?.Shift?.Contains("NS") == true ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">NS</label>
+                            <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="NS" name="QtyShiftNS[@i]" value="@(record?.QtyShiftNS)" placeholder="Qty" @(record?.Shift?.Contains("NS") == true ? "" : "disabled") />
+                        </div>
+                    </td>
+
+                    <td style="min-width: 150px;">
+                        <input type="hidden" class="row-total-ovt" name="Overtime[@i]"
+                                   value="@(record?.Overtime?.ToString())" />
+                        <div class="d-flex align-items-center mb-1 mt-1">
+                            <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="1" name="OvtShiftCb[@i]" value="1" @(record?.OvtShift1 != null ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">S1</label>
+                            <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="1" name="OvtShift1[@i]" value="@(record?.OvtShift1)" placeholder="Ovt" @(record?.OvtShift1 != null ? "" : "disabled") />
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="2" name="OvtShiftCb[@i]" value="2" @(record?.OvtShift2 != null ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">S2</label>
+                            <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="2" name="OvtShift2[@i]" value="@(record?.OvtShift2)" placeholder="Ovt" @(record?.OvtShift2 != null ? "" : "disabled") />
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="3" name="OvtShiftCb[@i]" value="3" @(record?.OvtShift3 != null ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">S3</label>
+                            <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="3" name="OvtShift3[@i]" value="@(record?.OvtShift3)" placeholder="Ovt" @(record?.OvtShift3 != null ? "" : "disabled") />
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="NS" name="OvtShiftCb[@i]" value="NS" @(record?.OvtShiftNS != null ? "checked" : "")>
+                            <label class="form-check-label me-2" style="width: 30px;">NS</label>
+                            <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="NS" name="OvtShiftNS[@i]" value="@(record?.OvtShiftNS)" placeholder="Ovt" @(record?.OvtShiftNS != null ? "" : "disabled") />
+                        </div>
+                    </td>
+
+                    <td>
+                        <input type="number" class="form-control" name="NoOfDirectWorker[@i]"
+                               value="@(record?.NoDirectOfWorker?.ToString())"
+                               placeholder="Worker" autocomplete="off" />
+                    </td>
+
+                    <td>
+                        <input type="number" class="form-control" name="NoOfDirectWorkerOvertime[@i]"
+                               value="@(record?.NoDirectOfWorkerOvertime?.ToString())"
+                               placeholder="Ovt" autocomplete="off" />
+                    </td>
+
+                    <td>
+                        <input type="text" class="form-control" name="QtyHour[@i]"
+                               value="@(record?.QtyHour?.ToString())"
+                               placeholder="Qty/Hr" autocomplete="off" />
+                    </td>
+
+                    <td>
+                        <input type="text" class="form-control" name="Hour[@i]"
+                               value="@(record?.Hour ?? 0)" readonly />
+                    </td>
+
+                    <td>
+                        <div class="d-flex justify-content-center">
+                                        @if (record != null)
+                                        {
+                                    <a class="btn btn-warning btn-sm mt-1 me-1"
+                                       data-bs-toggle="modal" data-bs-target="#edit-model"
+                                       onclick="setModalData(this)">Edit</a>
+                                    <a class="btn btn-danger btn-sm mt-1"
+                                       data-bs-toggle="modal" data-bs-target="#delete-model"
+                                       onclick="setDeleteRecordId(@(record?.Id))">Del</a>
+                                        }
+                                        else
+                                        {
+                                    <button type="button" class="btn btn-danger btn-sm mt-1"
+                                            onclick="removeRow(this)">Del</button>
+                                        }
+                        </div>
+                    </td>
+                </tr>
+                        }
+    </tbody>
+                </table>
+               <div class="row">
+        <div class="col-12 mb-3 d-flex justify-content-end">
+            <button type="button" class="btn btn-success btn-sm" onclick="addNewRow()">
+                <i class="bi bi-plus-circle"></i> Add Row
+            </button>
+        </div>
+
+                    <div class="col-12">
+                        <div class="d-flex align-items-start gap-3">
+                            <p class="fw-bold mt-2" style="min-width: 100px;">Comment</p>
+                            <textarea class="form-control" name="comment" id="comment" placeholder="Masukkan Komentar" rows="2">@Model.Comment</textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex align-middle justify-content-center pb-3">
+                    <button type="button" id="btn-validate-submit" class="btn btn-primary me-3" onclick="validateAndSubmit()">Submit</button>
+                    <a class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#delete-all-model">Reset</a>
+                    <span id="submitCounter" class="ms-3">Submitted <span id="counter">0</span> time(s)</span>
+                </div>
+            </form>
+        </div>
+        <div class="modal fade" id="new-model-modal" tabindex="-1" aria-labelledby="new-model-modal-label" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="new-model-modal-label">Tambah Opsi</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form method="post" asp-page-handler="InsertProduct">
+                        <input type="hidden" name="FilterMachineCode" value="@Model.FilterMachineCode" />
+                        <input type="hidden" name="FilterDate" value="@Model.CurrentDate.ToString("yyyy-MM-dd")" />
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="new-model" class="col-form-label fw-bold">TAMBAHKAN MODEL BARU JIKA TIDAK ADA PILIHAN MODEL YANG DIINGINKAN</label>
+                                <input type="text" class="form-control" id="new-model" name="ProductName">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-primary">Submit</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade" id="edit-model" tabindex="-1" aria-labelledby="Edit-Model-Modal-Label" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h1 class="modal-title fs-5" id="exampleModalLabel">Edit Data</h1>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form method="post" asp-page-handler="UpdateProduct">
+                        <input type="hidden" name="Id" />
+                        <input type="hidden" name="TargetDate" value="@Model.CurrentDate.ToString("yyyy-MM-dd")" />
+                        <input type="hidden" name="FilterMachineCode" value="@Model.FilterMachineCode" />
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="" class="col-form-label">Product Name:</label>
+                                <input type="text" class="form-control productInput" name="ProductName" placeholder="Silahkan Pilih Model" autocomplete="off" />
+                                <div id="dropdown" class="dropdown"></div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="col-form-label fw-bold">Quantity (Normal):</label>
+                                <input type="text" class="form-control mb-2" name="Quantity" id="quantity" placeholder="Total Quantity" autocomplete="off" readonly />
+                                
+                                <div class="d-flex flex-column gap-2 ms-3">
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-shift" type="checkbox" name="Shift" value="1" id="editShift1" data-shift="1">
+                                        <label class="form-check-label me-2" for="editShift1" style="width: 30px;">S1</label>
+                                        <input type="number" class="form-control form-control-sm edit-shift-qty w-50" name="QtyShift1" id="editQtyShift1" placeholder="Qty S1" disabled />
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-shift" type="checkbox" name="Shift" value="2" id="editShift2" data-shift="2">
+                                        <label class="form-check-label me-2" for="editShift2" style="width: 30px;">S2</label>
+                                        <input type="number" class="form-control form-control-sm edit-shift-qty w-50" name="QtyShift2" id="editQtyShift2" placeholder="Qty S2" disabled />
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-shift" type="checkbox" name="Shift" value="3" id="editShift3" data-shift="3">
+                                        <label class="form-check-label me-2" for="editShift3" style="width: 30px;">S3</label>
+                                        <input type="number" class="form-control form-control-sm edit-shift-qty w-50" name="QtyShift3" id="editQtyShift3" placeholder="Qty S3" disabled />
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-shift" type="checkbox" name="Shift" value="NS" id="editShiftNS" data-shift="NS">
+                                        <label class="form-check-label me-2" for="editShiftNS" style="width: 30px;">NS</label>
+                                        <input type="number" class="form-control form-control-sm edit-shift-qty w-50" name="QtyShiftNS" id="editQtyShiftNS" placeholder="Qty NS" disabled />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="col-form-label fw-bold">Overtime:</label>
+                                <input type="text" class="form-control mb-2" name="Overtime" id="overtime" placeholder="Total Overtime" autocomplete="off" readonly />
+                                
+                                <div class="d-flex flex-column gap-2 ms-3">
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-ovt-shift" type="checkbox" name="OvtShiftCb" value="1" id="editOvtShift1" data-shift="1">
+                                        <label class="form-check-label me-2" for="editOvtShift1" style="width: 30px;">S1</label>
+                                        <input type="number" class="form-control form-control-sm edit-ovt-shift-qty w-50" name="OvtShift1" id="editOvtQtyShift1" placeholder="Ovt S1" disabled />
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-ovt-shift" type="checkbox" name="OvtShiftCb" value="2" id="editOvtShift2" data-shift="2">
+                                        <label class="form-check-label me-2" for="editOvtShift2" style="width: 30px;">S2</label>
+                                        <input type="number" class="form-control form-control-sm edit-ovt-shift-qty w-50" name="OvtShift2" id="editOvtQtyShift2" placeholder="Ovt S2" disabled />
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-ovt-shift" type="checkbox" name="OvtShiftCb" value="3" id="editOvtShift3" data-shift="3">
+                                        <label class="form-check-label me-2" for="editOvtShift3" style="width: 30px;">S3</label>
+                                        <input type="number" class="form-control form-control-sm edit-ovt-shift-qty w-50" name="OvtShift3" id="editOvtQtyShift3" placeholder="Ovt S3" disabled />
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <input class="form-check-input me-2 edit-ovt-shift" type="checkbox" name="OvtShiftCb" value="NS" id="editOvtShiftNS" data-shift="NS">
+                                        <label class="form-check-label me-2" for="editOvtShiftNS" style="width: 30px;">NS</label>
+                                        <input type="number" class="form-control form-control-sm edit-ovt-shift-qty w-50" name="OvtShiftNS" id="editOvtQtyShiftNS" placeholder="Ovt NS" disabled />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="message-text" class="col-form-label fw-bold">QtyHour:</label>
+                                <input type="text" class="form-control" name="QtyHour" id="qtyhour" placeholder="Masukkan Quantity/Hour" autocomplete="off" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="col-form-label fw-bold">No Of Direct Worker</label>
+
+                                <div class="row">
+                                    <div class="col-6">
+                                        <label class="form-label">Normal</label>
+                                        <input type="number"
+                                               class="form-control"
+                                               name="NoOfDirectWorker"
+                                               id="noOfDirectWorker"
+                                               placeholder="Normal"
+                                               autocomplete="off" />
+                                    </div>
+
+                                    <div class="col-6">
+                                        <label class="form-label">Overtime</label>
+                                        <input type="number"
+                                               class="form-control"
+                                               name="NoOfDirectWorkerOvertime"
+                                               id="noOfDirectWorkerOvertime"
+                                               placeholder="Overtime"
+                                               autocomplete="off" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade" id="delete-model" tabindex="-1" aria-labelledby="delete-model-modal-label" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="exampleModalLabel">Delete Data</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form method="post" asp-page-handler="DeleteRecord">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="FilterMachineCode" value="@Model.FilterMachineCode" />
+                        <input type="hidden" name="FilterDate" value="@Model.CurrentDate.ToString("yyyy-MM-dd")" />
+                        <div class="modal-body">
+                            <label for="delete-model" class="col-form-label fw-bold">Apakah anda yakin ingin menghapus data ini ?</label>
+                            <input type="hidden" id="delete-record-id" name="RecordId" />
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-danger">Delete Record</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade" id="delete-all-model" tabindex="-1" aria-labelledby="delete-model-modal-label" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="exampleModalLabel">Delete Data</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form method="post" asp-page-handler="DeleteAllRecord">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="FilterMachineCode" value="@Model.FilterMachineCode" />
+                        <input type="hidden" name="FilterDate" value="@Model.CurrentDate.ToString("yyyy-MM-dd")" />
+                        <div class="modal-body">
+                            <label for="delete-model" class="col-form-label fw-bold">Apakah anda yakin ingin me-reset semua data pada hari ini ?</label>
+                            <input type="hidden" id="delete-record-id" name="RecordId" />
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-danger">Delete Record</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script src="~/lib/jquery/dist/jquery.min.js"></script>
+        <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="~/js/site.js" asp-append-version="true"></script>
+        <script src="~/js/sweetalert2.min.js"></script>
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                var statusMessage = '@TempData["StatusMessage"]';
+                var message = '@TempData["Message"]';
+
+                if (statusMessage === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success',
+                        text: message,
+                        confirmButtonText: 'OK'
+                    });
+                } else if (statusMessage === 'error') {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: message,
+                        confirmButtonText: 'OK'
+                    });
+                }
+            });
+
+            function validateAndSubmit() {
+                const rows = document.querySelectorAll('#production-table-body tr');
+                let hasData = false;
+                let isValid = true;
+                let errorMsg = "";
+
+                rows.forEach((row, index) => {
+                    const modelName = row.querySelector('input[name^="ModelName"]').value.trim();
+                    const quantity = row.querySelector('input[name^="Quantity"]').value.trim();
+                    const worker = row.querySelector('input[name^="NoOfDirectWorker"]').value.trim();
+
+                    const isRowFilled = modelName !== "" || quantity !== "" || worker !== "";
+
+                    if (isRowFilled) {
+                        hasData = true;
+
+                        if (modelName === "" || quantity === "" || worker === "") {
+                            isValid = false;
+                            row.style.backgroundColor = "#ffe6e6";
+                            errorMsg = `Baris ke-${index + 1} tidak lengkap! \nModel Name, Quantity, dan Worker (Normal) wajib diisi.`;
+                            return;
+                        } else {
+                            row.style.backgroundColor = "";
+                        }
+                    }
+                });
+                if (!hasData) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Data Kosong',
+                        text: 'Silakan isi minimal satu baris data (Model, Qty, dan Worker) sebelum submit.',
+                        confirmButtonText: 'OK'
+                    });
+                    return;
+                }
+                if (!isValid) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Data Tidak Lengkap',
+                        text: errorMsg,
+                        confirmButtonText: 'Perbaiki'
+                    });
+                    return;
+                }
+                Swal.fire({
+                    title: 'Menyimpan Data...',
+                    text: 'Mohon tunggu sebentar',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                const form = document.getElementById('form-production-plan');
+                if (form) {
+                    form.submit();
+                } else {
+                    console.error("Form tidak ditemukan! Pastikan ID form sudah benar.");
+                    Swal.fire('Error', 'Terjadi kesalahan sistem: Form tidak ditemukan.', 'error');
+                }
+            }
+        </script>
+
+        <script>
+            const productNames = @Html.Raw(Model.ProductNames);
+            const productNameStrings = productNames.map(product => product.Name);
+
+            let currentIndex = document.querySelectorAll('#production-table-body tr').length;
+
+            function addNewRow() {
+                const tableBody = document.getElementById('production-table-body');
+
+                const newRowHtml = `
+                        <tr style="border-bottom-width: 2px !important;">
+                            <th scope="row" class="text-center align-middle row-number">${currentIndex + 1}</th>
+                            <td><input disabled type="text" class="form-control" placeholder="-" /></td>
+                            <td><input disabled type="text" class="form-control" placeholder="-" /></td>
+
+                            <td>
+                                <div class="input-group position-relative">
+                                    <input type="hidden" name="IdModel[${currentIndex}]" value="" />
+                                    <input type="text" class="form-control productInput" name="ModelName[${currentIndex}]" placeholder="Pilih Model" autocomplete="off" />
+                                    <a class="btn btn-primary input-group-text" data-bs-toggle="modal" data-bs-target="#new-model-modal">Opsi</a>
+                                    <div class="dropdown custom-dropdown" style="top: 100%; left: 0; width: 100%;"></div>
+                                </div>
+                            </td>
+
+                            <td style="min-width: 150px;">
+                                <input type="hidden" class="row-total-qty" name="Quantity[${currentIndex}]" />
+                                <div class="d-flex align-items-center mb-1 mt-1">
+                                    <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="1" name="Shift[${currentIndex}]" value="1">
+                                    <label class="form-check-label me-2" style="width: 30px;">S1</label>
+                                    <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="1" name="QtyShift1[${currentIndex}]" placeholder="Qty" disabled />
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="2" name="Shift[${currentIndex}]" value="2">
+                                    <label class="form-check-label me-2" style="width: 30px;">S2</label>
+                                    <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="2" name="QtyShift2[${currentIndex}]" placeholder="Qty" disabled />
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="3" name="Shift[${currentIndex}]" value="3">
+                                    <label class="form-check-label me-2" style="width: 30px;">S3</label>
+                                    <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="3" name="QtyShift3[${currentIndex}]" placeholder="Qty" disabled />
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <input class="form-check-input me-2 shift-checkbox" type="checkbox" data-shift="NS" name="Shift[${currentIndex}]" value="NS">
+                                    <label class="form-check-label me-2" style="width: 30px;">NS</label>
+                                    <input type="number" class="form-control form-control-sm shift-qty-input" data-shift="NS" name="QtyShiftNS[${currentIndex}]" placeholder="Qty" disabled />
+                                </div>
+                            </td>
+
+                            <td style="min-width: 150px;">
+                                <input type="hidden" class="row-total-ovt" name="Overtime[${currentIndex}]" />
+                                <div class="d-flex align-items-center mb-1 mt-1">
+                                    <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="1" name="OvtShiftCb[${currentIndex}]" value="1">
+                                    <label class="form-check-label me-2" style="width: 30px;">S1</label>
+                                    <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="1" name="OvtShift1[${currentIndex}]" placeholder="Ovt" disabled />
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="2" name="OvtShiftCb[${currentIndex}]" value="2">
+                                    <label class="form-check-label me-2" style="width: 30px;">S2</label>
+                                    <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="2" name="OvtShift2[${currentIndex}]" placeholder="Ovt" disabled />
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="3" name="OvtShiftCb[${currentIndex}]" value="3">
+                                    <label class="form-check-label me-2" style="width: 30px;">S3</label>
+                                    <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="3" name="OvtShift3[${currentIndex}]" placeholder="Ovt" disabled />
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <input class="form-check-input me-2 ovt-shift-checkbox" type="checkbox" data-shift="NS" name="OvtShiftCb[${currentIndex}]" value="NS">
+                                    <label class="form-check-label me-2" style="width: 30px;">NS</label>
+                                    <input type="number" class="form-control form-control-sm ovt-shift-qty-input" data-shift="NS" name="OvtShiftNS[${currentIndex}]" placeholder="Ovt" disabled />
+                                </div>
+                            </td>
+
+                            <td><input type="number" class="form-control" name="NoOfDirectWorker[${currentIndex}]" placeholder="Normal" /></td>
+                            <td><input type="number" class="form-control" name="NoOfDirectWorkerOvertime[${currentIndex}]" placeholder="Overtime" /></td>
+
+                            <td><input type="number" class="form-control" name="QtyHour[${currentIndex}]" placeholder="Qty/Hr" /></td>
+                            <td><input type="text" class="form-control" name="Hour[${currentIndex}]" value="0" readonly /></td>
+
+                            <td>
+                                <div class="d-flex justify-content-center">
+                                    <button type="button" class="btn btn-danger btn-sm mt-1" onclick="removeRow(this)">X</button>
+                                </div>
+                            </td>
+                        </tr>
+                        `;
+
+                tableBody.insertAdjacentHTML('beforeend', newRowHtml);
+
+                const newRow = tableBody.lastElementChild;
+                const newInput = newRow.querySelector('.productInput');
+                const newDropdown = newRow.querySelector('.custom-dropdown');
+                attachDropdownEvent(newInput, newDropdown);
+
+                currentIndex++;
+            }
+
+            function openEditModal(btn) {
+                document.querySelectorAll('.edit-shift').forEach(cb => cb.checked = false);
+
+                const shiftData = btn.getAttribute('data-shift');
+                if (!shiftData) return;
+
+                const shifts = shiftData.split(',');
+
+                shifts.forEach(s => {
+                    const checkbox = document.querySelector(`.edit-shift[value="${s}"]`);
+                    if (checkbox) checkbox.checked = true;
+                });
+            }
+
+            function removeRow(button) {
+                const row = button.closest('tr');
+                row.remove();
+                reindexRows();
+            }
+
+            function reindexRows() {
+                const rows = document.querySelectorAll('#production-table-body tr');
+                rows.forEach((row, index) => {
+                    const th = row.querySelector('.row-number');
+                    if (th) th.innerText = index + 1;
+                });
+            }
+
+            function showDropdown(input, dropdown, filteredNames) {
+                dropdown.innerHTML = '';
+                if (filteredNames.length > 0) {
+                    filteredNames.forEach(name => {
+                        const div = document.createElement('div');
+                        div.textContent = name;
+                        div.style.padding = '10px';
+                        div.style.cursor = 'pointer';
+
+                        div.onclick = () => {
+                            input.value = name;
+                            dropdown.style.display = 'none';
+
+                            const product = productNames.find(p => p.Name === name);
+                            if (product) {
+                                const row = input.closest('tr');
+                                if (row) {
+                                    const qtyHourInput = row.querySelector('input[name^="QtyHour["]');
+                                    if (qtyHourInput) {
+                                        qtyHourInput.value = product.QtyHour || '';
+                                        calculateHourForRow(row);
+                                    }
+                                } else {
+                                    const modal = input.closest('form');
+                                    if (modal) {
+                                        const qtyHourInput = modal.querySelector('input[name="QtyHour"]');
+                                        if (qtyHourInput) {
+                                            qtyHourInput.value = product.QtyHour || '';
+                                        }
+                                    }
+                                }
+                            }
+                        };
+                        dropdown.appendChild(div);
+                    });
+                    dropdown.style.display = 'block';
+                } else {
+                    dropdown.style.display = 'none';
+                }
+            }
+
+            function attachDropdownEvent(input, dropdown) {
+                input.addEventListener('input', () => {
+                    const query = input.value.toLowerCase();
+                    const filteredNames = productNameStrings.filter(name => name.toLowerCase().includes(query));
+                    showDropdown(input, dropdown, filteredNames);
+                });
+                input.addEventListener('click', () => {
+                    const query = input.value.toLowerCase();
+                    const filteredNames = productNameStrings.filter(name => name.toLowerCase().includes(query));
+                    showDropdown(input, dropdown, filteredNames);
+                });
+            }
+
+            document.addEventListener("DOMContentLoaded", function () {
+                const existingInputs = document.querySelectorAll('.productInput');
+                existingInputs.forEach(input => {
+                    const dropdown = input.parentNode.querySelector('.custom-dropdown');
+                    if (dropdown) {
+                        attachDropdownEvent(input, dropdown);
+                    }
+                });
+
+                const rows = document.querySelectorAll('#production-table-body tr');
+                rows.forEach(row => {
+                    validateRowShifts(row);
+                });
+            });
+
+            document.addEventListener('click', (event) => {
+                const isInput = event.target.classList.contains('productInput');
+                const isDropdownItem = event.target.closest('.custom-dropdown');
+
+                if (!isInput && !isDropdownItem) {
+                    document.querySelectorAll('.custom-dropdown').forEach(d => d.style.display = 'none');
+                }
+            });
+
+            function setModalData(button) {
+                const row = button.closest('tr');
+                const getVal = name => {
+                    const input = row.querySelector(`input[name^="${name}"]`);
+                    return input ? input.value : '';
+                };
+
+                const modal = document.querySelector('#edit-model form');
+                modal.querySelector('input[name="Id"]').value = getVal("IdModel");
+                modal.querySelector('input[name="ProductName"]').value = getVal("ModelName");
+                modal.querySelector('input[name="Quantity"]').value = getVal("Quantity");
+                modal.querySelector('input[name="Overtime"]').value = getVal("Overtime");
+                modal.querySelector('input[name="QtyHour"]').value = getVal("QtyHour");
+
+                const wNorm = modal.querySelector('input[name="NoOfDirectWorker"]');
+                if (wNorm) wNorm.value = getVal("NoOfDirectWorker");
+
+                const wOvt = modal.querySelector('input[name="NoOfDirectWorkerOvertime"]');
+                if (wOvt) wOvt.value = getVal("NoOfDirectWorkerOvertime");
+
+                modal.querySelectorAll('.edit-shift').forEach(cb => {
+                    cb.checked = false;
+                    const shift = cb.getAttribute('data-shift');
+                    const qtyInput = modal.querySelector(`#editQtyShift${shift}`);
+                    if (qtyInput) {
+                        qtyInput.value = '';
+                        qtyInput.disabled = true;
+                    }
+                });
+
+                const rowShiftCheckboxes = row.querySelectorAll('.shift-checkbox');
+                rowShiftCheckboxes.forEach(cb => {
+                    if (cb.checked) {
+                        const val = cb.value;
+                        const modalCb = modal.querySelector(`.edit-shift[value="${val}"]`);
+                        if (modalCb) {
+                            modalCb.checked = true;
+                            const shift = modalCb.getAttribute('data-shift');
+                            const modalQtyInput = modal.querySelector(`#editQtyShift${shift}`);
+                            if (modalQtyInput) {
+                                modalQtyInput.disabled = false;
+                                const rowQtyInput = row.querySelector(`.shift-qty-input[data-shift="${shift}"]`);
+                                if (rowQtyInput) {
+                                    modalQtyInput.value = rowQtyInput.value;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                modal.querySelectorAll('.edit-ovt-shift').forEach(cb => {
+                    cb.checked = false;
+                    const shift = cb.getAttribute('data-shift');
+                    const qtyInput = modal.querySelector(`#editOvtQtyShift${shift}`);
+                    if (qtyInput) {
+                        qtyInput.value = '';
+                        qtyInput.disabled = true;
+                    }
+                });
+
+                const rowOvtShiftCheckboxes = row.querySelectorAll('.ovt-shift-checkbox');
+                rowOvtShiftCheckboxes.forEach(cb => {
+                    if (cb.checked) {
+                        const val = cb.value;
+                        const modalCb = modal.querySelector(`.edit-ovt-shift[value="${val}"]`);
+                        if (modalCb) {
+                            modalCb.checked = true;
+                            const shift = modalCb.getAttribute('data-shift');
+                            const modalQtyInput = modal.querySelector(`#editOvtQtyShift${shift}`);
+                            if (modalQtyInput) {
+                                modalQtyInput.disabled = false;
+                                const rowQtyInput = row.querySelector(`.ovt-shift-qty-input[data-shift="${shift}"]`);
+                                if (rowQtyInput) {
+                                    modalQtyInput.value = rowQtyInput.value;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                validateEditModalShifts();
+            }
+
+            function setDeleteRecordId(recordId) {
+                document.getElementById("delete-record-id").value = recordId;
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                function updateDropdownStyle() {
+                    const dropdowns = document.querySelectorAll('.filter-content .form-select-sm');
+                    dropdowns.forEach(dropdown => {
+                        if (dropdown.name === 'FilterMachineCode' && dropdown.value) {
+                            dropdown.classList.add('selected');
+                        }
+                    });
+                }
+                updateDropdownStyle();
+                const dropdowns = document.querySelectorAll('.filter-content .form-select-sm');
+                dropdowns.forEach(dropdown => {
+                    dropdown.addEventListener('change', updateDropdownStyle);
+                });
+            });
+
+            document.addEventListener('change', function(e) {
+                if (e.target.classList.contains('shift-checkbox') && !e.target.classList.contains('edit-shift')) {
+                    const row = e.target.closest('tr');
+                    const shift = e.target.getAttribute('data-shift');
+                    const qtyInput = row.querySelector(`.shift-qty-input[data-shift="${shift}"]`);
+                    
+                    if (e.target.checked) {
+                        qtyInput.disabled = false;
+                        qtyInput.focus();
+                    } else {
+                        qtyInput.disabled = true;
+                        qtyInput.value = '';
+                        updateRowTotalQty(row);
+                    }
+                    validateRowShifts(row);
+                } else if (e.target.classList.contains('ovt-shift-checkbox') && !e.target.classList.contains('edit-ovt-shift')) {
+                    const row = e.target.closest('tr');
+                    const shift = e.target.getAttribute('data-shift');
+                    const qtyInput = row.querySelector(`.ovt-shift-qty-input[data-shift="${shift}"]`);
+                    
+                    if (e.target.checked) {
+                        qtyInput.disabled = false;
+                        qtyInput.focus();
+                    } else {
+                        qtyInput.disabled = true;
+                        qtyInput.value = '';
+                        updateRowTotalOvt(row);
+                    }
+                    validateRowShifts(row);
+                }
+            });
+
+            document.addEventListener('input', function(e) {
+                if (e.target.classList.contains('shift-qty-input') && !e.target.classList.contains('edit-shift-qty')) {
+                    const row = e.target.closest('tr');
+                    updateRowTotalQty(row);
+                    validateRowShifts(row);
+                } else if (e.target.classList.contains('ovt-shift-qty-input') && !e.target.classList.contains('edit-ovt-shift-qty')) {
+                    const row = e.target.closest('tr');
+                    updateRowTotalOvt(row);
+                    validateRowShifts(row);
+                }
+            });
+
+            function updateRowTotalQty(row) {
+                const qtyInputs = row.querySelectorAll('.shift-qty-input');
+                let total = 0;
+                qtyInputs.forEach(input => {
+                    if (!input.disabled && input.value) {
+                        total += parseInt(input.value) || 0;
+                    }
+                });
+                const totalInput = row.querySelector('.row-total-qty');
+                if (totalInput) {
+                    totalInput.value = total > 0 ? total : '';
+                }
+                calculateHourForRow(row);
+                calculateTotalQty();
+            }
+
+            function updateRowTotalOvt(row) {
+                const qtyInputs = row.querySelectorAll('.ovt-shift-qty-input');
+                let total = 0;
+                qtyInputs.forEach(input => {
+                    if (!input.disabled && input.value) {
+                        total += parseInt(input.value) || 0;
+                    }
+                });
+                const totalInput = row.querySelector('.row-total-ovt');
+                if (totalInput) {
+                    totalInput.value = total > 0 ? total : '';
+                }
+            }
+
+            function validateRowShifts(row) {
+                const checkboxes = row.querySelectorAll('.shift-checkbox');
+                let hasCheckedEmpty = false;
+                checkboxes.forEach(cb => {
+                    if (cb.checked) {
+                        const shift = cb.getAttribute('data-shift');
+                        const qtyInput = row.querySelector(`.shift-qty-input[data-shift="${shift}"]`);
+                        if (qtyInput && !qtyInput.value) hasCheckedEmpty = true;
+                    }
+                });
+                checkboxes.forEach(cb => {
+                    cb.disabled = !cb.checked && hasCheckedEmpty;
+                });
+
+                const ovtCheckboxes = row.querySelectorAll('.ovt-shift-checkbox');
+                let hasOvtCheckedEmpty = false;
+                ovtCheckboxes.forEach(cb => {
+                    if (cb.checked) {
+                        const shift = cb.getAttribute('data-shift');
+                        const qtyInput = row.querySelector(`.ovt-shift-qty-input[data-shift="${shift}"]`);
+                        if (qtyInput && !qtyInput.value) hasOvtCheckedEmpty = true;
+                    }
+                });
+                ovtCheckboxes.forEach(cb => {
+                    cb.disabled = !cb.checked && hasOvtCheckedEmpty;
+                });
+            }
+
+            document.addEventListener('change', function(e) {
+                if (e.target.classList.contains('edit-shift')) {
+                    const modal = e.target.closest('form');
+                    const shift = e.target.getAttribute('data-shift');
+                    const qtyInput = modal.querySelector(`#editQtyShift${shift}`);
+                    if (e.target.checked) {
+                        qtyInput.disabled = false;
+                        qtyInput.focus();
+                    } else {
+                        qtyInput.disabled = true;
+                        qtyInput.value = '';
+                        updateModalTotalQty(modal);
+                    }
+                    validateEditModalShifts();
+                } else if (e.target.classList.contains('edit-ovt-shift')) {
+                    const modal = e.target.closest('form');
+                    const shift = e.target.getAttribute('data-shift');
+                    const qtyInput = modal.querySelector(`#editOvtQtyShift${shift}`);
+                    if (e.target.checked) {
+                        qtyInput.disabled = false;
+                        qtyInput.focus();
+                    } else {
+                        qtyInput.disabled = true;
+                        qtyInput.value = '';
+                        updateModalTotalOvt(modal);
+                    }
+                    validateEditModalShifts();
+                }
+            });
+
+            document.addEventListener('input', function(e) {
+                if (e.target.classList.contains('edit-shift-qty')) {
+                    const modal = e.target.closest('form');
+                    updateModalTotalQty(modal);
+                    validateEditModalShifts();
+                } else if (e.target.classList.contains('edit-ovt-shift-qty')) {
+                    const modal = e.target.closest('form');
+                    updateModalTotalOvt(modal);
+                    validateEditModalShifts();
+                }
+            });
+
+            function updateModalTotalQty(modal) {
+                const qtyInputs = modal.querySelectorAll('.edit-shift-qty');
+                let total = 0;
+                qtyInputs.forEach(input => {
+                    if (!input.disabled && input.value) total += parseInt(input.value) || 0;
+                });
+                const totalInput = modal.querySelector('#quantity');
+                if (totalInput) totalInput.value = total > 0 ? total : '';
+            }
+
+            function updateModalTotalOvt(modal) {
+                const qtyInputs = modal.querySelectorAll('.edit-ovt-shift-qty');
+                let total = 0;
+                qtyInputs.forEach(input => {
+                    if (!input.disabled && input.value) total += parseInt(input.value) || 0;
+                });
+                const totalInput = modal.querySelector('#overtime');
+                if (totalInput) totalInput.value = total > 0 ? total : '';
+            }
+
+            function validateEditModalShifts() {
+                const modal = document.querySelector('#edit-model form');
+                if (!modal) return;
+                const checkboxes = modal.querySelectorAll('.edit-shift');
+                let hasCheckedEmpty = false;
+                checkboxes.forEach(cb => {
+                    if (cb.checked) {
+                        const shift = cb.getAttribute('data-shift');
+                        const qtyInput = modal.querySelector(`#editQtyShift${shift}`);
+                        if (qtyInput && !qtyInput.value) hasCheckedEmpty = true;
+                    }
+                });
+                checkboxes.forEach(cb => {
+                    cb.disabled = !cb.checked && hasCheckedEmpty;
+                });
+
+                const ovtCheckboxes = modal.querySelectorAll('.edit-ovt-shift');
+                let hasOvtCheckedEmpty = false;
+                ovtCheckboxes.forEach(cb => {
+                    if (cb.checked) {
+                        const shift = cb.getAttribute('data-shift');
+                        const qtyInput = modal.querySelector(`#editOvtQtyShift${shift}`);
+                        if (qtyInput && !qtyInput.value) hasOvtCheckedEmpty = true;
+                    }
+                });
+                ovtCheckboxes.forEach(cb => {
+                    cb.disabled = !cb.checked && hasOvtCheckedEmpty;
+                });
+            }
+
+            function calculateTotalQty() {
+                const tableBody = document.getElementById('production-table-body');
+                if (!tableBody) return;
+                let total = 0;
+                tableBody.querySelectorAll('input[name^="Quantity["]').forEach(input => {
+                    total += parseFloat(input.value) || 0;
+                });
+                const grandTotalEl = document.querySelector('.card-header .col-6:last-child .card .fs-4');
+                if (grandTotalEl) grandTotalEl.textContent = total > 0 ? total : '0';
+            }
+
+            function calculateHourForRow(row) {
+                if (!row) return;
+                const qtyInput = row.querySelector('input[name^="Quantity["]');
+                const qtyHourInput = row.querySelector('input[name^="QtyHour["]');
+                const hourInput = row.querySelector('input[name^="Hour["]');
+                if (!qtyInput || !qtyHourInput || !hourInput) return;
+                const qty = parseFloat(qtyInput.value) || 0;
+                const qtyHour = parseFloat(qtyHourInput.value) || 0;
+                hourInput.value = qtyHour > 0 ? (qty / qtyHour).toFixed(2) : '0';
+            }
+
+            function autoFillWorkerDown(changedInput, namePrefix) {
+                const tableBody = document.getElementById('production-table-body');
+                if (!tableBody) return;
+                const allRows = Array.from(tableBody.querySelectorAll('tr'));
+                const changedRow = changedInput.closest('tr');
+                const changedRowIndex = allRows.indexOf(changedRow);
+                const newValue = changedInput.value;
+
+                if (changedRowIndex === -1) return;
+
+                for (let i = changedRowIndex + 1; i < allRows.length; i++) {
+                    const originalInput = allRows[i].querySelector('input[name^="OriginalModelName"]');
+                    const hasOriginalData = originalInput && originalInput.value.trim() !== '';
+
+                    if (!hasOriginalData) continue;
+
+                    const workerInput = allRows[i].querySelector(`input[name^="${namePrefix}"]`);
+                    if (workerInput && !workerInput.disabled) {
+                        workerInput.value = newValue;
+                    }
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                const tableBody = document.getElementById('production-table-body');
+                if (!tableBody) return;
+
+                // Listener utama
+                tableBody.addEventListener('input', function (e) {
+                    const target = e.target;
+                    const row = target.closest('tr');
+
+                    // Quantity berubah → hitung Hour + Total Qty
+                    if (target.name && target.name.startsWith('Quantity[')) {
+                        calculateHourForRow(row);
+                        calculateTotalQty();
+                    }
+
+                    // QtyHour berubah → hitung Hour
+                    if (target.name && target.name.startsWith('QtyHour[')) {
+                        calculateHourForRow(row);
+                    }
+
+                    // Normal worker
+                    if (target.name && target.name.startsWith('NoOfDirectWorker[')
+                        && !target.name.startsWith('NoOfDirectWorkerOvertime[')) {
+                        autoFillWorkerDown(target, 'NoOfDirectWorker[');
+                    }
+
+                    // Overtime worker
+                    if (target.name && target.name.startsWith('NoOfDirectWorkerOvertime[')) {
+                        autoFillWorkerDown(target, 'NoOfDirectWorkerOvertime[');
+                    }
+                });
+
+                // Hitung ulang saat page load (kalau ada data existing)
+                calculateTotalQty();
+                tableBody.querySelectorAll('tr').forEach(row => calculateHourForRow(row));
+            });
+        </script>
+    </body>
+    </html>

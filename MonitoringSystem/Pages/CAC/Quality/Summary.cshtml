@@ -1,0 +1,144 @@
+﻿@page
+@model MonitoringSystem.Pages.CAC.Quality.SummaryModel
+@{
+    ViewData["Title"] = "Summary Defect Data Table";
+    var currentFy = MonitoringSystem.Pages.CAC.Quality.QualityDefectCatalog.FiscalYearOf(DateTime.Now);
+    var monthColumns = MonitoringSystem.Pages.CAC.Quality.SummaryModel.MonthColumns;
+}
+
+<link rel="stylesheet" href="~/css/quality-defect.css" asp-append-version="true" />
+
+<div class="container-fluid dashboard-container quality-summary-page">
+    <div class="quality-summary-toolbar">
+        <div class="quality-summary-heading">
+            <div class="quality-summary-title">Summary Defect Data Table</div>
+            <div class="quality-summary-line">@Model.LineDef.Code</div>
+        </div>
+
+        <form method="get" class="quality-summary-filters">
+            <label>
+                <span>Line</span>
+                <select name="line" onchange="this.form.submit()">
+                    @foreach (var option in MonitoringSystem.Pages.CAC.Quality.QualityDefectCatalog.Lines)
+                    {
+                        <option value="@option.Code" selected="@(option.Code == Model.LineDef.Code)">@option.Code</option>
+                    }
+                </select>
+            </label>
+            <label>
+                <span>Fiscal Year</span>
+                <select name="fy" onchange="this.form.submit()">
+                    @for (var year = currentFy + 1; year >= currentFy - 4; year--)
+                    {
+                        <option value="@year" selected="@(year == Model.FiscalYear)">FY@(year) (Apr-@((year % 100).ToString("00")) – Mar-@(((year + 1) % 100).ToString("00")))</option>
+                    }
+                </select>
+            </label>
+        </form>
+
+        <div class="quality-summary-actions">
+            <a class="quality-summary-back" asp-page="/CAC/Quality/index" asp-route-MachineCode="@Model.LineDef.Code">&lt;&lt; Back to Quality</a>
+            <a class="quality-summary-export" asp-page-handler="Export" asp-route-line="@Model.LineDef.Code" asp-route-fy="@Model.FiscalYear">Export to Excel</a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.errorMessage))
+    {
+        <div class="alert alert-danger py-2">@Model.errorMessage</div>
+    }
+
+    <div class="quality-summary-scroll">
+        <table class="quality-summary-table">
+            <thead>
+                <tr>
+                    <th colspan="3" class="sticky-col sticky-station">@Model.LineDef.Code Line</th>
+                    <th rowspan="2" class="sticky-col sticky-disposition disposition-head">1. Repair<br />2. Scrap/ Dispose/ Return to Supplier</th>
+                    @foreach (var month in Model.Months)
+                    {
+                        <th colspan="@monthColumns.Length" class="month-head">@month.ToString("MMM-yy")</th>
+                    }
+                    <th rowspan="2" class="total-head">Total</th>
+                </tr>
+                <tr>
+                    <th colspan="2" class="sticky-col sticky-station">Station</th>
+                    <th class="sticky-col sticky-item">Item Defect</th>
+                    @foreach (var month in Model.Months)
+                    {
+                        @for (var c = 0; c < monthColumns.Length; c++)
+                        {
+                            <th class="@(c == 0 ? "qty-head month-start" : "sub-head")">@monthColumns[c]</th>
+                        }
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Stations.Any())
+                {
+                    <tr>
+                        <td colspan="@(5 + Model.Months.Count * monthColumns.Length)" class="quality-summary-empty">
+                            Tidak ada data defect untuk line @Model.LineDef.Code pada FY@(Model.FiscalYear).
+                        </td>
+                    </tr>
+                }
+                @foreach (var station in Model.Stations)
+                {
+                    var firstInStation = true;
+                    foreach (var category in station.Categories)
+                    {
+                        var firstInCategory = true;
+                        foreach (var item in category.Items)
+                        {
+                            <tr class="@(firstInCategory ? "category-start" : null)">
+                                @if (firstInStation)
+                                {
+                                    <td rowspan="@station.RowCount" class="vertical-cell station-cell sticky-col sticky-station-a"><span>@station.Label</span></td>
+                                    firstInStation = false;
+                                }
+                                @if (firstInCategory)
+                                {
+                                    <td rowspan="@category.Items.Count" class="vertical-cell category-cell sticky-col sticky-station-b"><span>@category.Label</span></td>
+                                    firstInCategory = false;
+                                }
+                                <td class="item-cell sticky-col sticky-item" title="@item.Item">@item.Item</td>
+                                <td class="disposition-cell sticky-col sticky-disposition">@item.Disposition</td>
+                                @foreach (var cell in item.Cells)
+                                {
+                                    var values = cell.Values;
+                                    @for (var c = 0; c < values.Length; c++)
+                                    {
+                                        <td class="@(c == 0 ? "qty-cell month-start" : "num-cell")">@(values[c] > 0 ? values[c].ToString() : "")</td>
+                                    }
+                                }
+                                <td class="total-cell">@item.Cells.Sum(x => x.Qty)</td>
+                            </tr>
+                        }
+                    }
+                }
+            </tbody>
+            @if (Model.Stations.Any())
+            {
+                <tfoot>
+                    <tr>
+                        <td colspan="4" class="sticky-col sticky-station total-label">TOTAL</td>
+                        @foreach (var cell in Model.GrandTotal)
+                        {
+                            var values = cell.Values;
+                            @for (var c = 0; c < values.Length; c++)
+                            {
+                                <td class="@(c == 0 ? "qty-cell month-start" : "num-cell")">@(values[c] > 0 ? values[c].ToString() : "")</td>
+                            }
+                        }
+                        <td class="total-cell">@Model.GrandTotal.Sum(x => x.Qty)</td>
+                    </tr>
+                </tfoot>
+            }
+        </table>
+    </div>
+
+    <div class="quality-summary-legend">
+        <span><b>Qty.</b> = total defect</span>
+        <span><b>Quality</b> = disposisi Change Product / Dispose</span>
+        <span><b>Report</b> = sudah dikonfirmasi leader</span>
+        <span><b>Mfg/ Repair</b> = disposisi Repair</span>
+    </div>
+</div>

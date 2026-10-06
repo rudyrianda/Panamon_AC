@@ -1,0 +1,1720 @@
+﻿@page
+@using System.Globalization;
+@model MonitoringSystem.Pages.CAC.ProductionReport.IndexModel
+@{
+    ViewData["Title"] = "Production Report";
+    ViewData["ShowPanamonLines"] = true;
+    /* Pa Adan Disini */
+    
+    bool IsWeekend(int day) {
+        if (day < 1 || day > Model.DaysInMonth) return false;
+        var date = new DateTime(Model.SelectedYear, Model.SelectedMonth, day);
+        return date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday;
+    }
+}
+
+<script>
+    // Tandai halaman ini agar penyesuaian density tidak memengaruhi halaman report lain.
+    document.body.classList.add('production-report-page');
+</script>
+
+<style>
+    /*
+     * Browser zoom 80% membuat tinggi viewport CSS sekitar 25% lebih besar.
+     * Ukuran berbasis vh di bawah menjaga ukuran fisik report tetap konsisten
+     * dengan tampilan 100%, sambil tetap dibatasi agar tidak membesar berlebihan.
+     */
+    body.production-report-page {
+        --production-control-height: clamp(28px, 3.05vh, 35px);
+        --production-font-size: clamp(12px, 1.31vh, 15px);
+        --production-line-height: clamp(20px, 2.18vh, 25px);
+        --production-border-width: clamp(2px, 0.218vh, 2.5px);
+        --production-chart-height: clamp(350px, 38.05vh, 438px);
+        --production-page-gap: clamp(7px, 0.77vh, 8.75px);
+    }
+
+    body.production-report-page .main-header {
+        height: clamp(45px, 4.9vh, 56px) !important;
+    }
+
+    body.production-report-page .header-content {
+        height: clamp(30px, 3.27vh, 37.5px) !important;
+        padding-inline: clamp(25px, 2.72vh, 31.25px) !important;
+        margin-top: clamp(9px, 0.98vh, 11.25px) !important;
+    }
+
+    body.production-report-page .header-left img {
+        height: clamp(12px, 1.31vh, 15px) !important;
+    }
+
+    body.production-report-page .header-center .logo-panamon {
+        height: clamp(15px, 1.64vh, 18.75px) !important;
+    }
+
+    body.production-report-page .header-right {
+        font-size: var(--production-font-size) !important;
+        gap: clamp(12px, 1.31vh, 15px) !important;
+    }
+
+    body.production-report-page > .container-fluid.p-0.d-flex {
+        height: calc(100vh - clamp(45px, 4.9vh, 56px)) !important;
+        margin-top: clamp(45px, 4.9vh, 56px) !important;
+    }
+
+    body.production-report-page #bdSidebar {
+        width: clamp(75px, 8.16vh, 94px) !important;
+        height: calc(100vh - clamp(70px, 7.62vh, 87.5px)) !important;
+        margin-top: clamp(4px, 0.44vh, 5px) !important;
+        padding-block: clamp(8px, 0.87vh, 10px) !important;
+        border-width: var(--production-border-width) !important;
+        border-left-width: 0 !important;
+    }
+
+    body.production-report-page #bdSidebar .nav-item a {
+        width: clamp(88px, 9.58vh, 110px) !important;
+        height: clamp(56px, 6.1vh, 70px) !important;
+    }
+
+    body.production-report-page #bdSidebar .nav-item a i {
+        width: clamp(25px, 2.72vh, 31.25px);
+        font-size: clamp(16px, 1.74vh, 20px);
+    }
+
+    body.production-report-page #bdSidebar .nav-label {
+        font-size: clamp(8.5px, 0.93vh, 10.625px) !important;
+    }
+
+    body.production-report-page #bdSidebar .logout-btn {
+        width: clamp(88px, 9.58vh, 110px) !important;
+        height: clamp(50px, 5.45vh, 62.5px) !important;
+    }
+
+    body.production-report-page #bdSidebar .logout-btn i {
+        font-size: clamp(15px, 1.64vh, 18.75px) !important;
+    }
+
+    body.production-report-page #bdSidebar .logout-btn .nav-label {
+        font-size: clamp(9px, 0.98vh, 11.25px) !important;
+    }
+
+    body.production-report-page .main-content-wrapper {
+        height: calc(100vh - clamp(45px, 4.9vh, 56px));
+    }
+
+    body.production-report-page .footer-copyright,
+    body.production-report-page .footer-copyright p {
+        font-size: clamp(11px, 1.2vh, 13.75px) !important;
+    }
+
+    body.production-report-page .footer-copyright {
+        margin-top: clamp(-20px, -1.96vh, -18px) !important;
+    }
+
+    /* FILTER AREA WITH LINES - SUPER COMPACT */
+    .filter-area-with-lines {
+        position: relative;
+        padding: 1px 0;
+        margin-bottom: 8px;
+        margin-top: clamp(-25px, -2.18vh, -20px);
+        min-height: 10px;
+        width: calc(100% - var(--production-page-gap) - var(--production-page-gap));
+        margin-left: var(--production-page-gap);
+        margin-right: var(--production-page-gap);
+
+    }
+    .panamon-bottom-line,
+    .panamon-bottomm-line {
+        position: absolute !important;
+        left: 7px !important;
+        right: 7px !important;
+        width: width: calc(100% - 14px) !important;
+        height: 2px !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        z-index: 999 !important;
+        pointer-events: none !important;
+        display: block !important;
+    }
+
+    .panamon-bottom-line {
+        top: 0 !important;
+        border-top: 2px solid rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .panamon-bottomm-line {
+        bottom: 0 !important;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.08) !important;
+    }
+
+    /* FILTER CONTENT - SUPER COMPACT */
+    .filter-content {
+        position: relative;
+        z-index: 2;
+        padding: clamp(6px, 0.66vh, 7.5px) 0;
+        border-radius: 15px;
+        margin-left: 7px;
+        margin-right: 7px;
+
+    }
+    .filter-content .form-select-sm.selected {
+        font-weight: 700 !important;
+    }
+
+    .filter-content .form-select-sm {
+        height: var(--production-control-height);
+        padding: 0 22px 0 8px;
+        font-size: var(--production-font-size);
+        line-height: var(--production-line-height);
+        border-radius: 999px;
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        color: #ffffff;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 0.5rem center;
+        background-size: 12px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-top: 0;
+        padding-bottom: 0;
+        text-align: center;
+        padding-left: 8px;
+        padding-right: 22px;
+    }
+    .filter-content .form-select-sm option {
+        background-color: rgba(50, 60, 80, 0.95);
+        color: #ffffff;
+        font-size: var(--production-font-size);
+        padding: 8px;
+    }
+
+    .filter-content form.gap-3 {
+        column-gap: clamp(1rem, 1.74vh, 1.25rem) !important;
+        row-gap: clamp(0.5rem, 0.87vh, 0.625rem) !important;
+    }
+
+    .filter-content .gap-2 {
+        gap: clamp(0.5rem, 0.87vh, 0.625rem) !important;
+    }
+
+    #MachineLine {
+        width: clamp(70px, 7.62vh, 87.5px) !important;
+    }
+
+    #SelectedMonth {
+        width: clamp(110px, 11.98vh, 137.5px) !important;
+    }
+
+    #SelectedYear {
+        width: clamp(80px, 8.71vh, 100px) !important;
+    }
+
+    .filter-content .form-select-sm option:hover {
+        background-color: rgba(70, 85, 110, 0.95);
+    }
+
+    .filter-content .form-select:focus {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.3);
+        color: #ffffff;
+        box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.1);
+    }
+    .filter-content label {
+        color: rgba(255, 255, 255, 0.85);
+    }
+
+    .filter-content .form-check-input {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.4);
+        border-radius: 8px;
+    }
+
+    .filter-content .form-check-input:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+
+    .filter-content .btn-primary {
+        background-color: rgba(8, 65, 150, 0.95);
+        border: 2px solid rgba(100, 181, 246, 1);
+        color: rgba(100, 181, 246, 1);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .filter-content .btn-primary:hover {
+        background-color: rgba(5, 45, 110, 1);
+        border-color: rgba(144, 202, 249, 1);
+        color: rgba(144, 202, 249, 1);
+    }
+
+    .filter-content .btn-danger {
+        background-color: rgba(140, 30, 40, 0.95);
+        border: 2px solid rgba(239, 154, 154, 1);
+        color: rgba(239, 154, 154, 1);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .filter-content .btn-danger:hover {
+        background-color: rgba(110, 20, 30, 1);
+        border-color: rgba(244, 143, 177, 1);
+        color: rgba(244, 143, 177, 1);
+    }
+
+    /* TOMBOL UPLOAD & DOWNLOAD - MIRIP CHART BOX */
+    /* TOMBOL UPLOAD & DOWNLOAD - MIRIP CHART BOX */
+    .ms-auto .btn-primary {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 2px solid rgba(255, 255, 255, 0.5) !important;
+        color: #ffffff !important;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .ms-auto .btn-primary:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        border-color: rgba(255, 255, 255, 0.7) !important;
+    }
+
+    .ms-auto .btn-danger {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 2px solid rgba(255, 255, 255, 0.5) !important;
+        color: #ffffff !important;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .ms-auto .btn-danger:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        border-color: rgba(255, 255, 255, 0.7) !important;
+    }
+
+    .filter-content .btn {
+        border-radius: 999px !important;
+        border-width: var(--production-border-width) !important;
+    }
+    /* TABLE STYLING - COMPACT */
+    .table th,
+    .table td {
+        font-size: var(--production-font-size);
+        padding: clamp(0.1rem, 0.175vh, 0.125rem);
+        white-space: nowrap;
+        word-wrap: break-word;
+        vertical-align: middle;
+         font-weight: 700 !important;
+    }
+
+    /* STICKY HEADER - HEADER TETAP SAAT SCROLL */
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: rgba(0, 0, 0, 0.7) !important;
+        color: #ffffff !important;
+        z-index: 20;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.4) !important;
+    }
+
+    /* Kolom pertama header - STICKY HORIZONTAL DAN VERTIKAL */
+    .table thead th:first-child {
+        position: sticky;
+        left: 0;
+        top: 0;
+        z-index: 21 !important;
+        background-color: rgba(0, 0, 0, 0.7) !important;
+        box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
+        border-right: 2px solid rgba(255, 255, 255, 0.3) !important;
+        min-width: 100px;
+        max-width: 100px;
+        white-space: normal;
+        text-align: left;
+        padding-left: .5rem;
+    }
+
+    /* Kolom pertama body - STICKY HORIZONTAL */
+    .table tbody td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 10;
+        background-color: rgba(255, 255, 255, 0.20) !important;
+        box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
+        border-right: 2px solid rgba(255, 255, 255, 0.3) !important;
+        min-width: 100px;
+        max-width: 100px;
+        white-space: normal;
+        text-align: left;
+        padding-left: .5rem;
+    }
+
+    /* Row table-secondary tetap proper */
+    @*.table-secondary td:first-child {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    font-weight: 700;
+}*@
+    .extra-row {
+        display: none;
+    }
+
+    /* TABLE BACKGROUND */
+    .table.table {
+        background-color: rgba(255, 255, 255, 0.20) !important;
+    }
+
+    /* BASE CELL STYLE (TIDAK TERMASUK KOLOM PERTAMA AGAR STICKY TIDAK RUSAK) */
+    .table tbody td:not(:first-child) {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        color: #eaeaea !important;
+        transition: background-color 0.15s ease;
+    }
+
+    /* WEEKEND - kolom Sabtu/Minggu sedikit dibedakan */
+    .table tbody td.bg-weekend {
+        background-color: rgba(60, 80, 120, 0.3) !important;
+    }
+
+    .table thead th.bg-weekend-header {
+        background-color: rgba(40, 55, 90, 1) !important;
+    }
+
+    /* BARIS TOTAL PLAN & TOTAL ACTUAL - SEDIKIT LEBIH GELAP dari baris biasa */
+    .table tbody tr.bg-row-total > td:not(:first-child) {
+        background-color: rgba(0, 0, 0, 0.15) !important;
+    }
+
+    /* Sel weekend di baris total */
+    .table tbody tr.bg-row-total > td.bg-weekend {
+        background-color: rgba(0, 0, 0, 0.25) !important;
+    }
+
+    /* Kolom pertama (sticky) di baris total juga sedikit lebih gelap dari sticky biasa */
+    .table tbody tr.bg-row-total > td:first-child {
+        background-color: rgba(255, 255, 255, 0.12) !important;
+    }
+
+    /* TABLE HEADER */
+    .table thead th {
+        background-color: rgba(30, 40, 60, 1) !important;
+        color: #ffffff !important;
+        font-weight: 600;
+        border-bottom: 2px solid rgba(100, 181, 246, 0.5) !important;
+    }
+
+    /* HOVER - baris biasa */
+    .table tbody tr:hover td:not(:first-child) {
+        background-color: rgba(0, 0, 0, 0.25) !important;
+    }
+
+    /* HOVER - baris total */
+    .table tbody tr.bg-row-total:hover > td:not(:first-child) {
+        background-color: rgba(0, 0, 0, 0.35) !important;
+    }
+
+    table.table-bordered > :not(caption) > * > * {
+        border-color: rgba(255, 255, 255, 0.5) !important;
+        border-width: clamp(1.5px, 0.164vh, 1.875px) !important;
+    }
+
+    /* CHART CONTAINER - SUPER COMPACT */
+    #dayDiv {
+        position: relative;
+        width: calc(100% - var(--production-page-gap) - var(--production-page-gap));
+        max-width: 100%;
+        height: auto;
+        margin-top: 0.25rem;
+        margin-bottom: 0.25rem;
+        margin-left: var(--production-page-gap);
+        margin-right: var(--production-page-gap);
+        background: rgba(255, 255, 255, 0.20);
+        border-radius: 12px;
+        padding: clamp(8px, 0.87vh, 10px) clamp(12px, 1.31vh, 15px) clamp(6px, 0.66vh, 7.5px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.3) !important;
+        border-width: var(--production-border-width) !important;
+        overflow: visible !important;
+    }
+
+    #dayChart {
+        width: 100% !important;
+        max-width: 100%;
+        height: var(--production-chart-height) !important;
+        margin-bottom: clamp(6px, 0.66vh, 7.5px);
+    }
+    /* TOTAL INFO - SUPER COMPACT */
+    .total-info-text {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: clamp(15px, 1.64vh, 18.75px);
+        padding: 2px 0;
+    }
+
+    .total-info-text span {
+        font-size: clamp(0.75rem, 1.31vh, 0.9375rem);
+        color: #ffffff;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .total-info-text strong {
+        font-size: clamp(0.85rem, 1.48vh, 1.0625rem);
+        font-weight: 700;
+        margin-left: 3px;
+    }
+
+    .total-info-text span,
+    .total-info-text strong {
+        color: #ffffff !important;
+    }
+    /* COMPACT FILTER */
+    .filter-content .form-select-sm,
+    .filter-content .btn-sm {
+        height: var(--production-control-height);
+        min-height: 20px;
+        font-size: var(--production-font-size);
+        line-height: var(--production-line-height);
+    }
+
+    .filter-content .form-select-sm {
+        height: var(--production-control-height);
+        padding: 0;
+        padding-left: 12px;
+        padding-right: 28px;
+        padding-top: -2px;
+        font-size: var(--production-font-size);
+        line-height: clamp(16px, 1.74vh, 20px);
+        border-radius: 999px;
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        color: #ffffff;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        background-size: 10px 10px;
+        text-align: center;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .filter-content .btn-sm {
+        padding: 0 clamp(12px, 1.31vh, 15px);
+        border-radius: 999px;
+    }
+
+    .filter-content .form-check-input {
+        width: 14px;
+        height: 14px;
+        margin-top: 2px;
+    }
+
+    .filter-content label,
+    .filter-content .form-check-label {
+        font-size: var(--production-font-size);
+        line-height: var(--production-line-height);
+    }
+
+    /* CRITICAL OVERFLOW CONTROL */
+    /* CRITICAL OVERFLOW CONTROL - FIXED */
+    html, body {
+        height: 100vh;
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        max-width: 100vw;
+    }
+
+    .container-fluid {
+        max-width: 100%;
+        overflow-x: visible !important;
+        overflow-y: auto !important;
+        height: auto;
+        padding-left: 0px !important;  /* ← TAMBAH INI */
+        padding-right: 0px !important; /* ← GANTI JADI 1PX */
+    }
+
+    .table-responsive {
+        max-width: calc(100% - var(--production-page-gap) - var(--production-page-gap));
+        margin-top: clamp(6px, 0.66vh, 7.5px);
+        margin-left: var(--production-page-gap);
+        margin-right: var(--production-page-gap);
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: calc(100vh - 480px);
+        position: relative;
+        border-radius: 8px;
+        scroll-behavior: smooth;
+        padding-bottom: 1px;      /* ← KUNCI 1: SPACING BAWAH */
+        margin-bottom: 3px;        /* ← KUNCI 2: EXTRA SPACE */
+    }
+
+    main.pb-5 {
+        padding-bottom: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #reportContainer {
+        height: auto !important;
+        overflow: visible !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #reportContainer > .container-fluid {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: visible !important;
+    }
+    /* CUSTOM SHIFT BUTTONS - KOTAK KAYAK GAMBAR */
+    .shift-button {
+        width: var(--production-control-height);
+        height: var(--production-control-height);
+        border-radius: 6px;
+        background-color: rgba(70, 80, 100, 0.6);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        color: #ffffff;
+        font-size: var(--production-font-size);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+
+    .shift-button:hover {
+        background-color: rgba(90, 100, 120, 0.7);
+        border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .shift-button.active {
+        background-color: rgba(50, 60, 80, 0.9);
+        border: 3px solid #ffffff;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4);
+    }
+
+    input[type="checkbox"]:checked + .shift-button {
+        background-color: rgba(50, 60, 80, 0.9);
+        border: 3px solid #ffffff;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4);
+    }
+
+    .main-content-wrapper {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    .main-content-wrapper .p-4 {
+        padding-left: 1px !important;
+        padding-right: 1px !important;
+        padding-top: clamp(24px, 2.61vh, 30px) !important;
+    }
+
+    #reportContainer {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    #reportContainer > .container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    /* HEADER DI DALAM BOX */
+    .chart-box-header {
+        position: relative;
+        padding-bottom: clamp(6px, 0.66vh, 7.5px);
+        margin-bottom: clamp(6px, 0.66vh, 7.5px);
+    }
+
+    /* TEKS JUDUL */
+    .chart-box-title {
+        font-size: clamp(0.85rem, 1.48vh, 1.0625rem);
+        font-weight: 700;
+        color: #ffffff;
+        letter-spacing: 0.3px;
+        padding-left: 2px;
+    }
+
+    /* GARIS BAWAH */
+    .chart-box-line {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 1px;
+        background: rgba(0, 0, 0, 0.4);
+        );
+        border-radius: 1px;
+    }
+
+    /* ========================================
+       KOLOM CATEGORY - STICKY KIRI (BARU)
+       ======================================== */
+    .
+    /* ========================================
+       KOLOM PRODUCTION RESULT - STICKY KIRI (BARU)
+       ======================================== */
+    .table thead th:nth-child(2),
+    .table tbody td:nth-child(2) {
+        position: sticky;
+        left: 120px;
+        z-index: 11;
+        background-color: rgba(30, 40, 60, 1) !important;
+        box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
+        border-right: 2px solid rgba(255, 255, 255, 0.3) !important;
+        min-width: 130px;
+        max-width: 130px;
+        text-align: left;
+        padding-left: 0.75rem;
+        vertical-align: middle;
+        color: #ffffff !important;
+    }
+
+    /* Samakan posisi semua label pada kolom Production Result. */
+    #productionTable tbody td.production-result-label {
+        text-align: left !important;
+        padding: clamp(0.1rem, 0.175vh, 0.125rem) 0.75rem !important;
+        vertical-align: middle !important;
+        white-space: nowrap;
+    }
+
+    /* ========================================
+       HEADER TETAP DI TOP (UPDATE)
+       ======================================== */
+    .table thead th:first-child,
+    .table thead th:nth-child(2) {
+        top: 0;
+        z-index: 21 !important;
+        background-color: rgba(30, 40, 60, 1) !important;
+    }
+
+    /* ========================================
+       SEMUA BARIS BODY = WARNA PLAN FORECAST
+       ======================================== */
+    #productionTable tbody td {
+        background-color: rgba(255, 255, 255, 0.15) !important;
+        color: #eaeaea !important;
+    }
+
+    /* ========================================
+       BARIS TOTAL PLAN & TOTAL ACTUAL - ELEGAN & LEMBUT
+       ======================================== */
+    #productionTable tbody tr.bg-row-total > td {
+        background-color: rgba(255, 255, 255, 0.02) !important;
+    }
+
+    /* ========================================
+       KOLOM WEEKEND (SABTU/MINGGU) - MERAH HANGAT SANGAT TIPIS
+       ======================================== */
+    #productionTable tbody td.bg-weekend,
+    #productionTable tbody tr.bg-row-total > td.bg-weekend {
+        background-color: rgba(255, 60, 60, 0.08) !important;
+    }
+
+    #productionTable thead th.bg-weekend-header {
+        background-color: rgba(220, 45, 45, 0.20) !important;
+    }
+
+    /* ========================================
+       KOLOM TOTAL (SEBELAH KANAN) - SAMA LEMBUT SEPERTI BARIS TOTAL
+       ======================================== */
+    #productionTable tbody td:last-child {
+        background-color: rgba(255, 255, 255, 0.02) !important;
+        color: #ffffff !important;
+        font-weight: 700;
+    }
+
+    /* ========================================
+       KOLOM STICKY KIRI (CATEGORY & PROD RESULT) 
+       SAMA LEMBUT SEPERTI BARIS TOTAL
+       ======================================== */
+    #productionTable tbody td:first-child,
+    #productionTable tbody tr:nth-child(1) > td:nth-child(2),
+    #productionTable tbody tr:nth-child(4) > td:nth-child(2),
+    #productionTable tbody tr:nth-child(10) > td:nth-child(2),
+    #productionTable tbody tr:nth-child(11) > td:nth-child(2) {
+        background-color: rgba(255, 255, 255, 0.02) !important;
+    }
+
+    /* BARIS TOTAL PLAN & TOTAL ACTUAL - bold aja */
+    #productionTable tbody tr:nth-child(3) td,
+    #productionTable tbody tr:nth-child(6) td {
+        font-weight: 700;
+    }
+
+    /* Hover effect */
+    #productionTable tbody tr:hover td {
+        background-color: rgba(0, 0, 0, 0.20) !important;
+        transition: background-color 0.2s ease;
+    }
+
+    /* Hover effect - Baris Total */
+    #productionTable tbody tr.bg-row-total:hover > td {
+        background-color: rgba(0, 0, 0, 0.30) !important;
+    }
+
+    /* Header tetap solid gelap */
+    #productionTable thead th {
+        background-color: rgba(30, 40, 60, 1) !important;
+    }
+
+    /* LIGHT MODE - Total Info Text */
+    body.light-mode .total-info-text span,
+    body.light-mode .total-info-text strong {
+        color: #1a1a2e !important;
+    }
+
+    body.light-mode #totalActualValue {
+        color: #1a7a35 !important;
+    }
+
+    body.light-mode #totalPlanValue {
+        color: #235a9b !important;
+    }
+
+    body.light-mode #totalPhhValue {
+        color: #0e7490 !important;
+    }
+
+    .filter-content .btn-success {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 2px solid rgba(255, 255, 255, 0.5);
+        color: #ffffff;
+        font-weight: 600;
+    }
+
+    .filter-content .btn-success:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.7);
+    }
+</style>
+
+<div id="reportContainer">
+    @{
+        decimal monthlyTotalActual = Model.NormalData.Sum() + Model.OvertimeData.Sum();
+        double totalProductiveManHours = Model.DailyNetManHours.Sum();
+        
+        double monthlyPph = 0;
+        if (monthlyTotalActual > 0 && totalProductiveManHours > 0)
+        {
+            monthlyPph = Math.Round((double)monthlyTotalActual / totalProductiveManHours, 2);
+        }
+    }
+
+    <div class="container-fluid">
+        <!-- FILTER AREA WITH HORIZONTAL LINES -->
+        <div class="filter-area-with-lines">
+            <!-- GARIS HORIZONTAL - ALWAYS SHOW -->
+            <div class="panamon-bottom-line"></div>
+            <div class="panamon-bottomm-line"></div>
+
+            <div class="filter-content">
+                <div class="row g-3 align-items-center">
+                    <!-- FILTER FORM -->
+                    <div class="col-12">
+                        <form method="post" class="d-flex flex-wrap align-items-center gap-3">
+                            <!-- LINE - PALING KIRI -->
+                            <div class="d-flex align-items-center gap-2">
+                                <label class="mb-0 text-white small">Line</label>
+                                <select class="form-select form-select-sm" style="width: 150px;" id="MachineLine" name="MachineLine" asp-for="MachineLine">
+                                    <option value="CAC">CAC</option>
+                                    <option value="SKD">SKD</option>
+                                    <option value="STANDING FLOOR">Standing Floor</option>
+                                </select>
+                            </div>
+
+                            <!-- MONTH -->
+                            <div class="d-flex align-items-center gap-2">
+                                <label class="mb-0 text-white small">Month</label>
+                                <select class="form-select form-select-sm" style="width: 110px;" id="SelectedMonth" name="SelectedMonth" asp-for="SelectedMonth">
+                                    @for (int i = 1; i <= 12; i++)
+                                    {
+                                        <option value="@i">@CultureInfo.GetCultureInfo("en-US").DateTimeFormat.GetMonthName(i)</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- YEAR -->
+                            <div class="d-flex align-items-center gap-2">
+                                <label class="mb-0 text-white small">Year</label>
+                                <select class="form-select form-select-sm" style="width: 80px;" id="SelectedYear" name="SelectedYear" asp-for="SelectedYear">
+                                    @for (int i = DateTime.Now.Year; i >= 2020; i--)
+                                    {
+                                        <option value="@i">@i</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- SHIFT -->
+                            <div class="d-flex align-items-center gap-2">
+                                <label class="mb-0 text-white small">Shift</label>
+                                <div class="d-flex gap-2 shift-buttons-container">
+                                    <input type="checkbox" id="Shift1" name="SelectedShifts" value="1" @(Model.SelectedShifts.Contains("1") ? "checked" : "") style="display: none;">
+                                    <label for="Shift1" class="shift-button @(Model.SelectedShifts.Contains("1") ? "active" : "")">1</label>
+
+                                    <input type="checkbox" id="Shift2" name="SelectedShifts" value="2" @(Model.SelectedShifts.Contains("2") ? "checked" : "") style="display: none;">
+                                    <label for="Shift2" class="shift-button @(Model.SelectedShifts.Contains("2") ? "active" : "")">2</label>
+
+                                    <input type="checkbox" id="Shift3" name="SelectedShifts" value="3" @(Model.SelectedShifts.Contains("3") ? "checked" : "") style="display: none;">
+                                    <label for="Shift3" class="shift-button @(Model.SelectedShifts.Contains("3") ? "active" : "")">3</label>
+
+                                    <input type="checkbox" id="NonShift" name="SelectedShifts" value="NS" @(Model.SelectedShifts.Contains("NS") ? "checked" : "") style="display: none;">
+                                    <label for="NonShift" class="shift-button @(Model.SelectedShifts.Contains("NS") ? "active" : "")">NS</label>
+
+                                    <input type="checkbox" id="AllShift" name="SelectedShifts" value="All" @(Model.SelectedShifts.Contains("All") || !Model.SelectedShifts.Any() ? "checked" : "") style="display: none;">
+                                    <label for="AllShift" class="shift-button @(Model.SelectedShifts.Contains("All") || !Model.SelectedShifts.Any() ? "active" : "")">All</label>
+                                </div>
+                            </div>
+
+                            <button type="submit" name="submitButton" value="search" class="btn btn-sm btn-primary">Search</button>
+                            <button type="button" id="toggleChangePlanButton" class="btn btn-sm btn-success">
+                                <i class="fas fa-eye me-1"></i> Hide Change Plan
+                            </button>
+                            @*<button type="submit" name="submitButton" value="reset" class="btn btn-sm btn-danger">Reset</button>*@
+
+                            <div class="ms-auto d-flex gap-2">
+                                <button type="button" id="downloadPdfButton" class="btn btn-sm btn-danger">
+                                    <i class="bi bi-download me-2"></i>Download
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="dayDiv">
+            <div class="chart-box-header">
+                <span class="chart-box-title">
+                    Production Achievement
+                </span>
+                <div class="chart-box-line"></div>
+            </div>
+            <div class="row">
+                <div class="col-12">
+                    <canvas id="dayChart"></canvas>
+                </div>
+            </div>
+
+
+            <!-- TOTAL INFO - NO EXTRA BOX -->
+            <div class="total-info-text">
+                <span>Total Actual: <strong id="totalActualValue" class="text-success"></strong></span>
+                <span>Total Plan: <strong id="totalPlanValue" class="text-primary"></strong></span>
+                <span>P/H/H: <strong id="totalPhhValue" class="text-info">@monthlyPph</strong></span>
+            </div>
+        </div>
+
+        <!-- TABLE -->
+        <div class="table-responsive">
+            <table class="table table-bordered text-center align-middle w-100" id="productionTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Category</th>
+                        <th>Production Result</th>
+                        @for (int day = 1; day <= Model.DaysInMonth; day++)
+                        {
+                            <th class="@(IsWeekend(day) ? "bg-weekend-header" : "")">@day</th>
+                        }
+                        <th style="min-width: 80px; background-color: rgba(30, 40, 60, 1) !important;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- PLAN FORECAST -->
+                    <tr>
+                        <td rowspan="3" style="vertical-align: middle; text-align: center; font-weight: 700;">Plan Forecast</td>
+                        <td class="production-result-label">Normal</td>
+                        @for (int i = 0; i < Model.TablePlanData.Count; i++)
+                        {
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.TablePlanData[i].ToString("N0")</td>
+                        }
+                        <td style="font-weight: 700;">@Model.TablePlanData.Sum().ToString("N0")</td>
+                    </tr>
+                    <tr>
+                        <td class="production-result-label">Overtime</td>
+                        @for (int i = 0; i < Model.TablePlanOvertimeData.Count; i++)
+                        {
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.TablePlanOvertimeData[i].ToString("N0")</td>
+                        }
+                        <td style="font-weight: 700;">@Model.TablePlanOvertimeData.Sum().ToString("N0")</td>
+                    </tr>
+                    <tr class="bg-row-total">
+                        <td class="production-result-label"><b>Total Plan</b></td>
+                        @for (int i = 0; i < Model.TablePlanData.Count; i++)
+                        {
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@((Model.TablePlanData[i] + Model.TablePlanOvertimeData[i]).ToString("N0"))</td>
+                        }
+                        <td style="font-weight: 700;">@((Model.TablePlanData.Sum() + Model.TablePlanOvertimeData.Sum()).ToString("N0"))</td>
+                    </tr>
+
+                    <!-- ACTUAL -->
+                    <tr>
+                        <td rowspan="3" style="vertical-align: middle; text-align: center; font-weight: 700;">Actual</td>
+                        <td class="production-result-label">Normal</td>
+                        @for (int i = 0; i < Model.NormalData.Count; i++)
+                        {
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.NormalData[i].ToString("N0")</td>
+                        }
+                        <td style="font-weight: 700;">@Model.NormalData.Sum().ToString("N0")</td>
+                    </tr>
+                    <tr>
+                        <td class="production-result-label">Overtime</td>
+                        @for (int i = 0; i < Model.OvertimeData.Count; i++)
+                        {
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@Model.OvertimeData[i].ToString("N0")</td>
+                        }
+                        <td style="font-weight: 700;">@Model.OvertimeData.Sum().ToString("N0")</td>
+                    </tr>
+                    <tr class="bg-row-total">
+                        <td class="production-result-label"><b>Total Actual</b></td>
+                        @for (int i = 0; i < Model.NormalData.Count; i++)
+                        {
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@((Model.NormalData[i] + Model.OvertimeData[i]).ToString("N0"))</td>
+                        }
+                        <td style="font-weight: 700;">@((Model.NormalData.Sum() + Model.OvertimeData.Sum()).ToString("N0"))</td>
+                    </tr>
+
+                    <!-- DIFFERENCE - SATU KOLOM PENUH -->
+                    <tr>
+                        <td colspan="2" class="production-result-label" style="font-weight: 700;">Difference (Actual - Plan)</td>
+                        @for (int i = 0; i < Model.NormalData.Count; i++)
+                        {
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(((Model.NormalData[i] + Model.OvertimeData[i]) - (Model.EffectivePlanData[i] + Model.EffectivePlanOvertimeData[i])).ToString("N0"))</td>
+                        }
+                        <td style="font-weight: 700;">@(((Model.NormalData.Sum() + Model.OvertimeData.Sum()) - (Model.EffectivePlanData.Sum() + Model.EffectivePlanOvertimeData.Sum())).ToString("N0"))</td>
+                    </tr>
+
+                    <!-- ACHIEVEMENT RATIO - SATU KOLOM PENUH, DIBAWAH DIFFERENCE -->
+                    <tr>
+                        <td colspan="2" class="production-result-label" style="font-weight: 700;">Achievement Ratio</td>
+                        @for (int i = 0; i < Model.PlanData.Count; i++)
+                        {
+                            decimal totalActual = Model.NormalData[i] + Model.OvertimeData[i];
+                            decimal plan = Model.EffectivePlanData[i] + Model.EffectivePlanOvertimeData[i];
+                            string ratioDisplay = "-";
+
+                            if (plan > 0)
+                            {
+                                double ratio = Math.Round(((double)totalActual / (double)plan) * 100, 2);
+                                ratioDisplay = ratio.ToString("0.#") + "%";
+                            }
+                            else if (totalActual > 0)
+                            {
+                                ratioDisplay = "N/A";
+                            }
+
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@ratioDisplay</td>
+                        }
+                        <td style="font-weight: 700;">
+                            @{
+                                decimal totalMonthAct = Model.NormalData.Sum() + Model.OvertimeData.Sum();
+                                decimal totalMonthPlan = Model.EffectivePlanData.Sum() + Model.EffectivePlanOvertimeData.Sum();
+                                string monthRatioDisplay = "-";
+                                if (totalMonthPlan > 0)
+                                {
+                                    double mRatio = Math.Round(((double)totalMonthAct / (double)totalMonthPlan) * 100, 2);
+                                    monthRatioDisplay = mRatio.ToString("0.#") + "%";
+                                }
+                                else if (totalMonthAct > 0)
+                                {
+                                    monthRatioDisplay = "N/A";
+                                }
+                            }
+                            @monthRatioDisplay
+                        </td>
+                    </tr>
+
+                    <!-- NO. OF DIRECT WORKERS - SATU KOLOM PENUH, DIBAWAH ACHIEVEMENT RATIO -->
+                    <tr>
+                        <td colspan="2" class="production-result-label" style="font-weight: 700;">No. of Direct Workers</td>
+                        @for (int i = 0; i < Model.NoOfDirectWorkers.Count; i++)
+                        {
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.NoOfDirectWorkers[i] > 0 ? Model.NoOfDirectWorkers[i].ToString() : "0")</td>
+                        }
+                        <td style="font-weight: 700;">@(Model.NoOfDirectWorkers.Any() ? Model.NoOfDirectWorkers.Max().ToString() : "0")</td>
+                    </tr>
+
+                    <!-- WORKFORCE -->
+                    <tr>
+                        <td rowspan="1" style="vertical-align: middle; text-align: center; font-weight: 700;">Workforce</td>
+                        <td class="production-result-label">Overtime - No. of Operator</td>
+                        @for (int i = 0; i < Model.OvertimeOperators.Count; i++)
+                        {
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.OvertimeOperators[i] > 0 ? Model.OvertimeOperators[i] : "0")</td>
+                        }
+                        <td style="font-weight: 700;">@(Model.OvertimeOperators.Any() ? Model.OvertimeOperators.Max().ToString() : "0")</td>
+                    </tr>
+
+                    <!-- TIME MANAGEMENT -->
+                    <tr>
+                        <td rowspan="2" style="vertical-align: middle; text-align: center; font-weight: 700;">Time Management</td>
+                        <td class="production-result-label">Overtime - Minutes</td>
+                        @for (int i = 0; i < Model.OvertimeMinutes.Count; i++)
+                        {
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.OvertimeMinutes[i] > 0 ? Model.OvertimeMinutes[i].ToString("N0") : "0")</td>
+                        }
+                        <td style="font-weight: 700;">@Model.OvertimeMinutes.Sum().ToString("N0")</td>
+                    </tr>
+                    <tr>
+                        <td class="production-result-label">Loss Time</td>
+                        @for (int i = 0; i < Model.DailyLossTime.Count; i++)
+                        {
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.DailyLossTime[i] > 0 ? Model.DailyLossTime[i].ToString("0.##") : "0")</td>
+                        }
+                        <td style="font-weight: 700;">@Model.DailyLossTime.Sum().ToString("0.##")</td>
+                    </tr>
+
+                    <!-- TOTAL LOAD TIME - SATU KOLOM PENUH, DIBAWAH LOSS TIME -->
+                    <tr>
+                        <td colspan="2" class="production-result-label" style="font-weight: 700;">Total Load Time</td>
+                        @for (int i = 0; i < Model.DailyWorkTime.Count; i++)
+                        {
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">@(Model.DailyWorkTime[i] > 0 ? Model.DailyWorkTime[i].ToString("N0") : "0")</td>
+                        }
+                        <td style="font-weight: 700;">@Model.DailyWorkTime.Sum().ToString("N0")</td>
+                    </tr>
+
+                    <!-- PROD. QTY / HEAD / HOUR - SATU KOLOM PENUH, DIBAWAH TOTAL LOAD TIME -->
+                    <tr>
+                        <td colspan="2" class="production-result-label" style="font-weight: 700;">Production Qty. / Head / Hour</td>
+                        @for (int i = 0; i < Model.PlanData.Count; i++)
+                        {
+                            <td class="@(IsWeekend(i + 1) ? "bg-weekend" : "")">
+                                @{
+                                    decimal totalActual = Model.NormalData[i] + Model.OvertimeData[i];
+                                    double netManHours = Model.DailyNetManHours[i];
+                                    double pph = 0;
+                                    if (totalActual > 0 && netManHours > 0)
+                                    {
+                                        pph = Math.Round((double)totalActual / netManHours, 2);
+                                    }
+                                }
+                                @(pph > 0 ? pph.ToString() : "")
+                            </td>
+                        }
+                        <td style="font-weight: 700;">
+                            @{
+                                decimal monthTotalAct = Model.NormalData.Sum() + Model.OvertimeData.Sum();
+                                double monthNetManHours = Model.DailyNetManHours.Sum();
+                                double monthPph = 0;
+                                if (monthTotalAct > 0 && monthNetManHours > 0)
+                                {
+                                    monthPph = Math.Round((double)monthTotalAct / monthNetManHours, 2);
+                                }
+                            }
+                            @(monthPph > 0 ? monthPph.ToString() : "")
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @section Scripts {
+        <!-- GANTI JADI LOCAL -->
+        <script src="~/js/jquery-3.6.0.min.js"></script>
+        <script src="~/js/jquery.validate.min.js"></script>
+        <script src="~/js/jquery.validate.unobtrusive.min.js"></script>
+
+        <!-- Script yang sudah ada -->
+        <script src="~/js/chart.umd.min.js"></script>
+        <script src="~/js/jspdf.umd.min.js"></script>
+        <script src="~/js/jspdf.plugin.autotable.js"></script>
+
+
+        <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        // ===== DATA DARI MODEL =====
+                          const normalData = @Html.Raw(Json.Serialize(Model.NormalData));
+            const overtimeData = @Html.Raw(Json.Serialize(Model.OvertimeData));
+            const planData = @Html.Raw(Json.Serialize(Model.PlanData));
+            const planOvertimeData = @Html.Raw(Json.Serialize(Model.PlanOvertimeData));
+            const originalPlanData = @Html.Raw(Json.Serialize(Model.OriginalPlanData));
+            const originalPlanOvertimeData = @Html.Raw(Json.Serialize(Model.OriginalPlanOvertimeData));
+            const effectivePlanData = @Html.Raw(Json.Serialize(Model.EffectivePlanData));
+            const effectivePlanOtData = @Html.Raw(Json.Serialize(Model.EffectivePlanOvertimeData));
+            const chartLabels = @Html.Raw(Json.Serialize(Model.ChartLabels));
+            const isCurrentMonth = @Html.Raw(Json.Serialize(Model.IsCurrentMonthView));
+            const today = new Date().getDate();
+            
+            // true jika filter shift = All (atau kosong)
+            const isAllShift = @Html.Raw(Json.Serialize(
+                !Model.SelectedShifts.Any() || Model.SelectedShifts.Contains("All")
+            ));
+
+            const isNoShift = @Html.Raw(Json.Serialize(
+                Model.SelectedShifts.Count == 1 && Model.SelectedShifts.Contains("NS")
+            ));
+
+            const chartChangePlanData = planData.map((v, i) => {
+                const dayIndex = i + 1;
+                if (isNoShift && dayIndex > 5) return null; // hilangkan untuk NS selain tgl 1-5 sesuai request
+
+                if (v > 0) {
+                    // Ada change plan beneran → tampilkan untuk semua shift
+                    return effectivePlanData[i];
+                } else {
+                    // Fallback: tampilkan SAP plan sebagai bar ungu hanya saat filter All
+                    // dan hari ini atau besok belum di-input production plan
+                    if (isAllShift && isCurrentMonth && (dayIndex === today || dayIndex === today + 1)) {
+                        return (originalPlanData[i] || 0) + (originalPlanOvertimeData[i] || 0);
+                    }
+                    return null;
+                }
+            });
+            
+            const chartChangePlanOtData = planOvertimeData.map((v, i) => v > 0 ? effectivePlanOtData[i] : null);
+            const daysInMonth = @Model.DaysInMonth;
+            const anchorDay = isCurrentMonth ? today : daysInMonth;
+
+                        // ===== HITUNG TOTAL =====
+                        let totalActualSum = 0;
+                        let totalPlanSum = 0;
+                        for (let i = 0; i < daysInMonth; i++) {
+                            totalActualSum += (normalData[i] || 0) + (overtimeData[i] || 0);
+                            totalPlanSum += (effectivePlanData[i] || 0) + (effectivePlanOtData[i] || 0);
+                        }
+
+                        document.getElementById('totalActualValue').textContent = totalActualSum.toLocaleString();
+                        document.getElementById('totalPlanValue').textContent = totalPlanSum.toLocaleString();
+
+                        // ===== HITUNG RATIO =====
+                        const ratioActualData = [], ratioPlanData = [];
+                        let runningActualTotal = 0, runningPlanTotal = 0;
+
+                        for (let i = 0; i < chartLabels.length; i++) {
+                            if (isCurrentMonth && (i + 1) > today) {
+                                ratioActualData.push(null);
+                                ratioPlanData.push(null);
+                            } else {
+                                runningActualTotal += (normalData[i] || 0) + (overtimeData[i] || 0);
+                                runningPlanTotal += (effectivePlanData[i] || 0) + (effectivePlanOtData[i] || 0);
+                                ratioActualData.push((totalActualSum > 0) ? (runningActualTotal / totalActualSum) * 100 : 0);
+                                ratioPlanData.push((totalPlanSum > 0) ? (runningPlanTotal / totalPlanSum) * 100 : 0);
+                            }
+                        }
+            // ===== DETEKSI LIGHT MODE =====
+            const isLightMode = document.body.classList.contains('light-mode');
+            const chartTextColor = isLightMode ? '#1a1a2e' : '#ffffff';
+            const tooltipBgColor = isLightMode ? 'rgba(232, 240, 247, 0.95)' : 'rgba(0, 0, 0, 0.8)';
+            const tooltipTitleColor = isLightMode ? '#1a1a2e' : '#ffffff';
+            const tooltipBodyColor = isLightMode ? '#1a1a2e' : '#ffffff';
+            const gridColor = isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+            const chartDensity = Math.min(1.25, Math.max(1, window.innerHeight / 920));
+            const chartPx = value => Math.round(value * chartDensity);
+
+            // ===== CHART =====
+            new Chart(document.getElementById('dayChart'), {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        { type: 'line', label: 'Act Ratio (%)', data: ratioActualData, borderColor: '#FACC15', backgroundColor: 'rgba(255, 215, 0, 0.2)', tension: 0.1, yAxisID: 'y1' },
+                        { type: 'line', label: 'Plan Ratio (%)', data: ratioPlanData, borderColor: isLightMode ? '#666666' : '#FFFFFF', backgroundColor: isLightMode ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.2)', tension: 0.1, yAxisID: 'y1' },
+                           { label: 'SAP Plan Normal', data: originalPlanData.map(v => v === 0 ? null : v), backgroundColor: '#3cb9fc', borderColor: '#3cb9fc', borderWidth: 0, barThickness: chartPx(15), stack: 'OriginalPlan', yAxisID: 'y' },
+            { label: 'SAP Plan Overtime', data: originalPlanOvertimeData.map(v => v === 0 ? null : v), backgroundColor: '#1a3a6b', borderColor: '#1a3a6b', borderWidth: 0, barThickness: chartPx(15), stack: 'OriginalPlan', yAxisID: 'y' },
+               { label: 'Change Plan', data: chartChangePlanData.map(v => v === 0 ? null : v), backgroundColor: '#a32ca3', borderColor: '#a32ca3', borderWidth: 0, barThickness: chartPx(15), stack: 'Plan', yAxisID: 'y' },
+            { label: 'Overtime Plan', data: chartChangePlanOtData.map(v => v === 0 ? null : v), backgroundColor: '#6a1b9a', borderColor: '#6a1b9a', borderWidth: 0, barThickness: chartPx(15), stack: 'Plan', yAxisID: 'y' },
+                        { label: 'Act Normal', data: normalData.map(v => v === 0 ? null : v), backgroundColor: '#35FF00', borderColor: '#35FF00', borderWidth: 0, barThickness: chartPx(15), stack: 'Actual', yAxisID: 'y' },
+                        { label: 'Act Overtime', data: overtimeData.map(v => v === 0 ? null : v), backgroundColor: '#006330', borderColor: '#006330', borderWidth: 0, barThickness: chartPx(15), stack: 'Actual', yAxisID: 'y' }
+                    ]
+                },
+                options: {
+                    devicePixelRatio: 3,
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 500 },
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                           x: {
+                stacked: true,
+                ticks: {
+                        font: { size: chartPx(12) },
+                        color: function(context) {
+                const day = parseInt(chartLabels[context.index]); // paksa jadi integer
+                const month = parseInt(document.getElementById('SelectedMonth').value) - 1;
+                const year = parseInt(document.getElementById('SelectedYear').value);
+                const date = new Date(year, month, day);
+                const dayOfWeek = date.getDay();
+
+                if (dayOfWeek === 0 || dayOfWeek === 6) {
+                    return '#FF4444';
+                }
+                return chartTextColor;
+            }
+                },
+                grid: { color: gridColor }
+            },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: 'Production Qty (unit)', color: chartTextColor, font: { size: chartPx(12) } },
+                            ticks: { color: chartTextColor, font: { size: chartPx(12) } },
+                            grid: { color: gridColor }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            max: 120,
+                            title: { display: true, text: 'Ratio (%)', color: chartTextColor, font: { size: chartPx(12) } },
+                            ticks: { color: chartTextColor, font: { size: chartPx(12) }, callback: v => v + '%' },
+                            grid: { drawOnChartArea: false }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: chartTextColor,
+                                font: { weight: '600', size: chartPx(12) }
+                            }
+                        },
+                        tooltip: {
+                            titleColor: tooltipTitleColor,
+                            bodyColor: tooltipBodyColor,
+                            backgroundColor: tooltipBgColor,
+                            borderColor: isLightMode ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.2)',
+                            borderWidth: 1,
+                            padding: chartPx(12),
+                            titleFont: { weight: 'bold', size: chartPx(15) },
+                            bodyFont: { size: chartPx(13) },
+                            caretPadding: chartPx(40)
+                        }
+                    }
+                }
+            });
+                // ===== TOGGLE CHANGE PLAN BUTTON =====
+            let changePlanVisible = true;
+            const toggleChangePlanBtn = document.getElementById('toggleChangePlanButton');
+
+            toggleChangePlanBtn?.addEventListener('click', function () {
+                changePlanVisible = !changePlanVisible;
+
+                // Dataset index: 0=ActRatio, 1=PlanRatio, 2=SAPNormal, 3=SAPOvertime, 4=ChangePlan, 5=OvertimePlan
+                const chart = Chart.getChart('dayChart');
+                if (chart) {
+                    if (changePlanVisible) {
+                        chart.show(4); // Change Plan
+                        chart.show(5); // Overtime Plan
+                    } else {
+                        chart.hide(4);
+                        chart.hide(5);
+                    }
+                    chart.update();
+                }
+
+                // Update tampilan tombol (ikut light/dark mode)
+                const isLight = document.body.classList.contains('light-mode');
+                if (changePlanVisible) {
+                    toggleChangePlanBtn.innerHTML = '<i class="fas fa-eye me-1"></i> Hide Change Plan';
+                    toggleChangePlanBtn.style.borderColor = '';
+                    toggleChangePlanBtn.style.color = '';
+                    toggleChangePlanBtn.style.backgroundColor = '';
+                } else {
+                    toggleChangePlanBtn.innerHTML = '<i class="fas fa-eye-slash me-1"></i> Show Change Plan';
+                    toggleChangePlanBtn.style.borderColor = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(100, 181, 246, 0.6)';
+                    toggleChangePlanBtn.style.color = isLight ? 'rgba(0,0,0,0.6)' : 'rgba(100, 181, 246, 1)';
+                    toggleChangePlanBtn.style.backgroundColor = isLight ? 'rgba(0,0,0,0.05)' : '';
+                }
+            });
+
+                        // ===== DOWNLOAD PDF =====
+                        document.getElementById('downloadPdfButton')?.addEventListener('click', function () {
+                            const btn = this;
+                            const origContent = btn.innerHTML;
+                            btn.disabled = true;
+                            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating...';
+
+                            setTimeout(() => {
+                                try {
+                                    const { jsPDF } = window.jspdf;
+                                    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+                                    const pageWidth = doc.internal.pageSize.getWidth();
+
+                                    doc.setFontSize(18);
+                                    doc.text('Production Achievement', 40, 50);
+                                    doc.setFontSize(10);
+                                    doc.setTextColor(100);
+                                    doc.text(`Period: ${document.getElementById('SelectedMonth').selectedOptions[0].text} ${document.getElementById('SelectedYear').value}`, 40, 70);
+                                    doc.text(`Total Plan: ${document.getElementById('totalPlanValue').innerText}`, pageWidth - 40, 70, { align: 'right' });
+                                    doc.text(`Total Actual: ${document.getElementById('totalActualValue').innerText}`, pageWidth - 40, 85, { align: 'right' });
+                                    doc.text(`P/H/H: ${document.getElementById('totalPhhValue').innerText}`, pageWidth - 40, 100, { align: 'right' });
+                                    doc.setTextColor(0);
+
+                                    const chartImgData = document.getElementById('dayChart').toDataURL('image/png', 1.0);
+                                    doc.addImage(chartImgData, 'PNG', 40, 110, 760, 220);
+
+                                    doc.autoTable({
+                                        html: '#productionTable',
+                                        startY: 340,
+                                        theme: 'grid',
+                                        styles: { fontSize: 5, cellPadding: 2 },
+                                        headStyles: { fillColor: [44, 62, 80], fontSize: 6 }
+                                    });
+
+                                    doc.save('Production-Report.pdf');
+                                } catch (err) {
+                                    console.error(err);
+                                    alert('Gagal membuat PDF. Cek console untuk detail.');
+                                } finally {
+                                    btn.disabled = false;
+                                    btn.innerHTML = origContent;
+                                }
+                            }, 100);
+                        });
+
+                        // ===== DROPDOWN STYLE (BOLD) =====
+                        function updateDropdownStyle() {
+                            const dropdowns = document.querySelectorAll('.filter-content .form-select-sm');
+
+                            dropdowns.forEach(dropdown => {
+                                const dropdownId = dropdown.id;
+                                const dropdownValue = dropdown.value;
+
+                                if (dropdownId === 'SelectedYear') {
+                                    if (dropdownValue) {
+                                        dropdown.classList.add('selected');
+                                    }
+
+                                    }  else if (dropdownId === 'SelectedMonth') {
+                        if (dropdownValue) {
+                            dropdown.classList.add('selected');
+                        } else {
+                            dropdown.classList.remove('selected');
+                        }
+                    }
+                                else if (dropdown.name === 'MachineLine') {
+                                    if (dropdownValue && dropdownValue !== 'All') {
+                                        dropdown.classList.add('selected');
+                                    } else {
+                                        dropdown.classList.remove('selected');
+                                    }
+                                }
+                            });
+                        }
+
+                        // Jalankan saat halaman load
+                        updateDropdownStyle();
+
+                        // Jalankan saat dropdown berubah
+                        const dropdowns = document.querySelectorAll('.filter-content .form-select-sm');
+                        dropdowns.forEach(dropdown => {
+                            dropdown.addEventListener('change', updateDropdownStyle);
+                        });
+                    });
+
+                        // SHIFT BUTTON LOGIC - MUTUAL EXCLUSIVITY
+            document.addEventListener('DOMContentLoaded', function() {
+                const allShiftCheckbox = document.getElementById('AllShift');
+                const individualShifts = ['Shift1', 'Shift2', 'Shift3', 'NonShift'];
+
+                // Ketika "All" diklik
+                allShiftCheckbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        // Uncheck semua shift individual
+                        individualShifts.forEach(id => {
+                            const checkbox = document.getElementById(id);
+                            checkbox.checked = false;
+                            checkbox.nextElementSibling.classList.remove('active');
+                        });
+                        this.nextElementSibling.classList.add('active');
+                    } else {
+                        // Jika user uncheck "All" dan tidak ada shift lain yang dipilih
+                        const anyChecked = individualShifts.some(id =>
+                            document.getElementById(id).checked
+                        );
+                        if (!anyChecked) {
+                            // Force check "All" kembali
+                            this.checked = true;
+                            this.nextElementSibling.classList.add('active');
+                        }
+                    }
+                });
+
+                // Ketika shift individual diklik
+                individualShifts.forEach(shiftId => {
+                    const checkbox = document.getElementById(shiftId);
+                    checkbox.addEventListener('change', function() {
+                        if (this.checked) {
+                            // Uncheck "All"
+                            allShiftCheckbox.checked = false;
+                            allShiftCheckbox.nextElementSibling.classList.remove('active');
+                            this.nextElementSibling.classList.add('active');
+                        } else {
+                            this.nextElementSibling.classList.remove('active');
+
+                            // Jika semua shift individual di-uncheck
+                            const anyChecked = individualShifts.some(id =>
+                                document.getElementById(id).checked
+                            );
+                            if (!anyChecked) {
+                                // Auto-check "All"
+                                allShiftCheckbox.checked = true;
+                                allShiftCheckbox.nextElementSibling.classList.add('active');
+                            }
+                        }
+                    });
+                });
+            });
+                flatpickr(".datepicker", {
+                dateFormat: "Y-m-d",
+                allowInput: true
+            });
+
+            // ===== AJAX POLLING (AUTO REFRESH) =====
+            const isCurrentMonthView = @(Model.IsCurrentMonthView ? "true" : "false");
+            let refreshInFlight = false;
+
+            async function fetchLatestData() {
+                // Historical data is static; avoid repeatedly re-running the full report.
+                // Also avoid overlapping requests when a database refresh takes longer
+                // than the polling interval.
+                if (!isCurrentMonthView || document.hidden || refreshInFlight) return;
+
+                refreshInFlight = true;
+                const month = document.getElementById('SelectedMonth').value;
+                const year = document.getElementById('SelectedYear').value;
+                const machineLine = document.getElementById('MachineLine').value;
+
+                // kumpulkan shift yang dipilih
+                const shiftCheckboxes = document.querySelectorAll('input[name="SelectedShifts"]:checked');
+                let shiftsQuery = '';
+                shiftCheckboxes.forEach(cb => {
+                    shiftsQuery += `&SelectedShifts=${encodeURIComponent(cb.value)}`;
+                });
+
+                const url = `?handler=AjaxUpdate&SelectedMonth=${month}&SelectedYear=${year}&MachineLine=${machineLine}${shiftsQuery}`;
+
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error('Network response was not ok');
+
+                    const data = await response.json();
+                    updateTableCells(data);
+                    updateChart(data);
+                } catch (error) {
+                    console.error('Error fetching data:', error);
+                } finally {
+                    refreshInFlight = false;
+                }
+            }
+
+            function updateTableCells(data) {
+                const tbody = document.querySelector('#productionTable tbody');
+                if(!tbody) return;
+                const rows = tbody.querySelectorAll('tr');
+                const daysInMonth = data.chartLabels.length;
+                const formatN0 = num => num ? num.toLocaleString('en-US') : "0";
+                const getCell = (rIdx, cIdx) => {
+                    if (rows[rIdx] && rows[rIdx].cells[cIdx]) return rows[rIdx].cells[cIdx];
+                    return { textContent: '' }; // safe fallback
+                };
+
+                // Plan Forecast (tabel): Change Plan bila ada, selain itu SAP Plan untuk semua tanggal
+                const tablePlan = data.tablePlanData || data.effectivePlanData;
+                const tablePlanOt = data.tablePlanOtData || data.effectivePlanOtData;
+
+                let sumPlanNormal = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(0, i+2).textContent = formatN0(tablePlan[i]);
+                    sumPlanNormal += tablePlan[i] || 0;
+                }
+                getCell(0, daysInMonth+2).textContent = formatN0(sumPlanNormal);
+
+                let sumPlanOvt = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(1, i+1).textContent = formatN0(tablePlanOt[i]);
+                    sumPlanOvt += tablePlanOt[i] || 0;
+                }
+                getCell(1, daysInMonth+1).textContent = formatN0(sumPlanOvt);
+
+                let sumPlanTableTotal = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    const val = (tablePlan[i] || 0) + (tablePlanOt[i] || 0);
+                    getCell(2, i+1).textContent = formatN0(val);
+                    sumPlanTableTotal += val;
+                }
+                getCell(2, daysInMonth+1).textContent = formatN0(sumPlanTableTotal);
+
+                // Achievement Ratio bulanan tetap memakai plan efektif (aturan lama)
+                let sumPlanTotal = 0;
+                for(let i=0; i<daysInMonth; i++) sumPlanTotal += (data.effectivePlanData[i] || 0) + (data.effectivePlanOtData[i] || 0);
+
+                let sumActNormal = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(3, i+2).textContent = formatN0(data.normalData[i]);
+                    sumActNormal += data.normalData[i] || 0;
+                }
+                getCell(3, daysInMonth+2).textContent = formatN0(sumActNormal);
+
+                let sumActOvt = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(4, i+1).textContent = formatN0(data.overtimeData[i]);
+                    sumActOvt += data.overtimeData[i] || 0;
+                }
+                getCell(4, daysInMonth+1).textContent = formatN0(sumActOvt);
+
+                let sumActTotal = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    const val = (data.normalData[i] || 0) + (data.overtimeData[i] || 0);
+                    getCell(5, i+1).textContent = formatN0(val);
+                    sumActTotal += val;
+                }
+                getCell(5, daysInMonth+1).textContent = formatN0(sumActTotal);
+
+                let sumDiff = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    const act = (data.normalData[i] || 0) + (data.overtimeData[i] || 0);
+                    const plan = (data.effectivePlanData[i] || 0) + (data.effectivePlanOtData[i] || 0);
+                    getCell(6, i+1).textContent = formatN0(act - plan);
+                    sumDiff += (act - plan);
+                }
+                getCell(6, daysInMonth+1).textContent = formatN0(sumDiff);
+
+                for(let i=0; i<daysInMonth; i++) {
+                    const act = (data.normalData[i] || 0) + (data.overtimeData[i] || 0);
+                    const plan = (data.effectivePlanData[i] || 0) + (data.effectivePlanOtData[i] || 0);
+                    let ratio = "-";
+                    if(plan > 0) ratio = (act / plan * 100).toFixed(2).replace(/\.00$/, '') + "%";
+                    else if (act > 0) ratio = "N/A";
+                    getCell(7, i+1).textContent = ratio;
+                }
+                let monthRatio = "-";
+                if(sumPlanTotal > 0) monthRatio = (sumActTotal / sumPlanTotal * 100).toFixed(2).replace(/\.00$/, '') + "%";
+                else if (sumActTotal > 0) monthRatio = "N/A";
+                getCell(7, daysInMonth+1).textContent = monthRatio;
+
+                let maxWorkers = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(8, i+1).textContent = data.noOfDirectWorkers[i] > 0 ? data.noOfDirectWorkers[i] : "0";
+                    if(data.noOfDirectWorkers[i] > maxWorkers) maxWorkers = data.noOfDirectWorkers[i];
+                }
+                getCell(8, daysInMonth+1).textContent = maxWorkers > 0 ? maxWorkers : "0";
+
+                let maxOvtOp = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(9, i+2).textContent = data.overtimeOperators[i] > 0 ? data.overtimeOperators[i] : "0";
+                    if(data.overtimeOperators[i] > maxOvtOp) maxOvtOp = data.overtimeOperators[i];
+                }
+                getCell(9, daysInMonth+2).textContent = maxOvtOp > 0 ? maxOvtOp : "0";
+
+                let sumOvtMin = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(10, i+2).textContent = data.overtimeMinutes[i] > 0 ? formatN0(data.overtimeMinutes[i]) : "0";
+                    sumOvtMin += data.overtimeMinutes[i] || 0;
+                }
+                getCell(10, daysInMonth+2).textContent = formatN0(sumOvtMin);
+
+                let sumLossTime = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(11, i+1).textContent = data.dailyLossTime[i] > 0 ? data.dailyLossTime[i].toFixed(2).replace(/\.00$/, '') : "0";
+                    sumLossTime += data.dailyLossTime[i] || 0;
+                }
+                getCell(11, daysInMonth+1).textContent = sumLossTime > 0 ? sumLossTime.toFixed(2).replace(/\.00$/, '') : "0";
+
+                let sumLoadTime = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    getCell(12, i+1).textContent = data.dailyWorkTime[i] > 0 ? formatN0(data.dailyWorkTime[i]) : "0";
+                    sumLoadTime += data.dailyWorkTime[i] || 0;
+                }
+                getCell(12, daysInMonth+1).textContent = formatN0(sumLoadTime);
+
+                let sumNetManHours = 0;
+                for(let i=0; i<daysInMonth; i++) {
+                    const act = (data.normalData[i] || 0) + (data.overtimeData[i] || 0);
+                    const netManHours = data.dailyNetManHours[i] || 0;
+                    sumNetManHours += netManHours;
+                    let pph = "";
+                    if(act > 0 && netManHours > 0) pph = (act / netManHours).toFixed(2).replace(/\.00$/, '');
+                    getCell(13, i+1).textContent = pph;
+                }
+                let monthPph = "";
+                if(sumActTotal > 0 && sumNetManHours > 0) monthPph = (sumActTotal / sumNetManHours).toFixed(2).replace(/\.00$/, '');
+                getCell(13, daysInMonth+1).textContent = monthPph;
+                
+                document.getElementById('totalActualValue').textContent = formatN0(sumActTotal);
+                document.getElementById('totalPlanValue').textContent = formatN0(sumPlanTotal);
+                const totalPhhValueElem = document.getElementById('totalPhhValue');
+                if (totalPhhValueElem) totalPhhValueElem.textContent = monthPph;
+            }
+
+            function updateChart(data) {
+                const chart = Chart.getChart('dayChart');
+                if(!chart) return;
+
+                const today = new Date().getDate();
+                const isAllShift = !data.selectedShifts || data.selectedShifts.length === 0 || data.selectedShifts.includes("All");
+                const isNoShift = data.selectedShifts && data.selectedShifts.length === 1 && data.selectedShifts.includes("NS");
+
+                const chartChangePlanData = data.planData.map((v, i) => {
+                    const dayIndex = i + 1;
+                    if (isNoShift && dayIndex > 5) return null;
+                    if (v > 0) {
+                        return data.effectivePlanData[i];
+                    } else {
+                        if (isAllShift && data.isCurrentMonthView && (dayIndex === today || dayIndex === today + 1)) {
+                            return (data.originalPlanData[i] || 0) + (data.originalPlanOvertimeData[i] || 0);
+                        }
+                        return null;
+                    }
+                });
+
+                const chartChangePlanOtData = data.planOvertimeData.map((v, i) => v > 0 ? data.effectivePlanOtData[i] : null);
+
+                let totalActualSum = 0;
+                let totalPlanSum = 0;
+                const daysInMonth = data.chartLabels.length;
+                for (let i = 0; i < daysInMonth; i++) {
+                    totalActualSum += (data.normalData[i] || 0) + (data.overtimeData[i] || 0);
+                    totalPlanSum += (data.effectivePlanData[i] || 0) + (data.effectivePlanOtData[i] || 0);
+                }
+
+                const ratioActualData = [], ratioPlanData = [];
+                let runningActualTotal = 0, runningPlanTotal = 0;
+
+                for (let i = 0; i < daysInMonth; i++) {
+                    if (data.isCurrentMonthView && (i + 1) > today) {
+                        ratioActualData.push(null);
+                        ratioPlanData.push(null);
+                    } else {
+                        runningActualTotal += (data.normalData[i] || 0) + (data.overtimeData[i] || 0);
+                        runningPlanTotal += (data.effectivePlanData[i] || 0) + (data.effectivePlanOtData[i] || 0);
+                        ratioActualData.push((totalActualSum > 0) ? (runningActualTotal / totalActualSum) * 100 : 0);
+                        ratioPlanData.push((totalPlanSum > 0) ? (runningPlanTotal / totalPlanSum) * 100 : 0);
+                    }
+                }
+
+                // Update datasets in order
+                chart.data.datasets[0].data = ratioActualData;
+                chart.data.datasets[1].data = ratioPlanData;
+                chart.data.datasets[2].data = data.originalPlanData.map(v => v === 0 ? null : v);
+                chart.data.datasets[3].data = data.originalPlanOvertimeData.map(v => v === 0 ? null : v);
+                chart.data.datasets[4].data = chartChangePlanData.map(v => v === 0 ? null : v);
+                chart.data.datasets[5].data = chartChangePlanOtData.map(v => v === 0 ? null : v);
+                chart.data.datasets[6].data = data.normalData.map(v => v === 0 ? null : v);
+                chart.data.datasets[7].data = data.overtimeData.map(v => v === 0 ? null : v);
+
+                chart.update('none'); // Update without animation so it's seamless
+            }
+
+            // Data produksi bulan berjalan tetap real-time; bulan historis tidak perlu polling.
+            if (isCurrentMonthView) {
+                setInterval(fetchLatestData, 5000);
+            }
+
+        </script>
+    }

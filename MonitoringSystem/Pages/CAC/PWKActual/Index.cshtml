@@ -1,0 +1,1072 @@
+@page
+@model MonitoringSystem.Pages.CAC.PWKActual.IndexModel
+@{
+    ViewData["Title"] = "PWK Actual";
+}
+
+<style>
+    /* Meniru lembar Excel PWK: garis tipis, header hijau muda, font kecil. */
+    .pwk {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 11px;
+        color: #000;
+        background: #fff;
+        border-radius: 8px;
+        padding: 16px;
+        overflow-x: auto;
+        box-sizing: border-box;
+    }
+
+        .pwk table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        .pwk th, .pwk td {
+            border: 1px solid #000;
+            padding: 2px 4px;
+            vertical-align: middle;
+        }
+
+        .pwk th {
+            background: #d9f2d9;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .pwk .title {
+            background: #d9f2d9;
+            font-weight: bold;
+            text-align: center;
+            padding: 6px;
+        }
+
+        .pwk h3 {
+            font-size: 12px;
+            margin: 14px 0 3px;
+        }
+
+        .pwk .num {
+            text-align: right;
+        }
+
+        .pwk .ctr {
+            text-align: center;
+        }
+
+        .pwk .given-grand-total {
+            background: #fff;
+            font-weight: bold;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .pwk .given-count-cell,
+        .pwk .given-count-total,
+        .pwk .given-count-cell input {
+            text-align: center !important;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .pwk .given-count-cell input {
+            padding: 0 !important;
+            appearance: textfield;
+            -moz-appearance: textfield;
+        }
+
+        .pwk .given-count-cell input::-webkit-inner-spin-button,
+        .pwk .given-count-cell input::-webkit-outer-spin-button {
+            margin: 0;
+            -webkit-appearance: none;
+        }
+
+        .pwk .given-count-total {
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            vertical-align: middle !important;
+        }
+
+        .pwk input, .pwk select {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            font: inherit;
+            text-align: center;
+        }
+
+        .pwk .filter input, .pwk .filter select {
+            border: 1px solid #7a7a7a;
+            background: #fff;
+            padding: 2px;
+        }
+
+        .pwk .rot {
+            height: 150px;
+            vertical-align: bottom;
+            padding: 0;
+        }
+
+            .pwk .rot > div {
+                writing-mode: vertical-rl;
+                transform: rotate(180deg);
+                white-space: nowrap;
+                padding: 4px 2px;
+                font-weight: normal;
+                font-size: 10px;
+            }
+
+        .pwk .grp {
+            border-left: 2px solid #000;
+        }
+
+        .pwk .scroll {
+            overflow-x: auto;
+        }
+
+        .pwk .msg {
+            background: #eef7ee;
+            border: 1px solid #6aa84f;
+            padding: 6px;
+            margin-bottom: 8px;
+        }
+
+        .pwk .err {
+            background: #fdecea;
+            border: 1px solid #c0392b;
+            padding: 6px;
+            margin-bottom: 8px;
+        }
+
+        .pwk .bar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: end;
+            margin-bottom: 10px;
+        }
+
+            .pwk .bar label {
+                display: block;
+                font-weight: bold;
+                margin-bottom: 2px;
+            }
+
+        .pwk button {
+            padding: 5px 14px;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .pwk .rekap {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+            .pwk .rekap .box {
+                border: 1px solid #000;
+                padding: 10px 16px;
+                min-width: 190px;
+            }
+
+        .pwk .warn {
+            font-size: 9px;
+            color: #a33;
+        }
+
+        .pwk .loss-assignment {
+            margin-top: 4px;
+            padding: 4px;
+            border: 1px solid #d6a643;
+            background: #fff8df;
+            text-align: left;
+        }
+
+        .pwk .loss-assignment select,
+        .pwk .loss-assignment input {
+            margin-top: 3px;
+            padding: 3px 4px;
+            border: 1px solid #888;
+            background: #fff;
+            text-align: left;
+        }
+
+        .pwk .loss-assignment-actions {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px;
+        }
+
+        .pwk .loss-assignment-actions button {
+            flex: 1 1 0;
+            min-width: 0;
+            padding: 3px 6px;
+        }
+
+        .pwk .loss-delete-button {
+            color: #fff;
+            border: 1px solid #9e1d1d;
+            background: #c62828;
+        }
+
+        .pwk .prod-source-status {
+            display: inline-block;
+            margin: 0 0 6px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #eef7ee;
+            border: 1px solid #6aa84f;
+        }
+
+        .pwk .prod-edit {
+            min-width: 58px;
+            padding: 2px 4px;
+            border: 1px solid #8a8a8a;
+            background: #fffbe6;
+        }
+
+        .pwk .prod-note {
+            min-width: 180px;
+            text-align: left;
+        }
+
+        .pwk .prod-serial {
+            min-width: 185px;
+        }
+
+        .pwk .prod-time-range {
+            display: grid;
+            grid-template-columns: minmax(58px, 1fr) auto minmax(58px, 1fr);
+            gap: 3px;
+            align-items: center;
+            min-width: 145px;
+        }
+
+        .pwk .prod-time-range .prod-time {
+            min-width: 58px;
+            padding-left: 2px;
+            padding-right: 2px;
+        }
+
+        .pwk .prod-row.edited td {
+            background: #fff8d6;
+        }
+
+    @@media print {
+        @@page {
+            size: A4 portrait;
+            margin: 3mm;
+        }
+
+        html, body {
+            width: 210mm !important;
+            min-width: 0 !important;
+            height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            background: #fff !important;
+        }
+
+        body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .main-header,
+        #bdSidebar,
+        .footer-copyright,
+        #breakTimeFilterModal,
+        .pwk .print-hide,
+        .pwk .msg,
+        .pwk .err,
+        .pwk .prod-source-status,
+        .pwk .warn {
+            display: none !important;
+        }
+
+        body > .container-fluid,
+        .main-content-wrapper,
+        .main-content-wrapper > .p-4,
+        .main-content-wrapper main {
+            display: block !important;
+            width: auto !important;
+            min-width: 0 !important;
+            height: auto !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+        }
+
+        .pwk {
+            width: var(--pwk-print-width, 1800px) !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            border-radius: 0 !important;
+            font-size: 8px !important;
+            line-height: 1.05 !important;
+            zoom: var(--pwk-print-scale, .58);
+        }
+
+        .pwk table,
+        .pwk .scroll,
+        .pwk .rekap {
+            break-inside: avoid;
+            page-break-inside: avoid;
+            overflow: visible !important;
+        }
+
+        .pwk table {
+            table-layout: auto;
+        }
+
+        .pwk th,
+        .pwk td {
+            padding: 1px 2px !important;
+        }
+
+        .pwk h3 {
+            margin: 4px 0 2px !important;
+            font-size: 9px !important;
+        }
+
+        .pwk .title {
+            padding: 3px !important;
+        }
+
+        .pwk .rot {
+            height: 105px !important;
+        }
+
+        .pwk .rot > div {
+            padding: 2px 1px !important;
+            font-size: 7px !important;
+        }
+
+        .pwk .bar {
+            display: grid !important;
+            grid-template-columns: repeat(8, minmax(105px, 1fr));
+            gap: 3px 8px !important;
+            margin-bottom: 4px !important;
+            align-items: end;
+        }
+
+        .pwk .bar label {
+            margin: 0 !important;
+            font-size: 7px !important;
+        }
+
+        .pwk .filter input,
+        .pwk .filter select,
+        .pwk input,
+        .pwk select {
+            min-width: 0 !important;
+            padding: 0 1px !important;
+            border: 0 !important;
+            border-bottom: 1px solid #777 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            color: #000 !important;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        .pwk .prod-edit {
+            min-width: 0 !important;
+        }
+
+        .pwk .prod-note,
+        .pwk .prod-serial {
+            min-width: 115px !important;
+        }
+
+        .pwk .rekap {
+            flex-wrap: nowrap !important;
+            gap: 6px !important;
+            margin-top: 4px !important;
+        }
+
+        .pwk .rekap .box {
+            min-width: 0 !important;
+            flex: 1 1 0;
+            padding: 4px 7px !important;
+        }
+
+    }
+</style>
+
+<div class="pwk">
+
+    <table style="margin-bottom:10px">
+        <tr>
+            <td class="title" style="width:210px">
+                PENGAWASAN WAKTU KERJA<br />(TIME CONTROL)<br />FOR LINE
+            </td>
+            <td style="width:520px">
+                <table>
+                    <tr>
+                        <th>HARI</th>
+                        <th>SEN-KAM</th>
+                        <th>JUMAT</th>
+                        <th>SHIFT 1</th>
+                        <th>SHIFT 2</th>
+                        <th>SHIFT 3</th>
+                    </tr>
+                    <tr>
+                        <td class="ctr">A : WORKING TIME</td>
+                        <td class="ctr">@Model.HdrNonShift</td>
+                        <td class="ctr">@Model.HdrNonShiftJumat</td>
+                        <td class="ctr">@Model.HdrShift1</td>
+                        <td class="ctr">@Model.HdrShift2</td>
+                        <td class="ctr">@Model.HdrShift3</td>
+                    </tr>
+                </table>
+            </td>
+            <td>
+                <table>
+                    <tr><th>MANAGER</th><th>S-CHIEF</th><th>G.CHIEF</th><th>LEADER</th></tr>
+                    <tr><td style="height:42px"></td><td></td><td></td><td></td></tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    @if (!string.IsNullOrEmpty(Model.Pesan))
+    {
+        <div class="msg">@Model.Pesan</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="err">@Model.Error</div>
+    }
+
+    <form method="post" action="@Url.Page("/CAC/PWKActual/Index")" id="pwkForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="Ctx" value="@Model.Ctx" />
+        <input type="hidden" name="lossId" id="lossId" />
+        <input type="hidden" name="reasonId" id="reasonId" />
+        <input type="hidden" name="lossCategory" id="lossCategory" />
+        <input type="hidden" name="lossSubCategory" id="lossSubCategory" />
+        <input type="hidden" name="lossDetail" id="lossDetail" />
+
+        <div class="bar filter">
+            <div>
+                <label>Tanggal</label>
+                <input type="date" name="Tanggal" value="@Model.Tanggal.ToString("yyyy-MM-dd")" onchange="reload()" />
+            </div>
+            <div>
+                <label>Line</label>
+                <input type="text" value="@MonitoringSystem.Pages.CAC.PWKActual.IndexModel.LineName" readonly />
+            </div>
+            <div>
+                <label>Group</label>
+                <select name="GroupName" onchange="reload()">
+                    @foreach (var g in Model.GroupNames)
+                    {
+                        <option value="@g" selected="@(g == Model.GroupName)">@g</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label>Machine Code</label>
+                <input type="text" value="@Model.MachineCode" readonly />
+            </div>
+            <div>
+                <label>Shift</label>
+                <select name="Shift" onchange="reload()">
+                    @foreach (var s in Model.Shifts)
+                    {
+                        <option value="@s" selected="@(s == Model.Shift)">@s</option>
+                    }
+                </select>
+            </div>
+            @if (Model.IsSabtu)
+            {
+                <div>
+                    <label>Sabtu</label>
+                    <select name="SabtuMode" onchange="reload()">
+                        @foreach (var s in Model.SabtuModes)
+                        {
+                            <option value="@s" selected="@(s == Model.SabtuMode)">@s</option>
+                        }
+                    </select>
+                </div>
+            }
+            else
+            {
+                <input type="hidden" name="SabtuMode" value="@Model.SabtuMode" />
+            }
+            <div>
+                <label>Jumlah OPR</label>
+                <input type="number" min="0" id="jumlahOpr" name="JumlahOpr" value="@Model.JumlahOpr"
+                       oninput="oprManual = true; hitungRekap();" />
+                <div style="font-size:9px;color:#555">kosongkan untuk ikut Given Time</div>
+            </div>
+            <div>
+                <label>Waktu Kerja (A)</label>
+                <input type="text" value="@Model.WorkingTime menit" readonly />
+            </div>
+            <div class="print-hide">
+                <button type="submit" asp-page-handler="Load">Muat data</button>
+                <button type="submit" asp-page-handler="Save">Simpan PWK</button>
+                <button type="submit" asp-page-handler="DownloadExcel" onclick="preparePwKOutput()">Unduh Excel</button>
+                <button type="submit" asp-page-handler="DownloadPdf" onclick="preparePwKOutput()">Unduh PDF A4</button>
+                <button type="submit" asp-page-handler="PrintPdf" formtarget="_blank" onclick="preparePwKOutput()">Print A4</button>
+            </div>
+        </div>
+
+        <h3>A. GIVEN TIME</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:200px">ITEM</th>
+                    <th>TERDAFTAR</th>
+                    <th>ABSENSI</th>
+                    <th>WAKTU KERJA</th>
+                    <th>LEMBUR</th>
+                    <th>TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < Model.Given.Count; i++)
+                {
+                    <tr class="gt-row" data-idx="@i">
+                        <td>@Model.Given[i].Item</td>
+                        <td class="given-count-cell"><input type="number" min="0" class="gt-terdaftar" name="Given[@i].Terdaftar" value="@Model.Given[i].Terdaftar" /></td>
+                        <td class="given-count-cell"><input type="number" min="0" class="gt-absensi" name="Given[@i].Absensi" value="@Model.Given[i].Absensi" /></td>
+                        @if (i == 0)
+                        {
+                            <td class="ctr" rowspan="@Model.Given.Count">
+                                <span class="gt-wk-shared">@Model.WorkingTime</span>
+                                @for (int j = 0; j < Model.Given.Count; j++)
+                                {
+                                    <input type="hidden" name="Given[@j].WaktuKerja" value="@Model.WorkingTime" />
+                                }
+                            </td>
+                            <td class="ctr" rowspan="@Model.Given.Count">
+                                <input type="number" min="0" class="gt-lembur-shared" value="@Model.SharedLembur" />
+                                @for (int j = 0; j < Model.Given.Count; j++)
+                                {
+                                    <input type="hidden" class="gt-lembur-hidden" name="Given[@j].Lembur" value="@Model.SharedLembur" />
+                                }
+                            </td>
+                            <td class="given-grand-total" id="sumTotal" rowspan="@(Model.Given.Count + 1)">@Model.Fmt(Model.TotalGiven)</td>
+                        }
+                    </tr>
+                }
+                <tr>
+                    <th>TOTAL</th>
+                    <th id="sumTerdaftar" class="given-count-total">@Model.Fmt(Model.Given.Sum(g => g.Terdaftar))</th>
+                    <th id="sumAbsensi" class="given-count-total">@Model.Fmt(Model.Given.Sum(g => g.Absensi))</th>
+                    <th id="sumWk">@Model.Fmt(Model.TotalWorkingTime)</th>
+                    <th id="sumLembur">@Model.Fmt(Model.TotalOvertime)</th>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>B. LOSE TIME</h3>
+        <div class="scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="width:150px">ITEM TIME LOSS</th>
+                        @foreach (var k in MonitoringSystem.Pages.CAC.PWKActual.IndexModel.KategoriList)
+                        {
+                            <th colspan="@Model.ReasonsOf(k).Count()" class="grp">@k</th>
+                        }
+                        <th rowspan="2" style="width:60px">TOTAL</th>
+                    </tr>
+                    <tr>
+                        @foreach (var k in MonitoringSystem.Pages.CAC.PWKActual.IndexModel.KategoriList)
+                        {
+                            var first = true;
+                            foreach (var r in Model.ReasonsOf(k))
+                            {
+                                <th class="@(first ? "rot grp" : "rot")"><div>@r.Name</div></th>
+                                first = false;
+                            }
+                        }
+                    </tr>
+                    <tr>
+                        <th>JAM</th>
+                        @foreach (var k in MonitoringSystem.Pages.CAC.PWKActual.IndexModel.KategoriList)
+                        {
+                            foreach (var r in Model.ReasonsOf(k))
+                            {
+                                <th style="font-size:9px">@r.Id</th>
+                            }
+                        }
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var jam in Model.JamRows())
+                    {
+                        var belumList = Model.BelumAdaReasons(jam).ToList();
+                        <tr>
+                            <td class="ctr">
+                                @if (string.IsNullOrEmpty(jam))
+                                {
+                                    <text>s/d</text>
+                                }
+                                else
+                                {
+                                    <text>@jam</text>
+                                    foreach (var belum in belumList)
+                                    {
+                                        <div class="loss-assignment print-hide" data-loss-id="@belum.Id" data-loss-time="@belum.Jam">
+                                            <div class="warn">
+                                                Loss belum dikategorikan
+                                                @if (!string.IsNullOrWhiteSpace(belum.RawReason))
+                                                {
+                                                    <text> (data lama: @belum.RawReason)</text>
+                                                }
+                                            </div>
+                                            <select class="loss-category-select" onchange="toggleLossSubCategory(this)">
+                                                <option value="">-- pilih kategori --</option>
+                                                @foreach (var category in MonitoringSystem.Pages.CAC.PWKActual.IndexModel.ScannerLossCategories)
+                                                {
+                                                    <option value="@category">@category</option>
+                                                }
+                                            </select>
+                                            <select class="loss-subcategory-select" style="display:none">
+                                                <option value="">-- pilih subkategori --</option>
+                                                @foreach (var subCategory in Model.ScannerMachineTroubleCategories)
+                                                {
+                                                    <option value="@subCategory">@subCategory</option>
+                                                }
+                                            </select>
+                                            <input type="text" maxlength="500" class="loss-detail-input"
+                                                   placeholder="Reason/detail masalah" />
+                                            <div class="loss-assignment-actions">
+                                                <button type="button" onclick="saveLossClassification(this)">Simpan</button>
+                                                <button type="button" class="loss-delete-button" onclick="deleteLoss(this)">Hapus</button>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </td>
+                            @foreach (var k in MonitoringSystem.Pages.CAC.PWKActual.IndexModel.KategoriList)
+                            {
+                                foreach (var r in Model.ReasonsOf(k))
+                                {
+                                    <td class="num">@Model.N(Model.Cell(jam, r.Id))</td>
+                                }
+                            }
+                            <td class="num">@Model.N(Model.RowTotal(jam))</td>
+                        </tr>
+                    }
+                    <tr>
+                        <th>TOTAL</th>
+                        @foreach (var k in MonitoringSystem.Pages.CAC.PWKActual.IndexModel.KategoriList)
+                        {
+                            foreach (var r in Model.ReasonsOf(k))
+                            {
+                                <th class="num">@Model.N(Model.ColTotal(r.Id))</th>
+                            }
+                        }
+                        <th class="num">@Model.TotalLoss</th>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>C. HASIL PRODUKSI</h3>
+        <div class="prod-source-status">
+            @if (Model.UsingSavedProduction)
+            {
+                <text>Menampilkan data terbaru dari OEESN dan MasterData sampai pukul 07:00 hari berikutnya, dengan koreksi PWK hanya pada bagian yang pernah diedit.</text>
+            }
+            else
+            {
+                <text>Menampilkan data terbaru dari OEESN dan MasterData sampai pukul 07:00 hari berikutnya. PLAN dihitung berdasarkan SUT per model; Simpan PWK hanya menyimpan bagian produksi yang diubah.</text>
+            }
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2">MODEL</th>
+                    <th rowspan="2">TIME</th>
+                    <th rowspan="2">NO. SERI AWAL</th>
+                    <th rowspan="2">NO. SERI AKHIR</th>
+                    <th colspan="3">DAILY</th>
+                    <th colspan="3">ACCM</th>
+                    <th rowspan="2">DEFECT QTY</th>
+                    <th rowspan="2">KETERANGAN</th>
+                </tr>
+                <tr>
+                    <th>PLAN</th>
+                    <th>ACTUAL</th>
+                    <th>+/-</th>
+                    <th>PLAN</th>
+                    <th>ACTUAL</th>
+                    <th>+/-</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Prods.Any())
+                {
+                    <tr><td colspan="12" class="ctr">Belum ada data produksi untuk tanggal, line, dan shift ini.</td></tr>
+                }
+                @for (int i = 0; i < Model.Prods.Count; i++)
+                {
+                    var p = Model.Prods[i];
+                    <tr class="prod-row @(p.IsEdited ? "edited" : "")" data-model="@p.Model"
+                        data-source-plan="@p.SourceDailyPlan" data-source-actual="@p.SourceDailyActual"
+                        data-source-defect="@p.SourceDefect" data-source-serial-start="@p.SourceSeriAwal"
+                        data-source-serial-end="@p.SourceSeriAkhir">
+                        <td>@p.Model</td>
+                        <td class="ctr">
+                            <div class="prod-time-range">
+                                <input type="time" step="60" class="prod-edit prod-time"
+                                       name="Prods[@i].TimeStart" value="@p.EffectiveTimeStart" />
+                                <span>s/d</span>
+                                <input type="time" step="60" class="prod-edit prod-time"
+                                       name="Prods[@i].TimeEnd" value="@p.EffectiveTimeEnd" />
+                            </div>
+                        </td>
+                        <td class="ctr"><input type="text" maxlength="100" class="prod-edit prod-serial prod-serial-start" name="Prods[@i].SeriAwal" value="@p.SeriAwal" /></td>
+                        <td class="ctr"><input type="text" maxlength="100" class="prod-edit prod-serial prod-serial-end" name="Prods[@i].SeriAkhir" value="@p.SeriAkhir" /></td>
+                        <td class="num">
+                            <input type="hidden" name="Prods[@i].Jam" value="@p.Jam.ToString("O")" />
+                            <input type="hidden" name="Prods[@i].ProductId" value="@p.ProductId" />
+                            <input type="hidden" name="Prods[@i].Model" value="@p.Model" />
+                            <input type="hidden" class="prod-sync-source" name="Prods[@i].SyncSource" value="" />
+                            <input type="number" min="0" class="prod-edit prod-plan" name="Prods[@i].DailyPlan" value="@p.DailyPlan" />
+                        </td>
+                        <td class="num"><input type="number" min="0" class="prod-edit prod-actual" name="Prods[@i].DailyActual" value="@p.DailyActual" /></td>
+                        <td class="num prod-daily-diff">@(p.DailyActual - p.DailyPlan)</td>
+                        <td class="num prod-accm-plan">@p.AccmPlan</td>
+                        <td class="num prod-accm-actual">@p.AccmActual</td>
+                        <td class="num prod-accm-diff">@(p.AccmActual - p.AccmPlan)</td>
+                        <td class="num"><input type="number" min="0" class="prod-edit prod-defect" name="Prods[@i].Defect" value="@p.Defect" /></td>
+                        <td><input type="text" maxlength="1000" class="prod-edit prod-note" name="Prods[@i].Keterangan" value="@p.Keterangan" /></td>
+                    </tr>
+                }
+                <tr>
+                    <th colspan="4">TOTAL</th>
+                    <th class="ctr" id="prodTotalPlan">@Model.TotalPlan</th>
+                    <th class="ctr" id="prodTotalActual">@Model.HasilProd</th>
+                    <th class="ctr" id="prodTotalDiff">@(Model.HasilProd - Model.TotalPlan)</th>
+                    <th colspan="3"></th>
+                    <th class="ctr" id="prodTotalDefect">@Model.TotalDefect</th>
+                    <th></th>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>D. CATATAN MASALAH</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:20%">HAMBATAN</th>
+                    <th style="width:33%">ANALISA MASALAH</th>
+                    <th style="width:33%">TINDAKAN</th>
+                    <th style="width:14%">DURASI</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < Model.Catatan.Count; i++)
+                {
+                    <tr>
+                        <td>
+                            <input type="hidden" name="Catatan[@i].LossId" value="@Model.Catatan[i].LossId" />
+                            <input type="text" name="Catatan[@i].Hambatan" value="@Model.Catatan[i].Hambatan" style="text-align:left" />
+                        </td>
+                        <td><input type="text" name="Catatan[@i].Analisa" value="@Model.Catatan[i].Analisa" style="text-align:left" /></td>
+                        <td><input type="text" name="Catatan[@i].Tindakan" value="@Model.Catatan[i].Tindakan" style="text-align:left" /></td>
+                        <td><input type="text" name="Catatan[@i].Pic" value="@Model.Catatan[i].Pic" /></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="rekap">
+            <div class="box"><b>( J ) HASIL PROD</b><br />@Model.Fmt(Model.HasilProd) pcs</div>
+            <div class="box">
+                <b>( K ) AVAILABLE WORKING TIME</b><br />
+                ( A + Lembur ) x Jumlah Operator<br />
+                (@Model.Fmt(Model.WorkingTime) + <span id="kLembur">@Model.Fmt(Model.SharedLembur)</span>) x <span id="kOpr">@Model.Fmt(Model.JumlahOpr)</span> = <span id="kNilai">@Model.Fmt(Model.AvailableWT)</span>
+            </div>
+            <div class="box">
+                <b>PROD / HEAD / HOUR</b><br />
+                ( J x 60 ) / ( K )<br />
+                (@Model.Fmt(Model.HasilProd) x 60) / <span id="phhK">@Model.Fmt(Model.AvailableWT)</span> = <b><span id="phhNilai">@Model.ProdHeadHour</span></b>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    function reload() { document.getElementById('pwkForm').submit(); }
+
+    function preparePwKOutput() {
+        // Sinkronkan kalkulasi tampilan sebelum form dikirim ke pembuat PDF/print.
+        hitungGiven();
+        hitungProduksi();
+        hitungRekap();
+    }
+
+    function printPwK() {
+        // Pastikan angka hasil edit terakhir sudah tercermin sebelum dicetak.
+        hitungGiven();
+        hitungProduksi();
+        hitungRekap();
+
+        var sheet = document.querySelector('.pwk');
+        if (!sheet) return;
+
+        // Area aman A4 portrait setelah margin 3 mm, dalam CSS pixel (96 dpi).
+        var targetWidth = 771;
+        var targetHeight = 1099;
+        var naturalWidth = Math.max(sheet.scrollWidth, sheet.offsetWidth);
+        var naturalHeight = Math.max(sheet.scrollHeight, sheet.offsetHeight);
+        var scale = Math.min(targetWidth / naturalWidth, targetHeight / naturalHeight, 1);
+
+        // Sedikit ruang cadangan untuk variasi engine print Chrome/Edge.
+        scale = Math.max(0.20, scale * 0.96);
+        sheet.style.setProperty('--pwk-print-width', naturalWidth + 'px');
+        sheet.style.setProperty('--pwk-print-scale', scale.toFixed(4));
+
+        var oldTitle = document.title;
+        var tanggal = document.querySelector('input[name="Tanggal"]')?.value || 'tanggal';
+        var group = document.querySelector('select[name="GroupName"]')?.value || 'line';
+        var shift = document.querySelector('select[name="Shift"]')?.value || 'shift';
+        document.title = ['PWK', tanggal, group, shift]
+            .join('-')
+            .replace(/\s+/g, '-')
+            .replace(/[^a-zA-Z0-9_-]/g, '');
+
+        window.addEventListener('afterprint', function restorePrintState() {
+            document.title = oldTitle;
+            sheet.style.removeProperty('--pwk-print-width');
+            sheet.style.removeProperty('--pwk-print-scale');
+        }, { once: true });
+
+        window.print();
+    }
+
+    var WORKING_TIME = @Model.WorkingTime;
+    var HASIL_PROD = @Model.HasilProd;
+    var INTEGER_FORMATTER = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
+
+    function angka(el) { var v = parseInt(el && el.value, 10); return isNaN(v) ? 0 : v; }
+    function formatAngka(value) { return INTEGER_FORMATTER.format(Number(value) || 0); }
+
+    // Baris TOTAL di Given Time dihitung langsung di browser supaya tidak perlu
+    // menekan "Muat data" dulu. Nilai resminya tetap dihitung ulang di server saat disimpan.
+    function hitungGiven() {
+        var t = 0, a = 0, totalWorkers = 0;
+        var rows = Array.from(document.querySelectorAll('.gt-row'));
+        var waktu = parseInt(document.querySelector('.gt-wk-shared')?.textContent, 10) || 0;
+        var lembur = angka(document.querySelector('.gt-lembur-shared'));
+
+        document.querySelectorAll('.gt-lembur-hidden').forEach(function (field) {
+            field.value = lembur;
+        });
+
+        rows.forEach(function (row) {
+            var terdaftar = angka(row.querySelector('.gt-terdaftar'));
+            var absensi = angka(row.querySelector('.gt-absensi'));
+            // Absensi hanya dicatat dan tidak mengurangi pengali waktu kerja/lembur.
+            var workers = Math.max(0, terdaftar);
+            t += terdaftar;
+            a += absensi;
+            totalWorkers += workers;
+        });
+        var multiplier = Math.max(1, totalWorkers);
+        var wk = waktu * multiplier;
+        var lb = lembur * multiplier;
+        var tot = wk + lb;
+        document.getElementById('sumTerdaftar').textContent = formatAngka(t);
+        document.getElementById('sumAbsensi').textContent = formatAngka(a);
+        document.getElementById('sumWk').textContent = formatAngka(wk);
+        document.getElementById('sumLembur').textContent = formatAngka(lb);
+        document.getElementById('sumTotal').textContent = formatAngka(tot);
+        hitungRekap();
+    }
+
+    // Jumlah OPR default mengikuti nilai Terdaftar di Given Time. Absensi hanya
+    // menjadi catatan dan tidak mengurangi perhitungan waktu kerja:
+    // (Karyawan Permanent + KWT + Magang) + Bantuan Masuk - Bantuan Keluar - DT/PC/KP/CT.
+    // Kalau operator mengetik sendiri di kolom Jumlah OPR, angka manual itu yang dipakai.
+    var oprManual = @(Model.JumlahOpr > 0 ? "true" : "false");   // ikut isian tersimpan bila ada
+
+    function oprDariGivenTime() {
+        var total = 0;
+        document.querySelectorAll('.gt-row').forEach(function (row) {
+            var idx = parseInt(row.getAttribute('data-idx'), 10);
+            var terdaftar = Math.max(0, angka(row.querySelector('.gt-terdaftar')));
+            if (idx <= 2) total += terdaftar;            // Permanent, KWT, Magang
+            else if (idx === 3) total += terdaftar;      // Bantuan Masuk
+            else total -= terdaftar;                     // Bantuan Keluar, DT/PC/KP/CT
+        });
+        return total < 0 ? 0 : total;
+    }
+
+    function hitungRekap() {
+        var field = document.getElementById('jumlahOpr');
+        if (!oprManual) field.value = oprDariGivenTime();
+        var opr = angka(field);
+        var lembur = angka(document.querySelector('.gt-lembur-shared'));
+        var k = (WORKING_TIME + lembur) * opr;
+        document.getElementById('kLembur').textContent = formatAngka(lembur);
+        document.getElementById('kOpr').textContent = formatAngka(opr);
+        document.getElementById('kNilai').textContent = formatAngka(k);
+        document.getElementById('phhK').textContent = formatAngka(k);
+        document.getElementById('phhNilai').textContent =
+            k === 0 ? '0' : (HASIL_PROD * 60 / k).toFixed(2);
+    }
+
+    function hitungProduksi() {
+        var accPlan = Object.create(null);
+        var accActual = Object.create(null);
+        var totalPlan = 0, totalActual = 0, totalDefect = 0;
+
+        document.querySelectorAll('.prod-row').forEach(function (row) {
+            var model = row.getAttribute('data-model') || '-';
+            var plan = angka(row.querySelector('.prod-plan'));
+            var actual = angka(row.querySelector('.prod-actual'));
+            var defect = angka(row.querySelector('.prod-defect'));
+            var note = (row.querySelector('.prod-note').value || '').trim();
+            var serialStart = (row.querySelector('.prod-serial-start').value || '').trim();
+            var serialEnd = (row.querySelector('.prod-serial-end').value || '').trim();
+
+            accPlan[model] = (accPlan[model] || 0) + plan;
+            accActual[model] = (accActual[model] || 0) + actual;
+            row.querySelector('.prod-daily-diff').textContent = actual - plan;
+            row.querySelector('.prod-accm-plan').textContent = accPlan[model];
+            row.querySelector('.prod-accm-actual').textContent = accActual[model];
+            row.querySelector('.prod-accm-diff').textContent = accActual[model] - accPlan[model];
+
+            var edited = plan !== parseInt(row.getAttribute('data-source-plan'), 10)
+                || actual !== parseInt(row.getAttribute('data-source-actual'), 10)
+                || defect !== parseInt(row.getAttribute('data-source-defect'), 10)
+                || serialStart !== (row.getAttribute('data-source-serial-start') || '')
+                || serialEnd !== (row.getAttribute('data-source-serial-end') || '')
+                || note.length > 0;
+            row.classList.toggle('edited', edited);
+
+            totalPlan += plan;
+            totalActual += actual;
+            totalDefect += defect;
+        });
+
+        document.getElementById('prodTotalPlan').textContent = totalPlan;
+        document.getElementById('prodTotalActual').textContent = totalActual;
+        document.getElementById('prodTotalDiff').textContent = totalActual - totalPlan;
+        document.getElementById('prodTotalDefect').textContent = totalDefect;
+        HASIL_PROD = totalActual;
+        hitungRekap();
+    }
+
+    function pecahSerial(value) {
+        var match = /^(.*?)(\d+)$/.exec((value || '').trim());
+        if (!match) return null;
+        try {
+            return {
+                prefix: match[1],
+                digits: match[2],
+                number: BigInt(match[2])
+            };
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function tandaiActualDiubah(row) {
+        var syncSource = row.querySelector('.prod-sync-source');
+        if (syncSource) syncSource.value = 'actual';
+    }
+
+    function syncActualDariSerial(row) {
+        var syncSource = row.querySelector('.prod-sync-source');
+        if (syncSource) syncSource.value = 'serial';
+
+        var start = pecahSerial(row.querySelector('.prod-serial-start').value);
+        var end = pecahSerial(row.querySelector('.prod-serial-end').value);
+        if (!start || !end || start.prefix !== end.prefix || end.number < start.number) return;
+
+        var count = end.number - start.number + 1n;
+        if (count > 2147483647n) return;
+        row.querySelector('.prod-actual').value = count.toString();
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.gt-terdaftar, .gt-absensi, .gt-lembur-shared')
+            .forEach(function (el) { el.addEventListener('input', hitungGiven); });
+        document.querySelectorAll('.prod-actual').forEach(function (el) {
+            el.addEventListener('input', function () {
+                tandaiActualDiubah(el.closest('.prod-row'));
+                hitungProduksi();
+            });
+        });
+        document.querySelectorAll('.prod-serial').forEach(function (el) {
+            el.addEventListener('input', function () {
+                syncActualDariSerial(el.closest('.prod-row'));
+                hitungProduksi();
+            });
+        });
+        document.querySelectorAll('.prod-plan, .prod-defect, .prod-note')
+            .forEach(function (el) { el.addEventListener('input', hitungProduksi); });
+        hitungGiven();
+        hitungProduksi();
+        hitungRekap();
+    });
+
+    function toggleLossSubCategory(categorySelect) {
+        var editor = categorySelect.closest('.loss-assignment');
+        var subCategory = editor.querySelector('.loss-subcategory-select');
+        var isMachineTrouble = categorySelect.value === 'Machine & Tools Trouble';
+        subCategory.style.display = isMachineTrouble ? '' : 'none';
+        if (!isMachineTrouble) subCategory.value = '';
+    }
+
+    function saveLossClassification(button) {
+        var editor = button.closest('.loss-assignment');
+        var category = editor.querySelector('.loss-category-select').value;
+        var subCategory = editor.querySelector('.loss-subcategory-select').value;
+        var detail = editor.querySelector('.loss-detail-input').value.trim();
+
+        if (!category) {
+            alert('Pilih kategori loss time terlebih dahulu.');
+            return;
+        }
+        if (category === 'Machine & Tools Trouble' && !subCategory) {
+            alert('Pilih subkategori Machine & Tools Trouble terlebih dahulu.');
+            return;
+        }
+
+        var f = document.getElementById('pwkForm');
+        document.getElementById('lossId').value = editor.getAttribute('data-loss-id');
+        document.getElementById('lossCategory').value = category;
+        document.getElementById('lossSubCategory').value = subCategory;
+        document.getElementById('lossDetail').value = detail;
+        f.action = '?handler=SetLossClassification';
+        f.submit();
+    }
+
+    function deleteLoss(button) {
+        var editor = button.closest('.loss-assignment');
+        var lossTime = editor.getAttribute('data-loss-time') || '';
+        if (!confirm('Hapus loss time ' + lossTime + '? Data ini akan dihapus dari AssemblyLossTime.'))
+            return;
+
+        var f = document.getElementById('pwkForm');
+        document.getElementById('lossId').value = editor.getAttribute('data-loss-id');
+        f.action = '?handler=DeleteLoss';
+        f.submit();
+    }
+
+    function setReason(lossId, reasonId) {
+        if (!reasonId) return;
+        var f = document.getElementById('pwkForm');
+        document.getElementById('lossId').value = lossId;
+        document.getElementById('reasonId').value = reasonId;
+        f.action = '?handler=SetReason';
+        f.submit();
+    }
+</script>
