@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "SubPanamon": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "subpanamon",
+      "applicationUrl": "http://localhost:5140",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

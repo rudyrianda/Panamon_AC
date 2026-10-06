@@ -1,0 +1,863 @@
+﻿@page
+@model SubPanamon.Pages.MachineEfficiency.MachineEfficiencyModel
+@{
+    ViewData["Title"] = "Machine Efficiency";
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link href="~/css/Sidebar.css" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/sweetalert2.css" />
+
+    <style>
+        .filter-area-with-lines { position:relative;padding:1px 0;margin-bottom:8px;margin-top:-20px;min-height:10px;width:100%;margin-left:0;margin-right:0; }
+        .panamon-bottom-line,.panamon-bottomm-line { position:absolute!important;left:0!important;right:0!important;width:100%!important;height:2px!important;background:rgba(255,255,255,0.04)!important;z-index:999!important;pointer-events:none!important;display:block!important; }
+        .panamon-bottom-line  { top:0!important;border-top:2px solid rgba(255,255,255,0.08)!important; }
+        .panamon-bottomm-line { bottom:0!important;border-bottom:2px solid rgba(255,255,255,0.08)!important; }
+        html.light-mode .panamon-bottom-line,html.light-mode .panamon-bottomm-line { background:rgba(0,0,0,0.04)!important; }
+        html.light-mode .panamon-bottom-line  { border-top:2px solid rgba(0,0,0,0.10)!important; }
+        html.light-mode .panamon-bottomm-line { border-bottom:2px solid rgba(0,0,0,0.10)!important; }
+        .filter-content { position:relative;z-index:2;padding:6px 0;border-radius:15px;margin-left:7px;margin-right:7px; }
+        .filter-content label { color:rgba(255,255,255,0.85);font-size:12px;line-height:20px; }
+        .filter-content .form-control { height:28px;font-size:12px;line-height:20px;border-radius:999px;background-color:rgba(255,255,255,0.05);border:2px solid rgba(255,255,255,0.5);color:#ffffff;text-align:center;appearance:none;-webkit-appearance:none;padding:0 22px 0 8px; }
+        .filter-content .form-select,.filter-content .form-select-sm { height:28px;padding:0 28px 0 12px!important;font-size:12px;border-radius:999px;background-color:rgba(255,255,255,0.05);border:2px solid rgba(255,255,255,0.5);color:#ffffff;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 8px center;background-size:10px; }
+        .filter-content .form-select option,.filter-content .form-select-sm option { background-color:rgba(50,60,80,0.95);color:#ffffff; }
+        .filter-content .form-select:focus,.filter-content .form-select-sm:focus,.filter-content .form-control:focus { background-color:rgba(255,255,255,0.20);border-color:rgba(255,255,255,0.3);color:#ffffff;box-shadow:0 0 0 0.2rem rgba(255,255,255,0.1); }
+        .filter-content .btn { height:28px;padding:0 12px;font-size:12px;border-radius:999px!important;font-weight:600;display:flex;align-items:center;justify-content:center; }
+        .filter-content .btn-primary { background-color:rgba(8,65,150,0.95);border:2px solid rgba(100,181,246,1);color:rgba(100,181,246,1); }
+        .filter-content .btn-primary:hover { background-color:rgba(5,45,110,1);border-color:rgba(144,202,249,1);color:rgba(144,202,249,1); }
+        .filter-content .btn-danger { background-color:rgba(140,30,40,0.95);border:2px solid rgba(239,154,154,1);color:rgba(239,154,154,1); }
+        .filter-content .btn-danger:hover { background-color:rgba(110,20,30,1);border-color:rgba(244,143,177,1);color:rgba(244,143,177,1); }
+        html.light-mode .filter-content label { color:#1a1a2e!important; }
+        html.light-mode .filter-content .form-control { background-color:rgba(255,255,255,0.65)!important;border-color:rgba(0,0,0,0.25)!important;color:#1a1a2e!important; }
+        html.light-mode .filter-content .form-select,html.light-mode .filter-content .form-select-sm { background-color:rgba(255,255,255,0.5)!important;border-color:rgba(0,0,0,0.2)!important;color:#1a1a2e!important;background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e")!important; }
+        html.light-mode .filter-content .form-select option,html.light-mode .filter-content .form-select-sm option { background-color:#ffffff!important;color:#1a1a2e!important; }
+        html.light-mode .filter-content .form-select:focus,html.light-mode .filter-content .form-select-sm:focus,html.light-mode .filter-content .form-control:focus { background-color:rgba(255,255,255,0.9)!important;border-color:rgba(61,121,176,0.5)!important;color:#1a1a2e!important;box-shadow:0 0 0 0.2rem rgba(61,121,176,0.15)!important; }
+        html.light-mode .filter-content .btn-primary { background-color:rgba(61,121,176,0.85)!important;border-color:rgba(61,121,176,0.9)!important;color:#ffffff!important; }
+        html.light-mode .filter-content .btn-primary:hover { background-color:rgba(35,90,150,0.95)!important;color:#ffffff!important; }
+        html.light-mode .filter-content .btn-danger { background-color:rgba(180,40,50,0.85)!important;border-color:rgba(200,60,70,0.9)!important;color:#ffffff!important; }
+        html.light-mode .filter-content .btn-danger:hover { background-color:rgba(150,25,35,0.95)!important;color:#ffffff!important; }
+        .filter-content .btn-success { background-color:rgba(18,90,48,0.92);border:2px solid rgba(129,199,132,0.85);color:rgba(129,199,132,1); }
+        .filter-content .btn-success:hover { background-color:rgba(12,70,35,1);border-color:rgba(165,214,167,1);color:rgba(165,214,167,1); }
+        html.light-mode .filter-content .btn-success { background-color:rgba(25,135,84,0.88)!important;border:2px solid rgba(25,135,84,0.9)!important;color:#ffffff!important; }
+        html.light-mode .filter-content .btn-success:hover { background-color:rgba(18,108,66,0.95)!important;color:#ffffff!important; }
+        .card { margin:5px 12px 8px;background:rgba(255,255,255,0.20)!important;border-radius:12px;border:2px solid rgba(255,255,255,0.3)!important;box-shadow:0 4px 16px rgba(0,0,0,0.2);color:#ffffff!important; }
+        .card * { color:#ffffff!important; }
+        .card .btn-warning,.card .btn-warning * { color:#000000!important; }
+        .card-header { background:transparent!important;border-bottom:1px solid rgba(255,255,255,0.2)!important;padding:16px 12px; }
+        .card-header .row { width:100%;display:flex;align-items:stretch; }
+        .card-header .col-6,.card-header .col-md-2 { display:flex;align-items:stretch; }
+        .card-header .kpi-input-box { flex:1; }
+        html.light-mode .card { background:rgba(255,255,255,0.55)!important;border:2px solid rgba(200,215,235,0.80)!important;box-shadow:0 4px 20px rgba(0,0,0,0.10)!important;color:#1a1a2e!important; }
+        html.light-mode .card * { color:#1a1a2e!important; }
+        html.light-mode .card .btn-success,html.light-mode .card .btn-success * { color:#ffffff!important; }
+        html.light-mode .card .btn-danger,html.light-mode .card .btn-danger * { color:#ffffff!important; }
+        html.light-mode .card .btn-primary,html.light-mode .card .btn-primary * { color:#ffffff!important; }
+        html.light-mode .card-header { background-color:rgba(255,255,255,0.35)!important;border-bottom:1px solid rgba(0,0,0,0.1)!important; }
+        .kpi-input-box { background:linear-gradient(135deg,rgba(20,30,45,0.95) 0%,rgba(15,25,40,0.95) 100%);border:2px solid rgba(100,181,246,0.35);border-radius:10px;padding:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:85px; }
+        .kpi-input-box label { font-size:10px;font-weight:600;color:rgba(255,255,255,0.65);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px; }
+        .kpi-input-box input { background:rgba(255,255,255,0.08)!important;border:1px solid rgba(100,181,246,0.35)!important;color:#64b5f6!important;font-size:16px!important;font-weight:700!important;text-align:center!important;border-radius:8px!important;padding:8px 6px!important;height:36px!important;width:100%!important;box-sizing:border-box!important;transition:all 0.2s ease!important; }
+        .kpi-input-box input:focus { background:rgba(255,255,255,0.12)!important;border-color:rgba(100,181,246,0.6)!important;box-shadow:0 0 0 3px rgba(100,181,246,0.1)!important;outline:none!important; }
+        .kpi-input-box input::placeholder { color:rgba(100,181,246,0.4)!important; }
+        .kpi-input-box > select,.card-header .kpi-input-box select { background-color:rgba(255,255,255,0.08)!important;background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%2364b5f6' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e")!important;background-repeat:no-repeat!important;background-position:right 10px center!important;background-size:11px!important;border:1px solid rgba(100,181,246,0.35)!important;color:#64b5f6!important;font-size:16px!important;font-weight:700!important;text-align:center!important;border-radius:8px!important;height:36px!important;width:100%!important;box-sizing:border-box!important;appearance:none!important;-webkit-appearance:none!important;padding:0 28px 0 10px!important;cursor:pointer!important;transition:border-color 0.2s ease,box-shadow 0.2s ease!important; }
+        .kpi-input-box > select:focus,.card-header .kpi-input-box select:focus { background-color:rgba(255,255,255,0.12)!important;border-color:rgba(100,181,246,0.6)!important;box-shadow:0 0 0 3px rgba(100,181,246,0.1)!important;outline:none!important; }
+        .kpi-input-box > select option,.card-header .kpi-input-box select option { background:#1e2d40!important;color:#ffffff!important; }
+        .kpi-input-box.ng-box input { color:#ef9a9a!important;border-color:rgba(239,154,154,0.35)!important; }
+        .kpi-input-box.ng-box input:focus { border-color:rgba(239,154,154,0.6)!important;box-shadow:0 0 0 3px rgba(239,154,154,0.1)!important; }
+        .kpi-input-box.actual-box input { color:#81c784!important;border-color:rgba(129,199,132,0.35)!important; }
+        .kpi-input-box.actual-box input:focus { border-color:rgba(129,199,132,0.6)!important;box-shadow:0 0 0 3px rgba(129,199,132,0.1)!important; }
+        html.light-mode .kpi-input-box { background:linear-gradient(135deg,rgba(230,242,255,0.85) 0%,rgba(220,235,255,0.85) 100%);border:2px solid rgba(61,121,176,0.3); }
+        html.light-mode .kpi-input-box label { color:rgba(26,26,46,0.72); }
+        html.light-mode .kpi-input-box input { background:rgba(255,255,255,0.88)!important;border:1px solid rgba(61,121,176,0.28)!important;color:rgba(8,65,150,0.95)!important; }
+        html.light-mode .kpi-input-box input:focus { background:rgba(255,255,255,0.98)!important;border-color:rgba(61,121,176,0.5)!important;box-shadow:0 0 0 3px rgba(61,121,176,0.08)!important; }
+        html.light-mode .kpi-input-box input::placeholder { color:rgba(8,65,150,0.3)!important; }
+        html.light-mode .kpi-input-box > select,html.light-mode .card-header .kpi-input-box select { background-color:rgba(255,255,255,0.88)!important;background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23084182' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e")!important;background-repeat:no-repeat!important;background-position:right 10px center!important;background-size:11px!important;border:1px solid rgba(61,121,176,0.28)!important;color:rgba(8,65,150,0.95)!important; }
+        html.light-mode .kpi-input-box > select:focus,html.light-mode .card-header .kpi-input-box select:focus { background-color:rgba(255,255,255,0.98)!important;border-color:rgba(61,121,176,0.5)!important;box-shadow:0 0 0 3px rgba(61,121,176,0.08)!important; }
+        html.light-mode .kpi-input-box > select option,html.light-mode .card-header .kpi-input-box select option { background:#ffffff!important;color:#1a1a2e!important; }
+        html.light-mode .kpi-input-box.ng-box input { color:rgba(180,40,50,0.9)!important;border-color:rgba(180,40,50,0.28)!important; }
+        html.light-mode .kpi-input-box.actual-box input { color:rgba(25,135,84,0.9)!important;border-color:rgba(25,135,84,0.28)!important; }
+        .section-divider { background:rgba(100,181,246,0.12);border-top:1px solid rgba(100,181,246,0.3);border-bottom:1px solid rgba(100,181,246,0.3);padding:6px 16px;font-size:12px;font-weight:700;color:#64b5f6;letter-spacing:1px;text-transform:uppercase; }
+        html.light-mode .section-divider { background:rgba(61,121,176,0.08);border-top:1px solid rgba(61,121,176,0.2);border-bottom:1px solid rgba(61,121,176,0.2);color:rgba(61,121,176,0.85); }
+        .table { background-color:rgba(255,255,255,0.08)!important;color:#ffffff!important;margin:0!important;border-collapse:collapse; }
+        .table thead th,.table > thead > tr > th { background-color:rgba(30,40,60,1)!important;color:#ffffff!important;border-color:rgba(255,255,255,0.3)!important;text-align:center!important;vertical-align:middle!important;padding:8px!important;font-size:12px!important; }
+        .table tbody td { background-color:rgba(255,255,255,0.05)!important;color:#ffffff!important;border-color:rgba(255,255,255,0.15)!important;padding:5px 6px!important;font-size:12px!important;vertical-align:middle!important; }
+        html.light-mode .table { background-color:transparent!important;color:#1a1a2e!important; }
+        html.light-mode .table thead th,html.light-mode .table > thead > tr > th { background-color:rgba(25,35,58,0.92)!important;color:#ffffff!important;border-color:rgba(255,255,255,0.25)!important; }
+        html.light-mode .table tbody td { background-color:rgba(255,255,255,0.50)!important;color:#1a1a2e!important;border-color:rgba(0,0,0,0.07)!important; }
+        .summary-box { background:linear-gradient(135deg,rgba(33,47,61,0.95) 0%,rgba(25,35,50,0.95) 100%);border:2px solid rgba(100,181,246,0.4);border-radius:12px;padding:12px 16px;text-align:center;min-width:120px;box-shadow:0 2px 8px rgba(0,0,0,0.25);transition:all 0.2s ease; }
+        .summary-box:hover { border-color:rgba(100,181,246,0.6);box-shadow:0 4px 12px rgba(100,181,246,0.15); }
+        .summary-box-label { font-size:10px;color:rgba(255,255,255,0.6);margin-bottom:6px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase; }
+        .summary-box-value { font-size:22px;font-weight:700;color:#64b5f6;letter-spacing:-0.5px; }
+        .summary-loss-value { color:#81c784!important; }
+        .summary-ng-value { color:#ef9a9a!important; }
+        html.light-mode .summary-box { background:linear-gradient(135deg,rgba(230,242,255,0.9) 0%,rgba(220,235,255,0.9) 100%);border:2px solid rgba(61,121,176,0.35);box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+        html.light-mode .summary-box-label { color:rgba(26,26,46,0.7)!important; }
+        html.light-mode .summary-box-value { color:rgba(8,65,150,0.95)!important; }
+        html.light-mode .summary-loss-value { color:rgba(25,135,84,0.9)!important; }
+        html.light-mode .summary-ng-value { color:rgba(180,40,50,0.9)!important; }
+        html.light-mode .section-divider i { color:rgba(61,121,176,0.85)!important; }
+        .btn-submit-main { background:rgba(8,65,150,0.95);border:2px solid rgba(100,181,246,1);color:rgba(100,181,246,1)!important;font-size:13px;padding:6px 28px;border-radius:999px;cursor:pointer;font-weight:700;transition:all 0.15s;display:flex;align-items:center;height:32px; }
+        .btn-submit-main:hover { background:rgba(5,45,110,1);border-color:rgba(144,202,249,1);color:rgba(144,202,249,1)!important; }
+        .btn-reset-main { background:rgba(140,30,40,0.95);border:2px solid rgba(239,154,154,1);color:rgba(239,154,154,1)!important;font-size:13px;padding:6px 24px;border-radius:999px;cursor:pointer;font-weight:700;transition:all 0.15s;display:flex;align-items:center;height:32px; }
+        .btn-reset-main:hover { background:rgba(110,20,30,1);border-color:rgba(244,143,177,1);color:rgba(244,143,177,1)!important; }
+        html.light-mode .btn-submit-main { background:rgba(61,121,176,0.9)!important;border-color:rgba(61,121,176,1)!important;color:#ffffff!important; }
+        html.light-mode .btn-reset-main { background:rgba(180,40,50,0.85)!important;border-color:rgba(200,60,70,0.9)!important;color:#ffffff!important; }
+        .submit-count-text { font-size:12px;color:rgba(255,255,255,0.6);margin-left:10px; }
+        html.light-mode .submit-count-text { color:rgba(26,26,46,0.55)!important; }
+        .btn-add-row { background:rgba(25,100,60,0.9);border:1.5px solid rgba(102,187,106,0.8);color:rgba(102,187,106,1)!important;font-size:12px;padding:5px 14px;border-radius:8px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:5px;transition:all 0.15s;height:28px; }
+        .btn-add-row:hover { background:rgba(35,120,75,1);border-color:rgba(129,199,132,1);color:rgba(165,214,167,1)!important; }
+        html.light-mode .btn-add-row { background:rgba(102,187,106,0.85)!important;border-color:rgba(102,187,106,0.9)!important;color:#ffffff!important; }
+        html.light-mode .btn-add-row:hover { background:rgba(76,155,80,0.95)!important;color:#ffffff!important; }
+        .csd-wrapper { position:relative; width:100%; box-sizing:border-box; }
+        .csd-trigger { position:relative; display:flex; align-items:center; height:30px; padding:0 26px 0 8px; font-size:12px; border-radius:6px; cursor:pointer; user-select:none; box-sizing:border-box; width:100%; background-color:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.25); color:#ffffff; transition:border-color 0.2s, background-color 0.2s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .csd-trigger::after { content:''; position:absolute; right:8px; top:50%; transform:translateY(-50%); width:10px; height:10px; pointer-events:none; flex-shrink:0; background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e"); background-repeat:no-repeat; background-size:10px; }
+        .csd-trigger:hover { border-color:rgba(255,255,255,0.45); background-color:rgba(255,255,255,0.13); }
+        .csd-trigger.open  { border-color:rgba(100,181,246,0.7);  background-color:rgba(255,255,255,0.13); }
+        .csd-dropdown { display:none; position:fixed; z-index:99999; min-width:200px; max-height:240px; overflow-y:auto; background:rgba(20,30,50,0.98); border:1.5px solid rgba(100,181,246,0.35); border-radius:8px; padding:4px 0; box-shadow:0 8px 28px rgba(0,0,0,0.55); backdrop-filter:blur(12px); }
+        .csd-dropdown.open { display:block; }
+        .csd-group-label { padding:6px 12px 3px; font-size:10px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:rgba(100,181,246,0.7); pointer-events:none; }
+        .csd-option { padding:6px 14px; font-size:12px; cursor:pointer; color:rgba(220,225,235,0.92); transition:background 0.12s; white-space:nowrap; }
+        .csd-option:hover    { background:rgba(100,181,246,0.18); color:#ffffff; }
+        .csd-option.selected { background:rgba(100,181,246,0.22); color:#64b5f6; font-weight:600; }
+        .csd-dropdown::-webkit-scrollbar       { width:5px; }
+        .csd-dropdown::-webkit-scrollbar-track { background:transparent; }
+        .csd-dropdown::-webkit-scrollbar-thumb { background:rgba(100,181,246,0.3); border-radius:4px; }
+        html.light-mode .csd-trigger { background-color:rgba(255,255,255,0.85); border:1px solid rgba(0,0,0,0.18); color:#1a1a2e; }
+        html.light-mode .csd-trigger::after { background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%231a1a2e' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e"); }
+        html.light-mode .csd-trigger:hover { border-color:rgba(0,0,0,0.32); background-color:rgba(255,255,255,0.98); }
+        html.light-mode .csd-trigger.open  { border-color:rgba(61,121,176,0.55); background-color:rgba(255,255,255,0.98); }
+        html.light-mode .csd-dropdown { background:#ffffff; border:1.5px solid rgba(61,121,176,0.28); box-shadow:0 8px 24px rgba(0,0,0,0.12); }
+        html.light-mode .csd-group-label          { color:rgba(61,121,176,0.75); }
+        html.light-mode .csd-option               { color:#1a1a2e; }
+        html.light-mode .csd-option:hover         { background:rgba(61,121,176,0.10); color:rgba(8,65,150,0.95); }
+        html.light-mode .csd-option.selected      { background:rgba(61,121,176,0.14); color:rgba(8,65,150,0.95); }
+        html.light-mode .csd-dropdown::-webkit-scrollbar-thumb { background:rgba(61,121,176,0.3); }
+    </style>
+</head>
+<body>
+
+    @Html.AntiForgeryToken()
+
+<div class="filter-area-with-lines">
+    <div class="panamon-bottom-line"></div>
+    <div class="panamon-bottomm-line"></div>
+    <div class="filter-content">
+        <div class="row g-3 align-items-center justify-content-between flex-wrap">
+            <div class="col-auto">
+                <form method="get" class="d-flex flex-wrap align-items-center gap-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="mb-0">Date</label>
+                        <input type="date" class="form-control" style="width:140px;" id="filterDate" />
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="doSearch()">Search</button>
+                    <button type="button" class="btn btn-danger"  onclick="doReset()">Reset</button>
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importExcelModal">
+                        <i class="fas fa-file-excel me-1"></i> Import Excel
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="row g-2 align-items-center">
+            <div class="col-6 col-md-2">
+                <div class="kpi-input-box">
+                    <label>Date</label>
+                    <div id="displayDate" style="font-size:16px;font-weight:700;"></div>
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="kpi-input-box">
+                    <label>Machine</label>
+                    <select id="inputMachine" onchange="loadExistingData()">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="kpi-input-box">
+                    <label>Shift</label>
+                    <select id="inputShift" onchange="loadExistingData()">
+                        <option value="1">Shift 1</option>
+                        <option value="2">Shift 2</option>
+                        <option value="3">Shift 3</option>
+                        <option value="NS">NS</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="kpi-input-box">
+                    <label>Plan</label>
+                    <input type="number" id="inputPlan" placeholder="0" min="0" oninput="recalc()" />
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="kpi-input-box ng-box">
+                    <label>NG</label>
+                    <input type="number" id="inputNG" placeholder="0" min="0" oninput="recalc()" />
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="kpi-input-box">
+                    <label>Quantity</label>
+                    <input type="number" id="inputQty" placeholder="0" min="0" oninput="recalc()" />
+                </div>
+            </div>
+            <div class="col-6 col-md-2">
+                <div class="kpi-input-box actual-box">
+                    <label>Actual</label>
+                    <input type="number" id="inputActual" placeholder="0" min="0" oninput="recalc()" />
+                </div>
+            </div>
+        </div>
+        </div>
+
+    <div class="section-divider">
+        <i class="bi bi-clock-history me-2"></i>Loss Time
+    </div>
+
+    <div style="padding:0;overflow-x:auto;">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th style="width:40px;">No</th>
+                    <th style="min-width:200px;">Loss Category</th>
+                    <th style="min-width:120px;">Minutes</th>
+                    <th style="width:60px;">Del</th>
+                </tr>
+            </thead>
+            <tbody id="loss-time-body"></tbody>
+        </table>
+    </div>
+
+    <div style="padding:10px 16px 4px;display:flex;justify-content:flex-end;">
+        <button type="button" class="btn-add-row" onclick="addLossRow()">
+            <i class="bi bi-plus-circle" style="font-size:14px;"></i>
+            <span>Add Loss Row</span>
+        </button>
+    </div>
+
+    <div style="padding:6px 16px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <div class="summary-box">
+                <div class="summary-box-label">Efficiency</div>
+                <div class="summary-box-value" id="effValue">-</div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-box-label">Total Loss (min)</div>
+                <div class="summary-box-value summary-loss-value" id="totalLoss">0</div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-box-label">Total NG</div>
+                <div class="summary-box-value summary-ng-value" id="totalNG">0</div>
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+            <button type="button" class="btn-submit-main" onclick="handleSubmit()">Submit</button>
+            <button type="button" class="btn-reset-main"  onclick="doReset()">Reset</button>
+            <span class="submit-count-text">Submitted <span id="submitCount">0</span> time(s)</span>
+        </div>
+    </div>
+</div>
+
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
+<script src="~/js/sweetalert2.min.js"></script>
+
+<script>
+    let firstMachineValue = '';
+    const SHIFT_WORKING_TIME = { '1': 458, '2': 393, '3': 398, 'NS': 473 };
+    const SHIFT_MAP = { '1': 'Shift 1', '2': 'Shift 2', '3': 'Shift 3', 'NS': 'Non Shift' };
+
+    // LossGroup lookup — dipakai saat build payload lossItems
+    const LOSS_GROUP_MAP = {
+        QualityTrouble:           'WorkingLoss',
+        ModelChangingLoss:        'WorkingLoss',
+        MaterialShortageExternal: 'WorkingLoss',
+        MachineToolsTrouble:      'WorkingLoss',
+        ManPowerAdjustment:       'WorkingLoss',
+        MaterialShortageInhouse:  'WorkingLoss',
+        MaterialShortageInternal: 'WorkingLoss',
+        SetRepairingLoss:         'WorkingLoss',
+        GawseExternalBodies:      'WorkingLoss',
+        Rework:                   'WorkingLoss',
+        MoldChangingLoss:         'WorkingLoss',
+        BreakTime:                'FixedLoss',
+        CompanyActivity:          'FixedLoss',
+        MorningAssembly:          'FixedLoss',
+        Cleaning:                 'FixedLoss',
+        StockOpname:              'FixedLoss',
+        GeneralAssembly:          'FixedLoss',
+        Maintenance:              'FixedLoss',
+        TrialRun:                 'FixedLoss',
+        TrainingEducation:        'FixedLoss',
+        FreeTalkingQC:            'FixedLoss',
+        NoProductionDay:          'FixedLoss',
+    };
+
+    // Mapping camelCase response JSON → DB column name (untuk pre-fill loss rows dari LoadExisting)
+    const LOSS_COL_MAP = {
+        qualityTrouble:           'QualityTrouble',
+        modelChangingLoss:        'ModelChangingLoss',
+        materialShortageExternal: 'MaterialShortageExternal',
+        machineToolsTrouble:      'MachineToolsTrouble',
+        manPowerAdjustment:       'ManPowerAdjustment',
+        materialShortageInhouse:  'MaterialShortageInhouse',
+        materialShortageInternal: 'MaterialShortageInternal',
+        setRepairingLoss:         'SetRepairingLoss',
+        gawseExternalBodies:      'GawseExternalBodies',
+        rework:                   'Rework',
+        moldChangingLoss:         'MoldChangingLoss',
+        breakTime:                'BreakTime',
+        companyActivity:          'CompanyActivity',
+        morningAssembly:          'MorningAssembly',
+        cleaning:                 'Cleaning',
+        stockOpname:              'StockOpname',
+        generalAssembly:          'GeneralAssembly',
+        maintenance:              'Maintenance',
+        trialRun:                 'TrialRun',
+        trainingEducation:        'TrainingEducation',
+        freeTalkingQC:            'FreeTalkingQC',
+        noProductionDay:          'NoProductionDay',
+    };
+
+    function todayISO() {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    }
+
+
+
+    async function loadExistingData() {
+        const machineSel  = document.getElementById('inputMachine');
+        const machineName = machineSel.options[machineSel.selectedIndex]?.text ?? '';
+        const date        = document.getElementById('filterDate').value;
+        const shiftRaw    = document.getElementById('inputShift').value;
+        const shiftDB     = SHIFT_MAP[shiftRaw] ?? shiftRaw;
+        const defaultWT   = SHIFT_WORKING_TIME[shiftRaw] ?? 458;
+
+        if (!machineName || machineName === 'Loading...' || !date || !shiftRaw) {
+
+            document.getElementById('inputActual').value = defaultWT;
+            recalc();
+            return;
+        }
+
+        try {
+            const res = await fetch(
+                `?handler=LoadExisting&machineName=${encodeURIComponent(machineName)}&date=${date}&shift=${encodeURIComponent(shiftDB)}`,
+                { headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+            );
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+
+            if (data.found) {
+                document.getElementById('inputPlan').value   = data.planQty           ?? '';
+                document.getElementById('inputNG').value     = data.defectQty         ?? '';
+                document.getElementById('inputQty').value    = data.goodProductionQty ?? '';
+                document.getElementById('inputActual').value = data.workingTime       ?? defaultWT;
+
+                document.getElementById('loss-time-body').innerHTML = '';
+                lossRowCount = 0;
+
+                const lossEntries = Object.entries(LOSS_COL_MAP)
+                    .map(([jsKey, dbCol]) => ({ dbCol, val: data[jsKey] }))
+                    .filter(x => x.val !== null && x.val !== undefined && x.val > 0);
+
+                if (lossEntries.length > 0) {
+                    for (const entry of lossEntries) {
+                        addLossRow();
+                        const tbody   = document.getElementById('loss-time-body');
+                        const lastRow = tbody.lastElementChild;
+                        const wrapper = lastRow.querySelector('.csd-wrapper');
+                        if (wrapper) _csdSetValue(wrapper.id, entry.dbCol);
+                        const minInput = lastRow.querySelector('.loss-min');
+                        if (minInput) minInput.value = entry.val;
+                    }
+                } else {
+                    for (let i = 0; i < 5; i++) addLossRow();
+                }
+
+            } else {
+                document.getElementById('inputPlan').value   = '';
+                document.getElementById('inputNG').value     = '';
+                document.getElementById('inputQty').value    = '';
+                document.getElementById('inputActual').value = defaultWT;
+                document.getElementById('loss-time-body').innerHTML = '';
+                lossRowCount = 0;
+                for (let i = 0; i < 5; i++) addLossRow();
+
+            }
+        } catch (e) {
+            console.warn('loadExistingData error:', e);
+            document.getElementById('inputActual').value = defaultWT;
+
+        }
+        recalc();
+    }
+
+    async function loadMachines() {
+        try {
+            const res  = await fetch('?handler=MachineList', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            const sel  = document.getElementById('inputMachine');
+            sel.innerHTML = '';
+            data.forEach((m, i) => {
+                const opt = document.createElement('option');
+                opt.value = m.machineName; opt.textContent = m.machineName;
+                sel.appendChild(opt);
+                if (i === 0) firstMachineValue = m.machineName;
+            });
+        } catch (e) { console.error('Gagal load machines:', e); }
+    }
+
+    let lossCategories = [];
+
+    async function loadLossCategories() {
+        try {
+            const res  = await fetch('?handler=LossCategories', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            lossCategories = [
+                { group: 'Working Loss', items: data.workingLoss },
+                { group: 'Fixed Loss',   items: data.fixedLoss   }
+            ];
+        } catch (e) {
+            console.error('Gagal load loss categories:', e);
+            lossCategories = [
+                { group: 'Working Loss', items: [
+                    { value: 'QualityTrouble',           label: 'Quality Trouble' },
+                    { value: 'ModelChangingLoss',        label: 'Model Changing Loss' },
+                    { value: 'MaterialShortageExternal', label: 'Material Shortage External' },
+                    { value: 'MachineToolsTrouble',      label: 'Machine & Tools Trouble' },
+                    { value: 'ManPowerAdjustment',       label: 'Man Power Adjustment' },
+                    { value: 'MaterialShortageInhouse',  label: 'Material Shortage Inhouse' },
+                    { value: 'MaterialShortageInternal', label: 'Material Shortage Internal' },
+                    { value: 'SetRepairingLoss',         label: 'Set Repairing Loss' },
+                    { value: 'GawseExternalBodies',      label: 'Gawse - External Bodies' },
+                    { value: 'Rework',                   label: 'Rework' },
+                    { value: 'MoldChangingLoss',         label: 'Mold Changing Loss' }
+                ]},
+                { group: 'Fixed Loss', items: [
+                    { value: 'BreakTime',         label: 'Break Time (AM/PM)' },
+                    { value: 'CompanyActivity',   label: 'Company Activity' },
+                    { value: 'MorningAssembly',   label: 'Morning Assembly' },
+                    { value: 'Cleaning',          label: 'Cleaning' },
+                    { value: 'StockOpname',       label: 'Stock Opname' },
+                    { value: 'GeneralAssembly',   label: 'General Assembly' },
+                    { value: 'Maintenance',       label: 'Maintenance' },
+                    { value: 'TrialRun',          label: 'Trial Run' },
+                    { value: 'TrainingEducation', label: 'Training Education' },
+                    { value: 'FreeTalkingQC',     label: 'Free Talking / QC Activity' },
+                    { value: 'NoProductionDay',   label: 'No Production Day' }
+                ]}
+            ];
+        }
+    }
+
+    /* ===================================================
+       CUSTOM SELECT DROPDOWN
+       =================================================== */
+    let _activeDropId = null;
+    let lossRowCount  = 0;
+    let submitCount   = 0;
+    let _floatDrop    = null;
+    let _floatWid     = null;
+
+    function _ensureFloatDrop() {
+        if (_floatDrop) return;
+        _floatDrop = document.createElement('div');
+        _floatDrop.id = 'csd-float-panel';
+        _floatDrop.className = 'csd-dropdown';
+        document.body.appendChild(_floatDrop);
+        _floatDrop.addEventListener('mousedown', e => e.preventDefault());
+        _floatDrop.addEventListener('click', function(e) {
+            const opt = e.target.closest('.csd-option');
+            if (!opt || !_floatWid) return;
+            const wrapper = document.getElementById(_floatWid);
+            if (!wrapper) return;
+            const trigger = wrapper.querySelector('.csd-trigger');
+            const hidden  = wrapper.querySelector('.loss-cat');
+            wrapper.dataset.value = opt.dataset.value;
+            hidden.value          = opt.dataset.value;
+            trigger.textContent   = opt.textContent;
+            _floatDrop.querySelectorAll('.csd-option').forEach(o => o.classList.remove('selected'));
+            opt.classList.add('selected');
+            _closeFloat();
+        });
+    }
+
+    function _openFloat(wid) {
+        _ensureFloatDrop();
+        if (_floatWid && _floatWid !== wid) _closeFloat();
+        _floatWid = wid;
+        const wrapper = document.getElementById(wid);
+        const trigger = wrapper.querySelector('.csd-trigger');
+        let html = '';
+        for (const group of lossCategories) {
+            html += `<div class="csd-group-label">${group.group}</div>`;
+            for (const cat of group.items)
+                html += `<div class="csd-option" data-value="${cat.value}">${cat.label}</div>`;
+        }
+        _floatDrop.innerHTML = html;
+        const curVal = wrapper.dataset.value;
+        _floatDrop.querySelectorAll('.csd-option').forEach(o =>
+            o.classList.toggle('selected', o.dataset.value === curVal)
+        );
+        _floatDrop.classList.add('open');
+        trigger.classList.add('open');
+        _activeDropId = wid;
+        _repositionFloat();
+    }
+
+    function _closeFloat() {
+        if (!_floatDrop) return;
+        _floatDrop.classList.remove('open');
+        if (_floatWid) { const w = document.getElementById(_floatWid); if (w) w.querySelector('.csd-trigger')?.classList.remove('open'); }
+        _floatWid = null; _activeDropId = null;
+    }
+
+    function _repositionFloat() {
+        if (!_floatWid || !_floatDrop) return;
+        const wrapper = document.getElementById(_floatWid);
+        if (!wrapper) return;
+        const r = wrapper.querySelector('.csd-trigger').getBoundingClientRect();
+        const dropH = _floatDrop.offsetHeight || 240;
+        const spaceB = window.innerHeight - r.bottom - 4;
+        const spaceT = r.top - 4;
+        const goUp = spaceB < dropH && spaceT > spaceB;
+        _floatDrop.style.left = r.left + 'px';
+        _floatDrop.style.width = r.width + 'px';
+        _floatDrop.style.maxHeight = Math.min(240, goUp ? spaceT : spaceB) + 'px';
+        if (goUp) { _floatDrop.style.top = ''; _floatDrop.style.bottom = (window.innerHeight - r.top + 2) + 'px'; }
+        else       { _floatDrop.style.bottom = ''; _floatDrop.style.top = (r.bottom + 2) + 'px'; }
+    }
+
+    function _buildCustomSelect(rowIdx) {
+        const wid      = `csd-w-${rowIdx}`;
+        const defVal   = lossCategories[0]?.items[0]?.value ?? '';
+        const defLabel = lossCategories[0]?.items[0]?.label ?? '';
+        return `
+        <div class="csd-wrapper" id="${wid}" data-value="${defVal}">
+            <input type="hidden" class="loss-cat" name="LossCat[${rowIdx}]" value="${defVal}" />
+            <div class="csd-trigger" id="csd-t-${rowIdx}" onclick="_csdToggle('${wid}',event)">${defLabel}</div>
+        </div>`;
+    }
+
+    function _csdToggle(wid, event) {
+        event.stopPropagation();
+        if (_activeDropId === wid) { _closeFloat(); return; }
+        _openFloat(wid);
+    }
+
+    // Set nilai custom dropdown secara programatik (untuk prefill)
+    function _csdSetValue(wid, value) {
+        const wrapper = document.getElementById(wid);
+        if (!wrapper) return;
+        const hidden  = wrapper.querySelector(".loss-cat");
+        const trigger = wrapper.querySelector(".csd-trigger");
+        let label = value;
+        for (const group of lossCategories) {
+            const found = group.items.find(i => i.value === value);
+            if (found) { label = found.label; break; }
+        }
+        wrapper.dataset.value = value;
+        if (hidden)  hidden.value        = value;
+        if (trigger) trigger.textContent = label;
+    }
+
+    document.addEventListener('click', function(e) {
+        if (!_floatDrop || _floatDrop.contains(e.target)) return;
+        if (_floatWid && document.getElementById(_floatWid)?.contains(e.target)) return;
+        _closeFloat();
+    });
+    window.addEventListener('scroll', () => _repositionFloat(), true);
+    window.addEventListener('resize', () => _repositionFloat());
+    /* =================================================== */
+
+    function isLight() { return document.documentElement.classList.contains('light-mode'); }
+
+    function inStyle() {
+        return isLight()
+            ? 'background-color:rgba(255,255,255,0.85);border:1px solid rgba(0,0,0,0.18);color:#1a1a2e;font-size:12px;padding:4px 8px;height:30px;border-radius:6px;width:100%;box-sizing:border-box;'
+            : 'background-color:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);color:#ffffff;font-size:12px;padding:4px 8px;height:30px;border-radius:6px;width:100%;box-sizing:border-box;';
+    }
+
+    function delStyle() {
+        return isLight()
+            ? 'background:rgba(180,40,50,0.85);border:1.5px solid rgba(200,60,70,0.9);color:#ffffff;font-size:11px;padding:3px 10px;border-radius:6px;cursor:pointer;font-weight:600;transition:all 0.15s;'
+            : 'background:rgba(140,30,40,0.9);border:1.5px solid rgba(239,154,154,0.8);color:rgba(239,154,154,1);font-size:11px;padding:3px 10px;border-radius:6px;cursor:pointer;font-weight:600;transition:all 0.15s;';
+    }
+
+    function addLossRow() {
+        const tbody = document.getElementById('loss-time-body');
+        const idx   = lossRowCount;
+        const tr    = document.createElement('tr');
+        tr.dataset.rowIdx = idx;
+        tr.innerHTML = `
+            <td class="row-num" style="text-align:center;">${tbody.children.length + 1}</td>
+            <td>${_buildCustomSelect(idx)}</td>
+            <td><input type="number" class="loss-min" name="LossMin[${idx}]" placeholder="Minutes" min="0" oninput="recalc()" style="${inStyle()}" /></td>
+            <td style="text-align:center;"><button type="button" class="del-btn" onclick="removeLossRow(this)" style="${delStyle()}">Del</button></td>
+        `;
+        tbody.appendChild(tr);
+        lossRowCount++;
+        recalc();
+    }
+
+    function removeLossRow(btn) { btn.closest('tr').remove(); renumberTable(); recalc(); }
+
+    function renumberTable() {
+        document.querySelectorAll('#loss-time-body tr').forEach((row, i) => {
+            const n = row.querySelector('.row-num'); if (n) n.textContent = i + 1;
+        });
+    }
+
+    function refreshRowColors() {
+        document.querySelectorAll('#loss-time-body tr').forEach(tr => {
+            const inp = tr.querySelector('.loss-min'); if (inp) inp.setAttribute('style', inStyle());
+            const del = tr.querySelector('.del-btn');  if (del) del.setAttribute('style', delStyle());
+        });
+        const dd = document.getElementById('displayDate');
+        if (dd) dd.style.color = isLight() ? 'rgba(8,65,150,0.95)' : '#64b5f6';
+    }
+
+    function recalc() {
+        let totalLoss = 0;
+        document.querySelectorAll('#loss-time-body tr').forEach(row => {
+            totalLoss += parseFloat(row.querySelector('.loss-min')?.value) || 0;
+        });
+        const plan   = parseFloat(document.getElementById('inputPlan')?.value)   || 0;
+        const actual = parseFloat(document.getElementById('inputActual')?.value) || 0;
+        const ng     = parseFloat(document.getElementById('inputNG')?.value)     || 0;
+        document.getElementById('totalLoss').textContent = totalLoss;
+        document.getElementById('totalNG').textContent   = ng;
+        document.getElementById('effValue').textContent  = plan > 0 ? ((actual / plan) * 100).toFixed(1) + '%' : '-';
+    }
+
+    function doSearch() {
+        const d = document.getElementById('filterDate').value;
+        if (d) {
+            const o = new Date(d + 'T00:00:00');
+            const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            document.getElementById('displayDate').textContent =
+                `${String(o.getDate()).padStart(2,'0')} ${m[o.getMonth()]} ${o.getFullYear()}`;
+        }
+        loadExistingData();
+    }
+
+    function doReset() {
+        document.getElementById('filterDate').value = todayISO();
+        const machSel = document.getElementById('inputMachine');
+        if (machSel.options.length > 0) machSel.selectedIndex = 0;
+        document.getElementById('inputShift').value = '1';
+        ['inputPlan','inputNG','inputQty','inputActual'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('loss-time-body').innerHTML = '';
+        lossRowCount = 0;
+        for (let i = 0; i < 5; i++) addLossRow();
+
+        doSearch();
+    }
+
+    // ─── SUBMIT — kirim format lossItems array (sesuai backend baru) ───
+    async function handleSubmit() {
+        if (!document.getElementById('inputPlan').value) {
+            alert('Mohon isi Plan terlebih dahulu.'); return;
+        }
+
+        // Kumpulkan loss rows → lossItems array, gabungkan duplikat kategori
+        const lossMap = {};
+        document.querySelectorAll('#loss-time-body tr').forEach(row => {
+            const cat = row.querySelector('.loss-cat')?.value;
+            const min = parseFloat(row.querySelector('.loss-min')?.value) || 0;
+            if (cat && min > 0) lossMap[cat] = (lossMap[cat] || 0) + min;
+        });
+
+        const lossItems = Object.entries(lossMap).map(([cat, min]) => ({
+            lossCategory: cat,
+            lossGroup:    LOSS_GROUP_MAP[cat] ?? 'WorkingLoss',
+            lossMinutes:  min
+        }));
+
+        const machineSel = document.getElementById('inputMachine');
+        const shiftRaw   = document.getElementById('inputShift').value;
+
+        // ✅ Format payload baru — sesuai MachineEfficiencyInput di backend
+        const payload = {
+            machineName:       machineSel.options[machineSel.selectedIndex]?.text ?? '',
+            date:              document.getElementById('filterDate').value,
+            shift:             SHIFT_MAP[shiftRaw] ?? shiftRaw,
+            planQty:           parseFloat(document.getElementById('inputPlan').value)   || null,
+            defectQty:         parseFloat(document.getElementById('inputNG').value)     || null,
+            goodProductionQty: parseFloat(document.getElementById('inputQty').value)    || null,
+            workingTime:       parseFloat(document.getElementById('inputActual').value) || null,
+            lossItems:         lossItems   // ← array, bukan flat fields
+        };
+
+        try {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+            const res = await fetch('?handler=Submit', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token },
+                body:    JSON.stringify(payload)
+            });
+            const result = await res.json();
+            if (result.success) {
+                submitCount++;
+                document.getElementById('submitCount').textContent = submitCount;
+                const action = result.action === 'updated' ? 'diperbarui' : 'disimpan';
+                alert(`Data berhasil ${action}!`);
+                await loadExistingData();
+            } else { alert('Gagal submit: ' + result.error); }
+        } catch (e) { alert('Error: ' + e.message); }
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        document.getElementById('filterDate').value = todayISO();
+        await loadMachines();
+        await loadLossCategories();
+        doSearch();
+        refreshRowColors();
+        new MutationObserver(() => refreshRowColors())
+            .observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    });
+</script>
+</body>
+</html>
+
+<!-- ===================== MODAL IMPORT EXCEL ===================== -->
+<style>
+    .import-step-label { font-size:11px; font-weight:700; display:block; margin-bottom:5px; }
+    .import-hint       { font-size:10px; margin-top:4px; }
+    .import-divider    { border-top:1px solid rgba(255,255,255,0.08); padding-top:10px; }
+    html.light-mode .import-divider { border-top-color:rgba(0,0,0,0.08) !important; }
+    .import-need-fmt   { font-size:11px; }
+</style>
+
+<div class="modal fade" id="importExcelModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-file-upload me-2"></i>Import Machine Efficiency Data
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="importAlertBox" class="alert d-none mb-3"></div>
+                <div class="mb-3">
+                    <label class="import-step-label">1. Choose Excel File</label>
+                    <input type="file" id="importExcelFile" accept=".xlsx" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label class="import-step-label">2. Select Target Machine</label>
+                    <select id="importMachineSelect" class="form-select">
+                        <option value="" disabled selected>Loading machines...</option>
+                    </select>
+                    <div class="import-hint form-text">Pilih machine yang sesuai dengan data Excel ini.</div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="import-step-label">3. Untuk Bulan:</label>
+                        <select id="importTargetMonth" class="form-select">
+                            <option value="1">January</option><option value="2">February</option><option value="3" selected>March</option>
+                            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+                            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+                            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="import-step-label">Untuk Tahun:</label>
+                        <select id="importTargetYear" class="form-select">
+                            <option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option>
+                            <option value="2026" selected>2026</option><option value="2027">2027</option><option value="2028">2028</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="import-divider d-flex justify-content-between align-items-center">
+                    <span class="import-need-fmt form-text">Need the format?</span>
+                    <a href="?handler=DownloadTemplate" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-download me-1"></i> Download Template
+                    </a>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                <button type="button" id="btnDoImport" class="btn btn-success btn-sm">
+                    <i class="fas fa-upload me-1"></i> Import Data
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('importExcelModal').addEventListener('show.bs.modal', async () => {
+        const sel = document.getElementById('importMachineSelect');
+        try {
+            const res = await fetch('?handler=MachineList', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const machines = await res.json();
+            
+            sel.innerHTML = '<option value="" disabled selected>-- Pilih Machine --</option>'
+                + machines.map(m => `<option value="${m.machineName}">${m.machineName}</option>`).join('');
+        } catch { sel.innerHTML = '<option value="" disabled selected>Gagal load data mesin</option>'; }
+    });
+
+    document.getElementById('importExcelModal').addEventListener('hidden.bs.modal', () => {
+        document.getElementById('importAlertBox').className = 'alert d-none';
+        document.getElementById('importExcelFile').value = '';
+    });
+
+    document.getElementById('btnDoImport').addEventListener('click', async function () {
+        const file        = document.getElementById('importExcelFile').files[0];
+        const machineName = document.getElementById('importMachineSelect').value;
+        const month       = document.getElementById('importTargetMonth').value;
+        const year        = document.getElementById('importTargetYear').value;
+        const alertBox    = document.getElementById('importAlertBox');
+        if (!file)        { alertBox.className='alert alert-warning'; alertBox.textContent='Harap pilih file Excel.'; alertBox.classList.remove('d-none'); return; }
+        if (!machineName) { alertBox.className='alert alert-warning'; alertBox.textContent='Harap pilih machine.';   alertBox.classList.remove('d-none'); return; }
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Importing...';
+        alertBox.className = 'alert d-none';
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('machineName', machineName);
+            formData.append('month', month);
+            formData.append('year', year);
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+            formData.append('__RequestVerificationToken', token);
+            const res    = await fetch('?handler=ImportExcel', { method: 'POST', body: formData });
+            const result = await res.json();
+            if (res.ok && result.success) {
+                alertBox.className = 'alert alert-success';
+                alertBox.textContent = result.message;
+                alertBox.classList.remove('d-none');
+                document.getElementById('importExcelFile').value = '';
+                setTimeout(() => bootstrap.Modal.getInstance(document.getElementById('importExcelModal')).hide(), 1500);
+            } else {
+                alertBox.className = 'alert alert-danger';
+                alertBox.textContent = result.error || 'Import gagal.';
+                alertBox.classList.remove('d-none');
+            }
+        } catch (err) {
+            alertBox.className = 'alert alert-danger';
+            alertBox.textContent = 'Sistem error: ' + err.message;
+            alertBox.classList.remove('d-none');
+        } finally {
+            this.disabled = false;
+            this.innerHTML = '<i class="fas fa-upload me-1"></i> Import Data';
+        }
+    });
+</script>
