@@ -119,10 +119,13 @@
     <form method="get" class="sap-filter" id="sapFilterForm">
         <div class="d-flex align-items-center">
             <label for="MachineLine">Line</label>
-            <select class="form-select form-select-sm" style="width:80px" name="MachineLine" id="MachineLine">
+            <select class="form-select form-select-sm" style="width:90px" name="MachineLine" id="MachineLine">
                 <option value="All" selected="@(Model.MachineLine == "All")">All</option>
                 <option value="MCH1-01" selected="@(Model.MachineLine == "MCH1-01")">CU</option>
                 <option value="MCH1-02" selected="@(Model.MachineLine == "MCH1-02")">CS</option>
+                <option value="">CB</option>
+                <option value="">EVA</option>
+                <option value="">COND</option>
             </select>
         </div>
         <div class="d-flex align-items-center">

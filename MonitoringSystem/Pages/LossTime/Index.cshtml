@@ -966,10 +966,13 @@
 
             <div class="d-flex align-items-center gap-2 @(Model.SelectedSource == "Machine" ? "filter-panel-hidden" : "")" id="lineFilterPanel">
                 <label class="mb-0">Line</label>
-                <select class="form-select" style="width: 60px;" id="MachineLine" name="MachineLine" asp-for="MachineLine">
+                <select class="form-select" style="width: 90px;" id="MachineLine" name="MachineLine" asp-for="MachineLine">
                     <option value="All">All</option>
                     <option value="MCH1-01">CU</option>
                     <option value="MCH1-02">CS</option>
+                    <!option value="">CB</!option>
+                    <!option value="">EVA</!option>
+                    <!option value="">COND</!option>
                 </select>
             </div>
 

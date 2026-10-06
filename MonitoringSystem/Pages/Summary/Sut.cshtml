@@ -570,10 +570,13 @@
                     <form method="get" class="d-flex flex-wrap align-items-center gap-3">
                         <div class="d-flex align-items-center gap-2">
                             <label class="mb-0">Machine</label>
-                            <select class="form-select" style="width: 80px;" name="FilterMachineCode" asp-for="FilterMachineCode">
+                            <select class="form-select" style="width: 100px;" name="FilterMachineCode" asp-for="FilterMachineCode">
                                 <option value="">All</option>
                                 <option value="MCH1-01">CU</option>
                                 <option value="MCH1-02">CS</option>
+                                <!option value="">CB</!option>
+                                <!option value="">EVA</!option>
+                                <!option value="">COND</!option>
                             </select>
                         </div>
                         <button type="submit" class="btn btn-primary">Search</button>
