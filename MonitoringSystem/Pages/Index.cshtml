@@ -1,90 +1,162 @@
-﻿@page
+@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    Layout = null;
 }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panamon - Pilih Monitoring</title>
+    <link rel="icon" href="~/assets/PanasonicIcon.png" />
+    <link rel="stylesheet" href="~/lib/fontawesome/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/fonts.css" asp-append-version="true" />
+    <style>
+        * { box-sizing: border-box; }
 
-<style>
-    /* ===== TITLE - DARK MODE DEFAULT ===== */
-    .home-title {
-        color: #ffffff !important;
-    }
+        html, body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'DINPro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: #fff;
+        }
 
-    /* ===== LIGHT MODE - TITLE ===== */
-    html.light-mode .home-title {
-        color: #1a1a2e !important;
-    }
-</style>
+        body {
+            background: url('/assets/BackgroundPanamon.png') no-repeat center center fixed;
+            background-size: cover;
+        }
 
-<div class="text-center" style="padding-right: 100px;">
-    <h4 class="display-4 text-center home-title">Air Conditioner Monitoring System</h4>
-</div>
+        /* Overlay gelap: halaman di belakang popup kosong */
+        .chooser-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(6, 10, 30, 0.72);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
 
-<!-- Modal untuk form export -->
-<div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="exportModalLabel">Export to Excel</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        .chooser-modal {
+            width: 100%;
+            max-width: 720px;
+            background: rgba(30, 38, 72, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+            padding: 32px;
+            text-align: center;
+            animation: chooser-in .25s ease-out;
+        }
+
+        @@keyframes chooser-in {
+            from { opacity: 0; transform: translateY(12px) scale(.98); }
+            to { opacity: 1; transform: none; }
+        }
+
+        .chooser-logo {
+            height: 28px;
+            margin-bottom: 18px;
+        }
+
+        .chooser-title {
+            margin: 0 0 6px;
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: .5px;
+        }
+
+        .chooser-sub {
+            margin: 0 0 28px;
+            font-size: .9rem;
+            color: rgba(255, 255, 255, 0.65);
+        }
+
+        .chooser-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .chooser-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            min-height: 200px;
+            padding: 24px 16px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.12);
+            color: #fff;
+            text-decoration: none;
+            transition: transform .15s ease, border-color .15s ease, background .15s ease, box-shadow .15s ease;
+        }
+
+            .chooser-card i {
+                font-size: 3rem;
+            }
+
+            .chooser-card .chooser-name {
+                font-size: 1.5rem;
+                font-weight: 800;
+                letter-spacing: 2px;
+            }
+
+            .chooser-card .chooser-desc {
+                font-size: .8rem;
+                color: rgba(255, 255, 255, 0.6);
+            }
+
+            .chooser-card:hover,
+            .chooser-card:focus-visible {
+                transform: translateY(-3px);
+                outline: none;
+            }
+
+        .chooser-rac i { color: #4fc3f7; }
+        .chooser-rac:hover, .chooser-rac:focus-visible {
+            border-color: #4fc3f7;
+            background: rgba(79, 195, 247, 0.12);
+            box-shadow: 0 10px 28px rgba(79, 195, 247, 0.25);
+        }
+
+        .chooser-machine i { color: #2ecc71; }
+        .chooser-machine:hover, .chooser-machine:focus-visible {
+            border-color: #2ecc71;
+            background: rgba(46, 204, 113, 0.12);
+            box-shadow: 0 10px 28px rgba(46, 204, 113, 0.25);
+        }
+
+        @@media (max-width: 560px) {
+            .chooser-modal { padding: 24px 16px; }
+            .chooser-options { grid-template-columns: 1fr; }
+            .chooser-card { min-height: 150px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="chooser-backdrop">
+        <div class="chooser-modal" role="dialog" aria-modal="true" aria-labelledby="chooserTitle">
+            <img class="chooser-logo" src="~/assets/PanasonicIcon.png" alt="Panasonic" />
+            <h1 class="chooser-title" id="chooserTitle">Pilih Monitoring</h1>
+            <p class="chooser-sub">Silakan pilih halaman yang ingin dibuka</p>
+
+            <div class="chooser-options">
+                <a class="chooser-card chooser-rac" href="/ProductionReport/index">
+                    <i class="fa-solid fa-snowflake"></i>
+                    <span class="chooser-name">RAC</span>
+                    <span class="chooser-desc">Production Monitoring (Panamon)</span>
+                </a>
+                <a class="chooser-card chooser-machine" href="/ACOEE/dashboard">
+                    <i class="fa-solid fa-gears"></i>
+                    <span class="chooser-name">MACHINE</span>
+                    <span class="chooser-desc">AC OEE Machine Dashboard</span>
+                </a>
             </div>
-            <form method="post" asp-page-handler="ExportToExcel" id="exportForm">
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="month" class="form-label">Month</label>
-                        <select class="form-select" name="month" id="month" required>
-                            <option value="" disabled selected>Select Month</option>
-                            <option value="1">January</option>
-                            <option value="2">February</option>
-                            <option value="3">March</option>
-                            <option value="4">April</option>
-                            <option value="5">May</option>
-                            <option value="6">June</option>
-                            <option value="7">July</option>
-                            <option value="8">August</option>
-                            <option value="9">September</option>
-                            <option value="10">October</option>
-                            <option value="11">November</option>
-                            <option value="12">December</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="year" class="form-label">Year</label>
-                        <input type="number" class="form-control" name="year" id="year" placeholder="2025" required />
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Export</button>
-                </div>
-            </form>
         </div>
     </div>
-</div>
-
-@section Scripts {
-@* Bootstrap sudah di-load local oleh _Layout.cshtml *@
-        <script>
-            document.getElementById('exportForm').addEventListener('submit', function (event) {
-                event.preventDefault();
-                const form = event.target;
-                const formData = new FormData(form);
-                fetch(form.action, {
-                    method: form.method,
-                    body: formData
-                }).then(response => {
-                    if (response.ok) {
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
-                        modal.hide();
-                        form.reset();
-                        form.querySelector('select[name="month"]').value = "";
-                    } else {
-                        alert('Failed to export. Please try again.');
-                    }
-                }).catch(error => {
-                    console.error('Error:', error);
-                    alert('An error occurred. Please try again.');
-                });
-            });
-        </script>
-}
+</body>
+</html>

@@ -22,9 +22,10 @@ namespace MonitoringSystem.Pages
             _logger = logger;
         }
 
+        // Halaman pilihan RAC / MACHINE (juga tujuan default setelah login)
         public IActionResult OnGet()
         {
-            return RedirectToPage("/ProductionReport/index");
+            return Page();
         }
 
         public IActionResult OnPostExportToExcel(int month, int year)
