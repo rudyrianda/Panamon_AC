@@ -49,9 +49,18 @@ namespace Plclogger
         public int ProdPlan { get; set; }
         public int Sut { get; set; }
         public string? PlanDate { get; set; } // yyyy-MM-dd, tanggal plan dari list rencana (boleh kosong)
+        public int Actual { get; set; }        // ACTUAL terakhir (output Inventory AC OEE yang dibagi ke baris ini)
+        public int Defect { get; set; }        // DEFECT terakhir dari register PLC baris ini (selama model PLC = model baris)
     }
 
     // Satu baris list mingguan dari tabel dbo.PsiWeeklyPlan (diisi worker SAP Plan di Panamon)
+    public class InventoryOutputItem
+    {
+        public string Date { get; set; } = string.Empty;  // tanggal produksi yyyy-MM-dd (07:00 s/d 07:00)
+        public string Model { get; set; } = string.Empty;
+        public int Actual { get; set; }
+    }
+
     public class PsiWeeklyItem
     {
         public int SeqInWeek { get; set; }
@@ -1013,6 +1022,7 @@ namespace Plclogger
         // =========================================================
         public const string ChangePlanTable = "PlcKyoshinChangePlan";
         public const string DailyOutputTable = "PlcKyoshinDailyOutput"; // output harian per model, diisi bersama ChangePlanTable
+        public const string DailyOutputOverrideTable = "PlcKyoshinDailyOutputOverride"; // koreksi Actual manual yang harus bertahan saat data harian dihitung ulang
 
         public sealed class KyoshinRun
         {
@@ -1021,41 +1031,123 @@ namespace Plclogger
             public int ProdPlan, PlanBySut, Actual;
         }
 
-        // Pecah sampel satu hari produksi (urut waktu) menjadi kali jalan model.
-        // before = sampel terakhir sebelum hari ini (untuk model yang masih jalan lewat 07:00).
-        public static List<KyoshinRun> BuildKyoshinRuns(
-            IEnumerable<(DateTime At, string Model, int R20, int R23, int R22)> samples,
-            (string Model, int R23, int R22)? before)
+        // Sampel layar utama + kenaikan counter-nya sejak sampel sebelumnya
+        public sealed record KyoshinStep(DateTime At, string Model, int R20, int D23, int D22, int D24);
+
+        // Nilai counter terakhir sebelum hari produksi (per model + PROD. PLAN), urut dari yang terbaru
+        public sealed record KyoshinCounterSeed(string Model, int R20, int R23, int R22, int R24);
+
+        // Counter PLAN BY SUT (R23), ACTUAL (R22) & DEFECT (R24) di PLC milik BARIS plan: operator pindah ke model lain lalu
+        // kembali ke baris lama = counter melanjutkan nilai lamanya (contoh 04/10: UN9AKJ 100 -> UN12AKJ 0 -> UN9AKJ 100).
+        // Patokan kenaikan = nilai terakhir baris yang sama (model + PROD. PLAN R20); belum ada = nilai terakhir model itu;
+        // belum ada juga = 0. Nilai turun dari patokan = counter di-reset / baris baru (dihitung dari 0).
+        public static List<KyoshinStep> BuildKyoshinSteps(
+            IEnumerable<(DateTime At, string Model, int R20, int R23, int R22, int R24)> samples,
+            IEnumerable<KyoshinCounterSeed>? seeds)
         {
-            var runs = new List<KyoshinRun>();
-            KyoshinRun? run = null;
-            int last23 = 0, last22 = 0;
+            var byRow = new Dictionary<(string, int), (int R23, int R22, int R24)>();
+            var byModel = new Dictionary<string, (int R23, int R22, int R24)>();
+            foreach (var s in seeds ?? Enumerable.Empty<KyoshinCounterSeed>())
+            {
+                var key = (s.Model ?? "").Trim().ToUpperInvariant();
+                if (key.Length == 0) continue;
+                var v = (Math.Max(0, s.R23), Math.Max(0, s.R22), Math.Max(0, s.R24));
+                byRow.TryAdd((key, s.R20), v); // seed terbaru lebih dulu
+                byModel.TryAdd(key, v);
+            }
+
+            var steps = new List<KyoshinStep>();
             foreach (var s in samples)
             {
                 var model = (s.Model ?? "").Trim();
                 if (model.Length == 0) continue; // layar belum ada model
-                int r23 = Math.Max(0, s.R23), r22 = Math.Max(0, s.R22);
+                var key = model.ToUpperInvariant();
+                int r23 = Math.Max(0, s.R23), r22 = Math.Max(0, s.R22), r24 = Math.Max(0, s.R24);
+                (int R23, int R22, int R24) last = byRow.TryGetValue((key, s.R20), out var rv) ? rv : byModel.TryGetValue(key, out var mv) ? mv : (0, 0, 0);
+                static int Up(int cur, int prev) => cur >= prev ? cur - prev : cur;
+                steps.Add(new KyoshinStep(s.At, model, Math.Max(0, s.R20), Up(r23, last.R23), Up(r22, last.R22), Up(r24, last.R24)));
+                byRow[(key, s.R20)] = byModel[key] = (r23, r22, r24);
+            }
+            return steps;
+        }
 
-                if (run == null || run.Model != model)
+        // Kali jalan model (ganti model = kali jalan baru) dari kenaikan counter satu hari produksi
+        public static List<KyoshinRun> BuildKyoshinRuns(IEnumerable<KyoshinStep> steps)
+        {
+            var runs = new List<KyoshinRun>();
+            KyoshinRun? run = null;
+            foreach (var s in steps)
+            {
+                if (run == null || run.Model != s.Model)
                 {
-                    // Model baru: R22/R23 dihitung dari 0. Kecuali model pertama hari ini yang sama dengan
-                    // model terakhir kemarin (masih jalan lewat 07:00): mulai dari nilai terakhir kemarin.
-                    bool continues = run == null && before?.Model == model;
-                    last23 = continues && r23 >= before!.Value.R23 ? before.Value.R23 : 0;
-                    last22 = continues && r22 >= before!.Value.R22 ? before.Value.R22 : 0;
-                    run = new KyoshinRun { Model = model, StartAt = s.At };
+                    run = new KyoshinRun { Model = s.Model, StartAt = s.At };
                     runs.Add(run);
                 }
-
-                // Kenaikan sejak sampel sebelumnya; kalau nilainya turun berarti counter di-reset (hitung dari 0)
-                run.PlanBySut += r23 >= last23 ? r23 - last23 : r23;
-                run.Actual += r22 >= last22 ? r22 - last22 : r22;
-                last23 = r23;
-                last22 = r22;
-                run.ProdPlan = Math.Max(0, s.R20);
+                run.PlanBySut += s.D23;
+                run.Actual += s.D22;
+                run.ProdPlan = s.R20;
                 run.EndAt = s.At;
             }
             return runs;
+        }
+
+        public const string ShiftOutputTable = "PlcKyoshinShiftOutput"; // output & defect per shift per model, untuk analisa
+
+        public sealed class KyoshinShiftOutput
+        {
+            public int ShiftNo;
+            public string Model = "";
+            public DateTime FirstAt, LastAt;
+            public int ProdPlan, PlanBySut, Actual, Defect;
+        }
+
+        // Kenaikan counter dijumlah per (shift, model): jumlah semua shift = Actual harian.
+        // Sampel jam 15:45:00 masuk shift 2, 23:15:00 masuk shift 3.
+        public static List<KyoshinShiftOutput> BuildKyoshinShiftOutput(IEnumerable<KyoshinStep> steps)
+        {
+            var result = new Dictionary<(int, string), KyoshinShiftOutput>();
+            foreach (var s in steps)
+            {
+                var shift = ShiftOf(s.At).shiftNo;
+                if (!result.TryGetValue((shift, s.Model), out var o))
+                    result[(shift, s.Model)] = o = new KyoshinShiftOutput { ShiftNo = shift, Model = s.Model, FirstAt = s.At };
+                o.PlanBySut += s.D23;
+                o.Actual += s.D22;
+                o.Defect += s.D24;
+                o.ProdPlan = s.R20;
+                o.LastAt = s.At;
+            }
+            return result.Values.OrderBy(x => x.ShiftNo).ThenBy(x => x.FirstAt).ToList();
+        }
+
+        // Patokan counter sebelum hari produksi: sampel terakhir tiap (model, PROD. PLAN) dalam 7 hari sebelumnya, terbaru dulu
+        public static List<KyoshinCounterSeed> LoadKyoshinCounterSeeds(SqlConnection conn, string trendTable, string machineCode, DateTime before)
+        {
+            var seeds = new List<KyoshinCounterSeed>();
+            using var cmd = new SqlCommand($@"
+                SELECT Model, ProdPlan, PlanBySut, Actual, Defect FROM (
+                    SELECT LTRIM(RTRIM(Model)) AS Model, ProdPlan, PlanBySut, Actual, Defect, SampleAt,
+                           ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(Model)), ProdPlan ORDER BY SampleAt DESC) AS rn
+                    FROM dbo.{trendTable}
+                    WHERE MachineCode = @mc AND SampleAt < @before AND SampleAt >= DATEADD(DAY, -7, @before) AND LTRIM(RTRIM(Model)) <> ''
+                ) x WHERE rn = 1 ORDER BY SampleAt DESC", conn);
+            cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = machineCode;
+            cmd.Parameters.Add("@before", SqlDbType.DateTime2).Value = before;
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) seeds.Add(new KyoshinCounterSeed(r.GetString(0), r.GetInt32(1), r.GetInt32(2), r.GetInt32(3), r.GetInt32(4)));
+            return seeds;
+        }
+
+        private static bool TableExists(SqlConnection conn, SqlTransaction? tx, string table)
+        {
+            using var cmd = new SqlCommand($"SELECT CASE WHEN OBJECT_ID(N'dbo.{table}', N'U') IS NULL THEN 0 ELSE 1 END", conn, tx);
+            return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+        }
+
+        private static bool ColumnExists(SqlConnection conn, SqlTransaction? tx, string table, string column)
+        {
+            using var cmd = new SqlCommand($"SELECT CASE WHEN COL_LENGTH(N'dbo.{table}', N'{column}') IS NULL THEN 0 ELSE 1 END", conn, tx);
+            return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
         }
 
         // Hitung ulang hari yang sedang berjalan dan setiap hari yang belum final (mis. Plclogger sempat mati saat 07:00).
@@ -1065,6 +1157,11 @@ namespace Plclogger
             using var conn = new SqlConnection(DbConnectionString);
             conn.Open();
 
+            // Tabel output per shift baru dibuat: hari lama (sampai 45 hari) yang belum punya datanya ikut dihitung sekali
+            string shiftBackfill = TableExists(conn, null, ShiftOutputTable) ? $@"
+                       OR NOT EXISTS (
+                        SELECT 1 FROM dbo.{ShiftOutputTable} so
+                        WHERE so.MachineCode = t.MachineCode AND so.ProductionDate = t.ProductionDate AND so.IsFinal = 1)" : "";
             var dates = new List<DateTime>();
             using (var cmd = new SqlCommand($@"
                 SELECT DISTINCT t.ProductionDate FROM dbo.{TrendTable} t
@@ -1074,7 +1171,7 @@ namespace Plclogger
                         WHERE c.MachineCode = t.MachineCode AND c.ProductionDate = t.ProductionDate AND c.IsFinal = 1)
                        OR NOT EXISTS (
                         SELECT 1 FROM dbo.{DailyOutputTable} o
-                        WHERE o.MachineCode = t.MachineCode AND o.ProductionDate = t.ProductionDate AND o.IsFinal = 1))", conn))
+                        WHERE o.MachineCode = t.MachineCode AND o.ProductionDate = t.ProductionDate AND o.IsFinal = 1){shiftBackfill})", conn))
             {
                 cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
                 cmd.Parameters.Add("@cur", SqlDbType.Date).Value = currentDate;
@@ -1090,33 +1187,37 @@ namespace Plclogger
         {
             var dayStart = productionDate.Date.AddHours(7);
 
-            // Sampel terakhir sebelum hari ini dimulai: untuk memotong model yang masih jalan dari kemarin
-            (string Model, int R23, int R22)? before = null;
-            using (var cmd = new SqlCommand($@"
-                SELECT TOP 1 Model, PlanBySut, Actual FROM dbo.{TrendTable}
-                WHERE MachineCode = @mc AND SampleAt < @start AND LTRIM(RTRIM(Model)) <> ''
-                ORDER BY SampleAt DESC", conn))
-            {
-                cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
-                cmd.Parameters.Add("@start", SqlDbType.DateTime2).Value = dayStart;
-                using var r = cmd.ExecuteReader();
-                if (r.Read()) before = (r.GetString(0).Trim(), Math.Max(0, r.GetInt32(1)), Math.Max(0, r.GetInt32(2)));
-            }
+            // Nilai counter terakhir sebelum hari ini dimulai: model yang masih jalan dari kemarin hanya dihitung kenaikannya
+            var seeds = LoadKyoshinCounterSeeds(conn, TrendTable, TrendMachineCode, dayStart);
 
-            var samples = new List<(DateTime At, string Model, int R20, int R23, int R22)>();
+            var samples = new List<(DateTime At, string Model, int R20, int R23, int R22, int R24)>();
             using (var cmd = new SqlCommand($@"
-                SELECT SampleAt, Model, ProdPlan, PlanBySut, Actual FROM dbo.{TrendTable}
+                SELECT SampleAt, Model, ProdPlan, PlanBySut, Actual, Defect FROM dbo.{TrendTable}
                 WHERE MachineCode = @mc AND ProductionDate = @pd ORDER BY SampleAt", conn))
             {
                 cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
                 cmd.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate.Date;
                 using var r = cmd.ExecuteReader();
                 while (r.Read())
-                    samples.Add((r.GetDateTime(0), r.GetString(1), r.GetInt32(2), r.GetInt32(3), r.GetInt32(4)));
+                    samples.Add((r.GetDateTime(0), r.GetString(1), r.GetInt32(2), r.GetInt32(3), r.GetInt32(4), r.GetInt32(5)));
             }
-            var runs = BuildKyoshinRuns(samples, before);
+            var steps = BuildKyoshinSteps(samples, seeds);
+            var runs = BuildKyoshinRuns(steps);
+            var shifts = BuildKyoshinShiftOutput(steps);
 
             using var tx = conn.BeginTransaction();
+            var actualOverrides = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            if (TableExists(conn, tx, DailyOutputOverrideTable))
+            {
+                using var overrideCmd = new SqlCommand($@"
+                    SELECT Model, Actual FROM dbo.{DailyOutputOverrideTable}
+                    WHERE MachineCode = @mc AND ProductionDate = @pd", conn, tx);
+                overrideCmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                overrideCmd.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate.Date;
+                using var overrideReader = overrideCmd.ExecuteReader();
+                while (overrideReader.Read())
+                    actualOverrides[overrideReader.GetString(0).Trim()] = overrideReader.GetInt32(1);
+            }
             using (var del = new SqlCommand($"DELETE FROM dbo.{ChangePlanTable} WHERE MachineCode = @mc AND ProductionDate = @pd", conn, tx))
             {
                 del.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
@@ -1150,17 +1251,53 @@ namespace Plclogger
                 del.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate.Date;
                 del.ExecuteNonQuery();
             }
+            bool dailyDefect = ColumnExists(conn, tx, DailyOutputTable, "Defect");
             foreach (var g in runs.GroupBy(x => x.Model))
             {
-                using var ins = new SqlCommand($@"
-                    INSERT INTO dbo.{DailyOutputTable} (MachineCode, ProductionDate, Model, Actual, IsFinal, UpdatedAt)
-                    VALUES (@mc, @pd, @model, @actual, @final, SYSDATETIME())", conn, tx);
+                int actual = actualOverrides.TryGetValue(g.Key, out var overrideActual)
+                    ? overrideActual
+                    : g.Sum(x => x.Actual);
+                using var ins = new SqlCommand(dailyDefect
+                    ? $@"INSERT INTO dbo.{DailyOutputTable} (MachineCode, ProductionDate, Model, Actual, Defect, IsFinal, UpdatedAt)
+                         VALUES (@mc, @pd, @model, @actual, @defect, @final, SYSDATETIME())"
+                    : $@"INSERT INTO dbo.{DailyOutputTable} (MachineCode, ProductionDate, Model, Actual, IsFinal, UpdatedAt)
+                         VALUES (@mc, @pd, @model, @actual, @final, SYSDATETIME())", conn, tx);
                 ins.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
                 ins.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate.Date;
                 ins.Parameters.Add("@model", SqlDbType.NVarChar, 50).Value = g.Key;
-                ins.Parameters.Add("@actual", SqlDbType.Int).Value = g.Sum(x => x.Actual);
+                ins.Parameters.Add("@actual", SqlDbType.Int).Value = actual;
+                ins.Parameters.Add("@defect", SqlDbType.Int).Value = shifts.Where(x => x.Model == g.Key).Sum(x => x.Defect);
                 ins.Parameters.Add("@final", SqlDbType.Bit).Value = isFinal;
                 ins.ExecuteNonQuery();
+            }
+
+            // Output & defect per shift per model (dbo.PlcKyoshinShiftOutput), untuk diolah / analisa
+            if (TableExists(conn, tx, ShiftOutputTable))
+            {
+                using (var del = new SqlCommand($"DELETE FROM dbo.{ShiftOutputTable} WHERE MachineCode = @mc AND ProductionDate = @pd", conn, tx))
+                {
+                    del.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                    del.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate.Date;
+                    del.ExecuteNonQuery();
+                }
+                foreach (var x in shifts)
+                {
+                    using var ins = new SqlCommand($@"
+                        INSERT INTO dbo.{ShiftOutputTable} (MachineCode, ProductionDate, ShiftNo, Model, Actual, Defect, PlanBySut, ProdPlan, FirstAt, LastAt, IsFinal, UpdatedAt)
+                        VALUES (@mc, @pd, @shift, @model, @actual, @defect, @r23, @r20, @first, @last, @final, SYSDATETIME())", conn, tx);
+                    ins.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                    ins.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate.Date;
+                    ins.Parameters.Add("@shift", SqlDbType.TinyInt).Value = (byte)x.ShiftNo;
+                    ins.Parameters.Add("@model", SqlDbType.NVarChar, 50).Value = x.Model;
+                    ins.Parameters.Add("@actual", SqlDbType.Int).Value = x.Actual;
+                    ins.Parameters.Add("@defect", SqlDbType.Int).Value = x.Defect;
+                    ins.Parameters.Add("@r23", SqlDbType.Int).Value = x.PlanBySut;
+                    ins.Parameters.Add("@r20", SqlDbType.Int).Value = x.ProdPlan;
+                    ins.Parameters.Add("@first", SqlDbType.DateTime2).Value = x.FirstAt;
+                    ins.Parameters.Add("@last", SqlDbType.DateTime2).Value = x.LastAt;
+                    ins.Parameters.Add("@final", SqlDbType.Bit).Value = isFinal;
+                    ins.ExecuteNonQuery();
+                }
             }
             tx.Commit();
         }
@@ -2066,6 +2203,14 @@ namespace Plclogger
             return m;
         }
 
+        // Kolom Actual & Defect (ALTER di database_plc_rohib_editor.sql). Belum ada = editor tetap jalan tanpa menyimpan keduanya.
+        private static bool EditorHasProgressColumns(SqlConnection conn, SqlTransaction? tx = null)
+        {
+            using var cmd = new SqlCommand(
+                $"SELECT CASE WHEN COL_LENGTH(N'dbo.{EditorDraftTable}', N'Actual') IS NOT NULL AND COL_LENGTH(N'dbo.{EditorDraftTable}', N'Defect') IS NOT NULL THEN 1 ELSE 0 END", conn, tx);
+            return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+        }
+
         public (List<EditorDraftRow> rows, DateTime? updatedAt) GetEditorDraft(string? machine)
         {
             string m = CheckDraftMachine(machine);
@@ -2073,8 +2218,11 @@ namespace Plclogger
             {
                 using var conn = new SqlConnection(DbConnectionString);
                 conn.Open();
+                bool progress = EditorHasProgressColumns(conn);
                 using var cmd = new SqlCommand(
-                    $"SELECT [RowNo], [ModelName], [ProdPlan], [Sut], [UpdatedAt], [PlanDate] FROM [dbo].[{EditorDraftTable}] WHERE [MachineCode] = @Machine ORDER BY [RowNo]", conn);
+                    $"SELECT [RowNo], [ModelName], [ProdPlan], [Sut], [UpdatedAt], [PlanDate], " +
+                    (progress ? "[Actual], [Defect]" : "0, 0") +
+                    $" FROM [dbo].[{EditorDraftTable}] WHERE [MachineCode] = @Machine ORDER BY [RowNo]", conn);
                 cmd.Parameters.AddWithValue("@Machine", m);
 
                 var rows = new List<EditorDraftRow>();
@@ -2085,7 +2233,9 @@ namespace Plclogger
                     rows.Add(new EditorDraftRow
                     {
                         RowNo = r.GetInt32(0), ModelName = r.GetString(1), ProdPlan = r.GetInt32(2), Sut = r.GetInt32(3),
-                        PlanDate = r.IsDBNull(5) ? null : r.GetDateTime(5).ToString("yyyy-MM-dd")
+                        PlanDate = r.IsDBNull(5) ? null : r.GetDateTime(5).ToString("yyyy-MM-dd"),
+                        Actual = r.GetInt32(6),
+                        Defect = r.GetInt32(7)
                     });
                     var at = r.GetDateTime(4);
                     if (updatedAt == null || at > updatedAt) updatedAt = at;
@@ -2143,6 +2293,103 @@ namespace Plclogger
             }
         }
 
+        // Output harian per model (dbo.PlcKyoshinDailyOutput = data Inventory AC OEE) sejak tanggal produksi "from",
+        // untuk kolom ACTUAL editor Production Plan.
+        public List<InventoryOutputItem> GetInventoryOutput(string? machine, string? from)
+        {
+            string m = CheckDraftMachine(machine);
+            if (!DateTime.TryParseExact(from, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var fromDate))
+                throw new ArgumentException("Tanggal harus format yyyy-MM-dd.");
+            try
+            {
+                using var conn = new SqlConnection(DbConnectionString);
+                conn.Open();
+                using var cmd = new SqlCommand($@"
+                    SELECT ProductionDate, Model, Actual FROM dbo.{DailyOutputTable}
+                    WHERE MachineCode = @Machine AND ProductionDate >= @From AND Actual > 0
+                    ORDER BY ProductionDate, Model", conn);
+                cmd.Parameters.Add("@Machine", SqlDbType.NVarChar, 20).Value = m;
+                cmd.Parameters.Add("@From", SqlDbType.Date).Value = fromDate.Date;
+                var rows = new List<InventoryOutputItem>();
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                    rows.Add(new InventoryOutputItem { Date = r.GetDateTime(0).ToString("yyyy-MM-dd"), Model = r.GetString(1).Trim(), Actual = r.GetInt32(2) });
+                return rows;
+            }
+            catch (SqlException ex) when (IsMissingTable(ex))
+            {
+                throw new InvalidOperationException($"Tabel dbo.{DailyOutputTable} belum ada di database PROMOSYS (database_plc_kyoshin_daily_output.sql).");
+            }
+        }
+
+        // Dijalankan logger server tiap menit (tanpa perlu halaman editor terbuka): isi kolom Actual & Defect dbo.PlcRohibEditorRow.
+        //   Actual = output Inventory (PlcKyoshinDailyOutput) sejak tanggal plan paling awal di editor.
+        //            Seluruh hasil model ditempatkan di kemunculan pertama model pada antrean; hasil lebih dari plan
+        //            tidak dipindahkan ke antrean model yang sama pada tanggal berikutnya (aturan sama dengan halaman editor).
+        //   Defect = register DEFECT PLC baris yang sama, hanya kalau model di PLC = model baris editor; selain itu nilai tersimpan dipertahankan.
+        public int RefreshEditorProgress(DateTime now)
+        {
+            const string machine = TrendMachineCode;
+            using var conn = new SqlConnection(DbConnectionString);
+            conn.Open();
+            if (!EditorHasProgressColumns(conn)) return 0;
+
+            var rows = new List<(int RowNo, string Model, int Plan, DateTime? PlanDate, int Actual, int Defect)>();
+            using (var cmd = new SqlCommand($@"
+                SELECT RowNo, ModelName, ProdPlan, PlanDate, Actual, Defect FROM dbo.{EditorDraftTable}
+                WHERE MachineCode = @mc ORDER BY RowNo", conn))
+            {
+                cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = machine;
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                    rows.Add((r.GetInt32(0), r.GetString(1).Trim(), r.GetInt32(2), r.IsDBNull(3) ? null : r.GetDateTime(3), r.GetInt32(4), r.GetInt32(5)));
+            }
+            if (rows.Count == 0) return 0;
+
+            var from = rows.Where(x => x.Model.Length > 0 && x.PlanDate != null).Select(x => x.PlanDate!.Value).DefaultIfEmpty(new DateTime(now.Year, now.Month, 1)).Min();
+            var left = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            using (var cmd = new SqlCommand($@"
+                SELECT Model, SUM(Actual) FROM dbo.{DailyOutputTable}
+                WHERE MachineCode = @mc AND ProductionDate >= @from GROUP BY Model", conn))
+            {
+                cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = machine;
+                cmd.Parameters.Add("@from", SqlDbType.Date).Value = from.Date;
+                using var r = cmd.ExecuteReader();
+                while (r.Read()) left[r.GetString(0).Trim()] = r.GetInt32(1);
+            }
+
+            // Register PLC per baris (pembacaan bersama dengan halaman editor, cache 1,5 detik); PLC offline = Defect tidak diubah
+            var (_, _, plcRows) = ReadPlcRowsWithChangeDetection(-1);
+            var plcByRow = LastReadLive ? plcRows.ToDictionary(p => p.RowNo) : new Dictionary<int, PlcDispatchRow>();
+
+            var firstRowOfModel = rows.Where(x => x.Model.Length > 0).GroupBy(x => x.Model, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Min(x => x.RowNo), StringComparer.OrdinalIgnoreCase);
+            int updated = 0;
+            foreach (var row in rows)
+            {
+                if (row.Model.Length == 0) continue;
+                int remaining = left.TryGetValue(row.Model, out var v) ? v : 0;
+                int actual = firstRowOfModel[row.Model] == row.RowNo ? remaining : 0;
+                left[row.Model] = remaining - actual;
+
+                int defect = row.Defect;
+                if (plcByRow.TryGetValue(row.RowNo, out var p) && string.Equals((p.ModelName ?? "").Trim(), row.Model, StringComparison.OrdinalIgnoreCase))
+                    defect = Math.Max(0, (int)p.Defect);
+
+                if (actual == row.Actual && defect == row.Defect) continue;
+                using var upd = new SqlCommand($@"
+                    UPDATE dbo.{EditorDraftTable} SET Actual = @actual, Defect = @defect
+                    WHERE MachineCode = @mc AND RowNo = @row AND ModelName = @model", conn); // isi baris diubah halaman sejak dibaca = dilewati
+                upd.Parameters.Add("@actual", SqlDbType.Int).Value = actual;
+                upd.Parameters.Add("@defect", SqlDbType.Int).Value = defect;
+                upd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = machine;
+                upd.Parameters.Add("@row", SqlDbType.Int).Value = row.RowNo;
+                upd.Parameters.Add("@model", SqlDbType.NVarChar, 50).Value = row.Model;
+                updated += upd.ExecuteNonQuery();
+            }
+            return updated;
+        }
+
         public DateTime SaveEditorDraft(string? machine, List<EditorDraftRow>? rows)
         {
             string m = CheckDraftMachine(machine);
@@ -2154,6 +2401,7 @@ namespace Plclogger
                 if (row.ModelName.Length > 50) throw new ArgumentException($"Row {row.RowNo}: nama model maksimal 50 karakter.");
                 if (row.ProdPlan < 0 || row.ProdPlan > short.MaxValue) throw new ArgumentException($"Row {row.RowNo}: Prod. Plan harus 0-{short.MaxValue}.");
                 if (row.Sut < 0 || row.Sut > 999) throw new ArgumentException($"Row {row.RowNo}: SUT harus 0-999 detik.");
+                if (row.Actual < 0 || row.Defect < 0) throw new ArgumentException($"Row {row.RowNo}: Actual & Defect tidak boleh negatif.");
                 row.PlanDate = string.IsNullOrWhiteSpace(row.PlanDate) ? null : row.PlanDate.Trim();
                 if (row.PlanDate != null && !DateTime.TryParseExact(row.PlanDate, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _))
                     throw new ArgumentException($"Row {row.RowNo}: tanggal plan harus format yyyy-MM-dd.");
@@ -2175,9 +2423,12 @@ namespace Plclogger
                     del.ExecuteNonQuery();
                 }
 
-                using (var ins = new SqlCommand(
-                    $@"INSERT INTO [dbo].[{EditorDraftTable}] ([MachineCode], [RowNo], [ModelName], [ProdPlan], [Sut], [PlanDate], [UpdatedAt])
-                       VALUES (@Machine, @RowNo, @ModelName, @ProdPlan, @Sut, @PlanDate, @UpdatedAt)", conn, tx))
+                bool progress = EditorHasProgressColumns(conn, tx);
+                using (var ins = new SqlCommand(progress
+                    ? $@"INSERT INTO [dbo].[{EditorDraftTable}] ([MachineCode], [RowNo], [ModelName], [ProdPlan], [Sut], [PlanDate], [Actual], [Defect], [UpdatedAt])
+                         VALUES (@Machine, @RowNo, @ModelName, @ProdPlan, @Sut, @PlanDate, @Actual, @Defect, @UpdatedAt)"
+                    : $@"INSERT INTO [dbo].[{EditorDraftTable}] ([MachineCode], [RowNo], [ModelName], [ProdPlan], [Sut], [PlanDate], [UpdatedAt])
+                         VALUES (@Machine, @RowNo, @ModelName, @ProdPlan, @Sut, @PlanDate, @UpdatedAt)", conn, tx))
                 {
                     ins.Parameters.Add("@Machine", SqlDbType.NVarChar, 20).Value = m;
                     var pRow = ins.Parameters.Add("@RowNo", SqlDbType.Int);
@@ -2185,6 +2436,8 @@ namespace Plclogger
                     var pPlan = ins.Parameters.Add("@ProdPlan", SqlDbType.Int);
                     var pSut = ins.Parameters.Add("@Sut", SqlDbType.Int);
                     var pDate = ins.Parameters.Add("@PlanDate", SqlDbType.Date);
+                    var pActual = ins.Parameters.Add("@Actual", SqlDbType.Int);
+                    var pDefect = ins.Parameters.Add("@Defect", SqlDbType.Int);
                     ins.Parameters.Add("@UpdatedAt", SqlDbType.DateTime2).Value = now;
                     foreach (var row in filled)
                     {
@@ -2192,6 +2445,8 @@ namespace Plclogger
                         pModel.Value = row.ModelName;
                         pPlan.Value = row.ProdPlan;
                         pSut.Value = row.Sut;
+                        pActual.Value = row.Actual;
+                        pDefect.Value = row.Defect;
                         pDate.Value = row.PlanDate == null ? DBNull.Value : DateTime.ParseExact(row.PlanDate, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
                         ins.ExecuteNonQuery();
                     }
@@ -2462,6 +2717,16 @@ namespace Plclogger
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     Console.WriteLine($"[CHANGE PLAN] Gagal menghitung change plan Kyoshin: {ex.Message.Split('\n')[0]}");
+                }
+
+                // ACTUAL & DEFECT editor Plan Exp 6.35 (dbo.PlcRohibEditorRow) diperbarui di server, walau halaman editor tidak dibuka
+                try
+                {
+                    await Task.Run(() => _svc.RefreshEditorProgress(DateTime.Now), stoppingToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    Console.WriteLine($"[EDITOR] Gagal memperbarui Actual & Defect editor: {ex.Message.Split('\n')[0]}");
                 }
             }
         }
@@ -3036,6 +3301,10 @@ namespace Plclogger
             // List mingguan (dbo.PsiWeeklyPlan) untuk tombol "Isi dari Rencana Database"
             app.MapGet("/api/psi-weekly", (FactoryDataService svc, string? machine, string? month) =>
                 MasterResult(() => new { Success = true, Month = month, Rows = svc.GetPsiWeeklyList(machine, month) }));
+
+            // Output harian per model (dbo.PlcKyoshinDailyOutput, data Inventory AC OEE) untuk kolom ACTUAL editor
+            app.MapGet("/api/inventory-output", (FactoryDataService svc, string? machine, string? from) =>
+                MasterResult(() => new { Success = true, From = from, Rows = svc.GetInventoryOutput(machine, from) }));
 
             app.MapPut("/api/editor-draft",(FactoryDataService svc, string? machine, [Microsoft.AspNetCore.Mvc.FromBody] EditorDraftRequest? req) =>
                 MasterResult(() => new { Success = true, SavedAt = svc.SaveEditorDraft(machine, req?.Rows).ToString("HH:mm:ss") }));

@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Data.SqlClient;
-using System.Reflection.PortableExecutable;
 using System.Collections.Generic;
 using System;
 namespace MonitoringSystem.Pages.Quality
@@ -15,12 +14,14 @@ namespace MonitoringSystem.Pages.Quality
         public double DefectRatio { get; set; }
         public string errorMessage = "";
 
-        public List<DailyDefect> TopDailyDefects { get; set; }
+        public QualityDefectCatalog.LineDefinition Line { get; private set; } = QualityDefectCatalog.CU;
 
-        public List<DailyDefect> DefectProblems { get; set; }
-        public List<DefectByModel> DefectsByModel { get; set; }
+        // Pie: jumlah defect per station group (selalu semua station pada rentang tanggal).
+        public List<StationQuantity> StationBreakdown { get; set; }
 
-        //public List<MonthlyDefectData> MonthlyDefects { get; set; }
+        // Defect Causes: [stationKey | "ALL"][categoryKey] -> total + top item.
+        public Dictionary<string, Dictionary<string, CategoryCauses>> CausesByStation { get; set; }
+
         public List<YearlyDefectData> YearlyDefects { get; set; }
 
         [BindProperty(SupportsGet = true)]
@@ -37,12 +38,13 @@ namespace MonitoringSystem.Pages.Quality
 
         [BindProperty(SupportsGet = true)]
         public string Station { get; set; }
+
+        public int ChartYear { get; private set; }
+
         public QualityModel()
         {
-            TopDailyDefects = new List<DailyDefect>();
-            DefectProblems = new List<DailyDefect>();
-            DefectsByModel = new List<DefectByModel>();
-            //MonthlyDefects = new List<MonthlyDefectData>();
+            StationBreakdown = new List<StationQuantity>();
+            CausesByStation = new Dictionary<string, Dictionary<string, CategoryCauses>>();
             YearlyDefects = new List<YearlyDefectData>();
         }
 
@@ -80,10 +82,6 @@ namespace MonitoringSystem.Pages.Quality
 
         public void OnGet()
         {
-            if (string.IsNullOrEmpty(MachineCode))
-            {
-                MachineCode = "MCH1-01";
-            }
             if (string.IsNullOrEmpty(StartDate))
             {
                 StartDate = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1).ToString("yyyy-MM-dd");
@@ -99,13 +97,18 @@ namespace MonitoringSystem.Pages.Quality
 
         private void LoadData()
         {
+            Line = QualityDefectCatalog.ResolveLine(MachineCode);
+            MachineCode = Line.MachineCode;
+            if (!string.IsNullOrEmpty(Station) && !Line.Stations.Any(s => s.Key == Station) && Station != QualityDefectCatalog.OthersKey)
+            {
+                Station = "";
+            }
+
             TotalPlan = 0;
             DefectQuantity = 0;
             DefectRatio = 100;
-            TopDailyDefects.Clear();
-            DefectProblems.Clear();
-            DefectsByModel.Clear();
-            //MonthlyDefects.Clear();
+            StationBreakdown.Clear();
+            CausesByStation.Clear();
             YearlyDefects.Clear();
 
             DateTime startDateParsed, endDateParsed;
@@ -117,19 +120,10 @@ namespace MonitoringSystem.Pages.Quality
             {
                 endDateParsed = DateTime.Now.Date;
             }
+            ChartYear = startDateParsed.Year;
 
-            string stationFilterClause = "";
-            if (!string.IsNullOrEmpty(Station))
-            {
-                stationFilterClause = " AND Station = @Station";
-            }
-
-            Action<SqlCommand> addStationParameter = (cmd) => {
-                if (!string.IsNullOrEmpty(Station))
-                {
-                    cmd.Parameters.AddWithValue("@Station", Station);
-                }
-            };
+            var rangeRows = new List<DefectRow>();
+            var yearRows = new List<DefectRow>();
 
             try
             {
@@ -168,276 +162,70 @@ namespace MonitoringSystem.Pages.Quality
                         }
                     }
 
-                    string getTotalDefect = $@"
-                    SELECT
-                        COUNT(*)
-                    FROM
-                        NG_RPTS
-                    WHERE
-                        MachineCode = @MachineCode
-                        AND CAST(SDate AS DATE) BETWEEN @StartDate AND @EndDate
-                        {stationFilterClause};";
-
-                    using (SqlCommand command = new SqlCommand(getTotalDefect, connection))
-                    {
-                        command.Parameters.AddWithValue("@MachineCode", MachineCode);
-                        command.Parameters.AddWithValue("@StartDate", startDateParsed);
-                        command.Parameters.AddWithValue("@EndDate", endDateParsed);
-                        addStationParameter(command);
-                        var result = command.ExecuteScalar();
-                        if (result != DBNull.Value && result != null)
-                        {
-                            DefectQuantity = Convert.ToInt32(result);
-                        }
-                    }
-
-                    string getTopDailyDefect = $@"
-                    SELECT TOP 5
-                        Cause,
-                        COUNT(*) AS DefectCount
-                    FROM
-                        NG_RPTS
-                    WHERE
-                        CAST(SDate AS DATE) BETWEEN @StartDate AND @EndDate 
-                        AND MachineCode = @MachineCode
-                        {stationFilterClause}
-                    GROUP BY
-                        Cause
-                    ORDER BY
-                        DefectCount DESC;";
-
-                    using (SqlCommand command = new SqlCommand(getTopDailyDefect, connection))
-                    {
-                        command.Parameters.AddWithValue("@MachineCode", MachineCode);
-                        command.Parameters.AddWithValue("@StartDate", startDateParsed);
-                        command.Parameters.AddWithValue("@EndDate", endDateParsed);
-                        addStationParameter(command);
-
-                        using (SqlDataReader reader = command.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                TopDailyDefects.Add(new DailyDefect
-                                {
-                                    Cause = reader.GetString(0),
-                                    Quantity = reader.GetInt32(1)
-                                });
-                            }
-                        }
-                    }
-
-                    string getDefectProblem = $@"
-                    SELECT
-                        Cause,
-                        COUNT(*) AS DefectCount
-                    FROM
-                        NG_RPTS
-                    WHERE
-                        CAST(SDate AS DATE) BETWEEN @StartDate AND @EndDate
-                        AND MachineCode = @MachineCode
-                        {stationFilterClause}
-                    GROUP BY
-                        Cause
-                    ORDER BY
-                        DefectCount DESC;";
-                    using (SqlCommand command = new SqlCommand(getDefectProblem, connection))
-                    {
-                        command.Parameters.AddWithValue("@MachineCode", MachineCode);
-                        command.Parameters.AddWithValue("@StartDate", startDateParsed);
-                        command.Parameters.AddWithValue("@EndDate", endDateParsed);
-                        addStationParameter(command);
-                        using (SqlDataReader reader = command.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                DefectProblems.Add(new DailyDefect
-                                {
-                                    Cause = reader.GetString(0),
-                                    Quantity = reader.GetInt32(1)
-                                });
-                            }
-                        }
-                    }
-
-                    //string getDefectsByModel = $@"
-                    //SELECT
-                    //    md.ProductName,
-                    //    COUNT(*) AS DefectCount
-                    //FROM
-                    //    NG_RPTS ng
-                    //JOIN
-                    //    MasterData md ON 
-                    //    LTRIM(RTRIM(CAST(ng.Product_Id AS VARCHAR(255)))) = LTRIM(RTRIM(CAST(md.Product_Id AS VARCHAR(255))))
-                    //WHERE
-                    //    ng.MachineCode = @MachineCode
-                    //    AND CAST(ng.SDate AS DATE) BETWEEN @StartDate AND @EndDate
-                    //    {stationFilterClause.Replace("Station", "ng.Station")}
-                    //GROUP BY
-                    //    md.ProductName
-                    //ORDER BY
-                    //    DefectCount DESC;";
-
-                    //using (SqlCommand command = new SqlCommand(getDefectsByModel, connection))
-                    //{
-                    //    command.Parameters.AddWithValue("@MachineCode", MachineCode);
-                    //    command.Parameters.AddWithValue("@StartDate", startDateParsed);
-                    //    command.Parameters.AddWithValue("@EndDate", endDateParsed);
-                    //    addStationParameter(command);
-                    //    using (SqlDataReader reader = command.ExecuteReader())
-                    //    {
-                    //        while (reader.Read())
-                    //        {
-                    //            DefectsByModel.Add(new DefectByModel
-                    //            {
-                    //                ProductName = reader.IsDBNull(0) ? "Nama Produk Kosong" : reader.GetString(0),
-                    //                Quantity = reader.IsDBNull(1) ? 0 : reader.GetInt32(1)
-                    //            });
-                    //        }
-                    //    }
-                    //}
-
-                    string getDefectsByModel = $@"
+                    // Station/kategori dikelompokkan di C# (lihat QualityDefectCatalog),
+                    // jadi query cukup mengambil agregat mentah.
+                    string getRangeDefects = @"
                     SELECT
                         Station,
+                        Cause,
+                        Detail,
                         COUNT(*) AS DefectCount
                     FROM
                         NG_RPTS
                     WHERE
                         MachineCode = @MachineCode
                         AND CAST(SDate AS DATE) BETWEEN @StartDate AND @EndDate
-                        {stationFilterClause}
                     GROUP BY
-                        Station
-                    ORDER BY
-                        DefectCount DESC;";
+                        Station, Cause, Detail;";
 
-                    var tempResults = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-                    using (SqlCommand command = new SqlCommand(getDefectsByModel, connection))
+                    using (SqlCommand command = new SqlCommand(getRangeDefects, connection))
                     {
                         command.Parameters.AddWithValue("@MachineCode", MachineCode);
                         command.Parameters.AddWithValue("@StartDate", startDateParsed);
                         command.Parameters.AddWithValue("@EndDate", endDateParsed);
-                        addStationParameter(command);
-
                         using (SqlDataReader reader = command.ExecuteReader())
                         {
                             while (reader.Read())
                             {
-                                string stationName = reader.IsDBNull(0) ? "Unknown" : reader.GetString(0);
-                                int qty = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
-
-                                if (!tempResults.ContainsKey(stationName))
+                                rangeRows.Add(new DefectRow
                                 {
-                                    tempResults.Add(stationName, qty);
-                                }
+                                    Station = reader.IsDBNull(0) ? null : reader.GetString(0),
+                                    Cause = reader.IsDBNull(1) ? null : reader.GetString(1),
+                                    Detail = reader.IsDBNull(2) ? null : reader.GetString(2),
+                                    Quantity = reader.GetInt32(3)
+                                });
                             }
                         }
                     }
 
-                    List<string> masterStations = new List<string> {
-                        "Chassis",
-                        "PREPARING",
-                        "GAS LEAK",
-                        "STARTING - RUNNING",
-                        "INNER",
-                        "FINAL",
-                        "DETAIL"
-                    };
-
-                    if (string.IsNullOrEmpty(Station))
-                    {
-                        foreach (var st in masterStations)
-                        {
-                            DefectsByModel.Add(new DefectByModel
-                            {
-                                ProductName = st,
-                                Quantity = tempResults.ContainsKey(st) ? tempResults[st] : 0
-                            });
-                        }
-
-                        foreach (var kvp in tempResults)
-                        {
-                            if (!masterStations.Contains(kvp.Key, StringComparer.OrdinalIgnoreCase))
-                            {
-                                DefectsByModel.Add(new DefectByModel { ProductName = kvp.Key, Quantity = kvp.Value });
-                            }
-                        }
-                    }
-                    else
-                    {
-                        foreach (var kvp in tempResults)
-                        {
-                            DefectsByModel.Add(new DefectByModel { ProductName = kvp.Key, Quantity = kvp.Value });
-                        }
-                    }
-
-                    //string getMonthlyDefects = $@"
-                    //SELECT
-                    //    DAY(SDate) AS DayOfMonth,
-                    //    Cause,
-                    //    COUNT(*) AS DefectCount
-                    //FROM
-                    //    NG_RPTS
-                    //WHERE
-                    //    MachineCode = @MachineCode
-                    //    AND MONTH(SDate) = MONTH(GETDATE())
-                    //    AND YEAR(SDate) = YEAR(GETDATE())
-                    //    {stationFilterClause}
-                    //GROUP BY
-                    //    DAY(SDate), Cause
-                    //ORDER BY
-                    //    DayOfMonth, DefectCount DESC;";
-
-                    //using (SqlCommand command = new SqlCommand(getMonthlyDefects, connection))
-                    //{
-                    //    command.Parameters.AddWithValue("@MachineCode", MachineCode);
-                    //    addStationParameter(command);
-                    //    using (SqlDataReader reader = command.ExecuteReader())
-                    //    {
-                    //        while (reader.Read())
-                    //        {
-                    //            MonthlyDefects.Add(new MonthlyDefectData
-                    //            {
-                    //                Day = reader.GetInt32(0),
-                    //                Cause = reader.GetString(1),
-                    //                Quantity = reader.GetInt32(2)
-                    //            });
-                    //        }
-                    //    }
-                    //}
-
-                    string getYearlyDefects = $@"
+                    string getYearlyDefects = @"
                     SELECT
-                        MONTH(SDate) AS MonthNumber, -- Ambil Angka Bulan (1-12)
+                        MONTH(SDate) AS MonthNumber,
+                        Station,
                         Cause,
                         COUNT(*) AS DefectCount
                     FROM
                         NG_RPTS
                     WHERE
                         MachineCode = @MachineCode
-                        AND YEAR(SDate) = YEAR(@StartDate) -- Filter berdasarkan TAHUN dari StartDate
-                        {stationFilterClause}
+                        AND YEAR(SDate) = YEAR(@StartDate)
                     GROUP BY
-                        MONTH(SDate), Cause
-                    ORDER BY
-                        MonthNumber, DefectCount DESC;";
+                        MONTH(SDate), Station, Cause;";
 
                     using (SqlCommand command = new SqlCommand(getYearlyDefects, connection))
                     {
                         command.Parameters.AddWithValue("@MachineCode", MachineCode);
                         command.Parameters.AddWithValue("@StartDate", startDateParsed);
-                        addStationParameter(command);
-
                         using (SqlDataReader reader = command.ExecuteReader())
                         {
                             while (reader.Read())
                             {
-                                YearlyDefects.Add(new YearlyDefectData
+                                yearRows.Add(new DefectRow
                                 {
                                     Month = reader.GetInt32(0),
-                                    Cause = reader.GetString(1),
-                                    Quantity = reader.GetInt32(2)
+                                    Station = reader.IsDBNull(1) ? null : reader.GetString(1),
+                                    Cause = reader.IsDBNull(2) ? null : reader.GetString(2),
+                                    Quantity = reader.GetInt32(3)
                                 });
                             }
                         }
@@ -450,10 +238,86 @@ namespace MonitoringSystem.Pages.Quality
                 Console.WriteLine(errorMessage);
             }
 
+            foreach (var row in rangeRows.Concat(yearRows))
+            {
+                row.StationKey = QualityDefectCatalog.ResolveStation(Line, row.Station).Key;
+            }
+
+            bool MatchesStation(DefectRow row) => string.IsNullOrEmpty(Station) || row.StationKey == Station;
+
+            DefectQuantity = rangeRows.Where(MatchesStation).Sum(r => r.Quantity);
+
+            foreach (var station in Line.Stations)
+            {
+                StationBreakdown.Add(new StationQuantity
+                {
+                    Key = station.Key,
+                    Label = station.Label,
+                    Quantity = rangeRows.Where(r => r.StationKey == station.Key).Sum(r => r.Quantity)
+                });
+            }
+            var othersQty = rangeRows.Where(r => r.StationKey == QualityDefectCatalog.OthersKey).Sum(r => r.Quantity);
+            if (othersQty > 0)
+            {
+                StationBreakdown.Add(new StationQuantity { Key = QualityDefectCatalog.OthersKey, Label = QualityDefectCatalog.OthersLabel, Quantity = othersQty });
+            }
+
+            CausesByStation["ALL"] = BuildCauses(rangeRows);
+            foreach (var station in StationBreakdown)
+            {
+                CausesByStation[station.Key] = BuildCauses(rangeRows.Where(r => r.StationKey == station.Key));
+            }
+
+            YearlyDefects = yearRows
+                .Where(MatchesStation)
+                .GroupBy(r => new { r.Month, Cause = QualityDefectCatalog.ItemLabel(r.Cause, null) })
+                .Select(g => new YearlyDefectData { Month = g.Key.Month, Cause = g.Key.Cause, Quantity = g.Sum(r => r.Quantity) })
+                .OrderBy(d => d.Month)
+                .ThenByDescending(d => d.Quantity)
+                .ToList();
+
             if (TotalPlan > 0)
             {
                 DefectRatio = (1 - (double)DefectQuantity / TotalPlan) * 100;
             }
+        }
+
+        private Dictionary<string, CategoryCauses> BuildCauses(IEnumerable<DefectRow> rows)
+        {
+            var byCategory = rows
+                .GroupBy(r => QualityDefectCatalog.ResolveCategory(Line, r.Cause, r.Detail).Key)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var result = new Dictionary<string, CategoryCauses>();
+            foreach (var category in Line.Categories)
+            {
+                var categoryRows = byCategory.TryGetValue(category.Key, out var list) ? list : new List<DefectRow>();
+                result[category.Key] = new CategoryCauses
+                {
+                    Total = categoryRows.Sum(r => r.Quantity),
+                    Items = categoryRows
+                        .GroupBy(r => QualityDefectCatalog.ItemLabel(r.Detail, r.Cause).ToUpperInvariant())
+                        .Select(g => new DailyDefect
+                        {
+                            Cause = QualityDefectCatalog.ItemLabel(g.First().Detail, g.First().Cause),
+                            Quantity = g.Sum(r => r.Quantity)
+                        })
+                        .OrderByDescending(d => d.Quantity)
+                        .Take(5)
+                        .ToList()
+                };
+            }
+            return result;
+        }
+
+        private class DefectRow
+        {
+            public int Month { get; set; }
+            public string? Station { get; set; }
+            public string? Cause { get; set; }
+            public string? Detail { get; set; }
+            public int Quantity { get; set; }
+            public string StationKey { get; set; } = "";
         }
 
         public class DailyDefect
@@ -462,17 +326,19 @@ namespace MonitoringSystem.Pages.Quality
             public int Quantity { get; set; }
         }
 
-        public class DefectByModel
+        public class StationQuantity
         {
-            public string? ProductName { get; set; }
+            public string Key { get; set; } = "";
+            public string Label { get; set; } = "";
             public int Quantity { get; set; }
         }
 
-        //{
-        //    public int Day { get; set; }
-        //    public string Cause { get; set; }
-        //    public int Quantity { get; set; }
-        //}
+        public class CategoryCauses
+        {
+            public int Total { get; set; }
+            public List<DailyDefect> Items { get; set; } = new();
+        }
+
         public class YearlyDefectData
         {
             public int Month { get; set; }

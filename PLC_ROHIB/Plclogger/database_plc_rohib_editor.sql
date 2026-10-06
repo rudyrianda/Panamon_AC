@@ -26,3 +26,13 @@ GO
 IF COL_LENGTH(N'dbo.PlcRohibEditorRow', N'PlanDate') IS NULL
     ALTER TABLE dbo.PlcRohibEditorRow ADD PlanDate DATE NULL;
 GO
+
+-- 2026-10-06: ACTUAL & DEFECT terakhir tiap baris, disimpan halaman editor setiap kali berubah
+--   Actual = output Inventory AC OEE (dbo.PlcKyoshinDailyOutput) yang dibagi ke baris ini
+--   Defect = register DEFECT PLC baris ini, selama model di PLC sama dengan model baris editor
+IF COL_LENGTH(N'dbo.PlcRohibEditorRow', N'Actual') IS NULL
+    ALTER TABLE dbo.PlcRohibEditorRow ADD Actual INT NOT NULL CONSTRAINT DF_PlcRohibEditorRow_Actual DEFAULT (0);
+GO
+IF COL_LENGTH(N'dbo.PlcRohibEditorRow', N'Defect') IS NULL
+    ALTER TABLE dbo.PlcRohibEditorRow ADD Defect INT NOT NULL CONSTRAINT DF_PlcRohibEditorRow_Defect DEFAULT (0);
+GO

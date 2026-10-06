@@ -218,6 +218,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Polling: auto-refresh nilai ACTUAL & DEFECT dari PLC secara real-time setiap 3 detik
   startPlcActualPolling();
 
+  // Polling: kolom ACTUAL editor dari output Inventory AC OEE per model setiap 60 detik
+  startInventoryActualPolling();
+
   // Setup popup modal
   setupShiftEndModal();
 
@@ -503,9 +506,12 @@ function getFilteredPlanItems() {
   return filtered.filter(x => !x.machineCode || x.machineCode === 'MCH1-01');
 }
 
-// Satu baris editor. Actual & Defect dipertahankan dari baris sebelumnya (milik register PLC, bukan model).
+const plcModelKey = (name) => (name || '').trim().toUpperCase();
+
+// Satu baris editor. actual = register ACTUAL PLC (hanya untuk preview), dipertahankan dari baris sebelumnya.
+// invActual & defect = ACTUAL (Inventory) & DEFECT milik isi baris ini, disimpan di database bersama isi editor.
 // planDate = tanggal plan dari list rencana (yyyy-MM-dd), hanya ditampilkan di kolom Urutan Antrian / Tanggal.
-function makeEditorRow(i, modelName, prodPlan, sut, planDate = '') {
+function makeEditorRow(i, modelName, prodPlan, sut, planDate = '', savedActual = 0, savedDefect = 0) {
   const reg = PLC_REGISTER_MAP[i] || {
     rowNo: i + 1,
     page: Math.floor(i / ROWS_PER_HMI_PAGE) + 1,
@@ -539,7 +545,8 @@ function makeEditorRow(i, modelName, prodPlan, sut, planDate = '') {
     sut: sut,
     planDate: planDate || '',
     actual: prev ? prev.actual : 0,
-    defect: prev ? prev.defect : 0
+    invActual: savedActual || 0,
+    defect: savedDefect || 0
   };
 }
 
@@ -566,8 +573,16 @@ let _draftRetryAt = 0;       // jeda sebelum mencoba lagi setelah gagal
 
 function editorDraftRows() {
   return current9Rows
-    .map(r => ({ rowNo: r.rowNo, modelName: (r.modelName || '').trim(), prodPlan: parseInt(r.prodPlan) || 0, sut: parseInt(r.sut) || 0, planDate: r.planDate || null }))
+    .map(r => ({ rowNo: r.rowNo, modelName: (r.modelName || '').trim(), prodPlan: parseInt(r.prodPlan) || 0, sut: parseInt(r.sut) || 0, planDate: r.planDate || null, actual: parseInt(r.invActual) || 0, defect: parseInt(r.defect) || 0 }))
     .filter(r => r.modelName || r.prodPlan > 0 || r.sut > 0);
+}
+
+// Isi yang tersimpan di DB, dalam bentuk & urutan yang sama dengan editorDraftRows() (untuk deteksi perubahan)
+function draftSigFromDb(rows) {
+  return JSON.stringify((rows || [])
+    .map(r => ({ rowNo: r.rowNo, modelName: (r.modelName || '').trim(), prodPlan: r.prodPlan || 0, sut: r.sut || 0, planDate: r.planDate || null, actual: r.actual || 0, defect: r.defect || 0 }))
+    .filter(r => r.modelName || r.prodPlan > 0 || r.sut > 0)
+    .sort((a, b) => a.rowNo - b.rowNo));
 }
 
 function setDraftStatus(state, text) {
@@ -593,16 +608,16 @@ async function loadEditorDraft() {
 
     if (editorDraftRows().length > 0) {
       // Operator sudah mengetik saat DB belum terhubung: isi layar dipertahankan dan akan disimpan ke DB.
-      _draftSavedSig = JSON.stringify((data.rows || []).map(r => ({ rowNo: r.rowNo, modelName: r.modelName, prodPlan: r.prodPlan, sut: r.sut, planDate: r.planDate || null })));
+      _draftSavedSig = draftSigFromDb(data.rows);
       addLog('[DATABASE] DB terhubung kembali. Isi editor di layar dipakai dan disimpan ke database.', 'info');
     } else {
       const byRow = new Map((data.rows || []).map(r => [r.rowNo, r]));
       current9Rows = PLC_REGISTER_MAP.map((reg, i) => {
         const d = byRow.get(reg.rowNo);
-        return d ? makeEditorRow(i, d.modelName, d.prodPlan, d.sut, d.planDate) : makeEditorRow(i, '', 0, 0);
+        return d ? makeEditorRow(i, d.modelName, d.prodPlan, d.sut, d.planDate, d.actual, d.defect) : makeEditorRow(i, '', 0, 0);
       });
       renderEditableTable();
-      _draftSavedSig = JSON.stringify(editorDraftRows());
+      _draftSavedSig = draftSigFromDb(data.rows); // ACTUAL yang baru dihitung (beda dari DB) ikut tersimpan
       if (byRow.size > 0) addLog(`[DATABASE] Isi editor dimuat dari database: ${byRow.size} baris (terakhir disimpan ${data.updatedAt}).`, 'info');
     }
 
@@ -739,6 +754,7 @@ function renderEditableTable() {
   const tbody = document.getElementById('editableTableBody');
   if (!tbody) return;
   tbody.innerHTML = '';
+  computeInventoryActuals();
 
   let lastWeekKey = null;
   current9Rows.forEach((row, idx) => {
@@ -802,8 +818,8 @@ function renderEditableTable() {
                title="${sutMissing ? 'SUT belum ada di Master Data Produk — isi manual' : `Register ${row.sutAddr}`}">
       </td>
       <td style="text-align:right;">
-        <span class="actual-display-box" id="actualBadge_${idx}" title="Register ${row.actAddr} (Actual - Read Only)">
-          ${row.actual}
+        <span class="actual-display-box" id="actualBadge_${idx}" title="Output Inventory AC OEE model ini (Read Only)">
+          ${row.invActual || 0}
         </span>
       </td>
       <td style="text-align:right;">
@@ -832,12 +848,12 @@ function renderEditableTable() {
     const inputSut = tr.querySelector(`#inputSut_${idx}`);
 
     if (inputModel) {
-      inputModel.addEventListener('input', (e) => onModelChange(idx, e.target.value));
-      inputModel.addEventListener('change', (e) => onModelChange(idx, e.target.value));
+      inputModel.addEventListener('input', (e) => { onModelChange(idx, e.target.value); applyInventoryActuals(); });
+      inputModel.addEventListener('change', (e) => { onModelChange(idx, e.target.value); applyInventoryActuals(); });
     }
 
     if (inputQty) {
-      inputQty.addEventListener('input', (e) => onQtyChange(idx, e.target.value));
+      inputQty.addEventListener('input', (e) => { onQtyChange(idx, e.target.value); applyInventoryActuals(); });
     }
 
     if (inputSut) {
@@ -1038,11 +1054,11 @@ function attachRowDragHandlers(tr, idx) {
   });
 }
 
-// Pindahkan isi baris (Model, Plan, SUT, Tanggal) dari posisi "from" ke "to"; baris di antaranya ikut bergeser.
-// Register PLC, Actual & Defect tetap di barisnya (milik register PLC, bukan milik model).
+// Pindahkan isi baris (Model, Plan, SUT, Tanggal, Actual & Defect tersimpan) dari posisi "from" ke "to";
+// baris di antaranya ikut bergeser. Register PLC (dan actual register untuk preview) tetap di barisnya.
 function moveEditorRow(from, to) {
   if (from === to || from < 0 || to < 0 || from >= current9Rows.length || to >= current9Rows.length) return;
-  const contents = current9Rows.map(r => ({ modelName: r.modelName, prodPlan: r.prodPlan, sut: r.sut, planDate: r.planDate }));
+  const contents = current9Rows.map(r => ({ modelName: r.modelName, prodPlan: r.prodPlan, sut: r.sut, planDate: r.planDate, invActual: r.invActual, defect: r.defect }));
   const [moved] = contents.splice(from, 1);
   contents.splice(to, 0, moved);
   current9Rows.forEach((r, i) => Object.assign(r, contents[i]));
@@ -1056,6 +1072,12 @@ function moveEditorRow(from, to) {
 window.onModelChange = function(idx, val) {
   if (!current9Rows[idx]) return;
   const trimmed = val.trim();
+  if (plcModelKey(trimmed) !== plcModelKey(current9Rows[idx].modelName)) {
+    // Model baris diganti: DEFECT tersimpan milik model lama tidak berlaku lagi
+    current9Rows[idx].defect = 0;
+    const defBadge = document.getElementById(`defectBadge_${idx}`);
+    if (defBadge) defBadge.innerText = 0;
+  }
   current9Rows[idx].modelName = trimmed;
 
   if (!trimmed) {
@@ -1509,25 +1531,18 @@ async function readPlcRegisters(silent = false) {
         const fIdx = current9Rows.findIndex(x => x.rowNo === r.rowNo);
         const found = current9Rows[fIdx];
         if (found) {
-          const actChanged = found.actual !== r.actual;
-          const defChanged = (found.defect || 0) !== (r.defect || 0);
+          // ACTUAL register PLC hanya untuk Live Preview; kolom ACTUAL editor diisi dari Inventory (applyInventoryActuals)
+          found.actual = r.actual;
 
-          if (actChanged || defChanged) {
+          // DEFECT register PLC hanya dicatat ke baris editor yang modelnya sama dengan model di PLC.
+          // Baris PLC sudah berganti model (atau belum dikirim) = DEFECT tersimpan baris ini dipertahankan.
+          const sameModel = !!found.modelName && plcModelKey(r.modelName) === plcModelKey(found.modelName);
+          if (!sameModel) return;
+          const defChanged = (found.defect || 0) !== (r.defect || 0);
+          if (defChanged) {
             changeCount++;
           }
-
-          found.actual = r.actual;
           found.defect = r.defect || 0;
-          
-          // Update badge di tabel editor
-          const actBadge = document.getElementById(`actualBadge_${fIdx}`);
-          if (actBadge) {
-            actBadge.innerText = r.actual;
-            if (actChanged && silent) {
-              actBadge.classList.add('badge-updated-flash');
-              setTimeout(() => actBadge.classList.remove('badge-updated-flash'), 1000);
-            }
-          }
 
           const defBadge = document.getElementById(`defectBadge_${fIdx}`);
           if (defBadge) {
@@ -1541,7 +1556,7 @@ async function readPlcRegisters(silent = false) {
       });
 
       if (changeCount > 0 && silent) {
-        addLog(`[PLC AUTO-SYNC] Nilai berubah di PLC: ${changeCount} baris diperbarui otomatis.`, 'info');
+        addLog(`[PLC AUTO-SYNC] Nilai DEFECT berubah di PLC: ${changeCount} baris diperbarui otomatis.`, 'info');
       }
 
       if (!silent) {
@@ -1551,7 +1566,7 @@ async function readPlcRegisters(silent = false) {
           title: 'Nilai Aktual & Defect Terbaca',
           badge: 'Status PLC: ' + (data.plcStatus || 'Online'),
           message: `Nilai <strong>ACTUAL (R1012..R1952)</strong> dan <strong>DEFECT (R1014..R1954)</strong> untuk <strong>${data.rows.length} baris</strong> berhasil diperbarui langsung dari memori fisik PLC.`,
-          tip: 'Angka aktual pada tabel dan preview layar HMI GOT sudah disinkronkan.',
+          tip: 'Preview layar HMI GOT dan kolom DEFECT sudah disinkronkan. Kolom ACTUAL tabel editor diambil dari output Inventory AC OEE per model.',
           buttonText: 'Tutup'
         });
       }
@@ -1573,6 +1588,90 @@ function startPlcActualPolling() {
   _plcActualPollingInterval = setInterval(() => {
     readPlcRegisters(true);
   }, 3000);
+}
+
+// =========================================================
+// ACTUAL EDITOR = OUTPUT INVENTORY AC OEE PER MODEL (dbo.PlcKyoshinDailyOutput, akumulasi R22 per hari produksi)
+// Output model sejak tanggal plan paling awal di editor tetap berada di kemunculan pertama model pada antrean.
+// Dengan begitu, hasil aktual yang melebihi Prod. Plan tetap tercatat pada rencana produksi yang menjalankannya,
+// bukan terbagi ke antrean model yang sama pada tanggal berikutnya. Diperbarui setiap 60 detik.
+// =========================================================
+let _inventoryOutput = { from: null, rows: [] };
+let _inventoryLoading = false;
+
+const inventoryModelKey = (name) => (name || '').trim().toUpperCase();
+
+// Tanggal plan paling awal di editor; tanpa tanggal plan = awal bulan berjalan
+function inventoryActualFrom() {
+  const dates = current9Rows.filter(r => r.modelName && /^\d{4}-\d{2}-\d{2}$/.test(r.planDate || '')).map(r => r.planDate).sort();
+  return dates.length ? dates[0] : getTodayLocalDate().slice(0, 8) + '01';
+}
+
+function computeInventoryActuals() {
+  const from = inventoryActualFrom();
+  // Editor berisi tanggal plan lebih awal dari data yang sudah diambil: ambil ulang (mis. setelah isi editor dimuat)
+  if (_inventoryOutput.from && from < _inventoryOutput.from && !_inventoryLoading) loadInventoryActuals(false);
+  // Data Inventory belum pernah terbaca: ACTUAL tersimpan di database dipertahankan (tidak diubah jadi 0)
+  if (!_inventoryOutput.from) return;
+  const left = new Map();
+  _inventoryOutput.rows.forEach(r => {
+    if (r.date < from) return;
+    const k = inventoryModelKey(r.model);
+    left.set(k, (left.get(k) || 0) + (r.actual || 0));
+  });
+  const firstIdx = new Map();
+  current9Rows.forEach((r, i) => {
+    if (!r.modelName) return;
+    const k = inventoryModelKey(r.modelName);
+    if (!firstIdx.has(k)) firstIdx.set(k, i);
+  });
+  current9Rows.forEach((r, i) => {
+    if (!r.modelName) { r.invActual = 0; return; }
+    const k = inventoryModelKey(r.modelName);
+    const remaining = left.get(k) || 0;
+    const take = firstIdx.get(k) === i ? remaining : 0;
+    r.invActual = take;
+    left.set(k, remaining - take);
+  });
+}
+
+// Hitung ulang & perbarui angka di tabel tanpa menggambar ulang tabel
+function applyInventoryActuals(flash = false) {
+  const before = current9Rows.map(r => r.invActual || 0);
+  computeInventoryActuals();
+  current9Rows.forEach((r, i) => {
+    const badge = document.getElementById(`actualBadge_${i}`);
+    if (!badge || before[i] === (r.invActual || 0)) return;
+    badge.innerText = r.invActual || 0;
+    if (flash) {
+      badge.classList.add('badge-updated-flash');
+      setTimeout(() => badge.classList.remove('badge-updated-flash'), 1000);
+    }
+  });
+}
+
+async function loadInventoryActuals(flash = false) {
+  const from = inventoryActualFrom();
+  _inventoryLoading = true;
+  try {
+    const res = await fetch(`api/inventory-output?machine=${encodeURIComponent(currentMachine)}&from=${from}`);
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.message || `HTTP ${res.status}`);
+    _inventoryOutput = {
+      from,
+      rows: (data.rows || []).map(r => ({ date: r.date, model: r.model, actual: r.actual }))
+    };
+    applyInventoryActuals(flash);
+  } catch (err) {
+    console.warn('[INVENTORY ACTUAL]', err.message); // angka terakhir dipertahankan
+  } finally {
+    _inventoryLoading = false;
+  }
+}
+
+function startInventoryActualPolling() {
+  setTimeout(() => loadInventoryActuals(false), 1500);
+  setInterval(() => loadInventoryActuals(true), 60000);
 }
 
 // Activity Log

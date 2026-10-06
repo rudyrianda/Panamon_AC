@@ -680,6 +680,20 @@
         align-self: flex-start;
     }
 
+    /* Judul kolom TIME / MODEL / PLAN / ACTUAL tetap di atas saat tabel digulir.
+       Warna solid (setara warna transparan sebelumnya) supaya baris yang lewat di bawahnya tidak tembus. */
+    /* Selector panjang supaya menang dari aturan global ".table thead tr:first-child th:nth-child(2)"
+       (background-style-light.css) yang membuat kolom MODEL tidak menempel & berlatar gelap */
+    .perf-hourly-panel .perf-hourly-table > thead > tr:first-child > th:nth-child(n) {
+        position: sticky !important;
+        top: 0;
+        z-index: 2;
+        background-color: #3c6ea0 !important;
+    }
+    body.light-mode .perf-hourly-panel .perf-hourly-table > thead > tr:first-child > th:nth-child(n) {
+        background-color: #4b83b6 !important;
+    }
+
 </style>
 
 <div class="row mx-3 perf-page-shell">
@@ -802,13 +816,13 @@
                     </colgroup>
                     <thead>
                         <tr>
-                            <th scope="col" style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important;">TIME</th>
-                            <th scope="col" style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important;">MODEL</th>
+                            <th scope="col" style="color: #ffffff !important;">TIME</th>
+                            <th scope="col" style="color: #ffffff !important;">MODEL</th>
                             <th scope="col"
                                 title="Plan By SUT"
                                 aria-label="Plan By SUT"
-                                style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important; cursor: help;">PLAN</th>
-                            <th scope="col" style="background-color: rgba(61, 121, 176, 0.82) !important; color: #ffffff !important;">ACTUAL</th>
+                                style="color: #ffffff !important; cursor: help;">PLAN</th>
+                            <th scope="col" style="color: #ffffff !important;">ACTUAL</th>
                         </tr>
                     </thead>
                     <tbody id="hourlyTableBody">

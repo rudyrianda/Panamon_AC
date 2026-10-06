@@ -448,22 +448,22 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
 
             TotalRecords = displayedRecords.Count;
             EnsureValidCurrentPage();
-            LossTimeData = displayedRecords
-                .OrderByDescending(r => r.Date)
-                .ThenBy(r => r.Location)
-                .ToList();
+            LossTimeData = OrderNewestFirst(displayedRecords);
 
             Console.WriteLine($"? LoadDataFromAssembly: {displayedRecords.Count} displayed records in {sw.ElapsedMilliseconds}ms");
 
-            AllMttRecords = displayedRecords
-    .Where(r => r.Category == MttCategory)
-    .OrderByDescending(r => r.Date)
-    .ThenBy(r => r.Location)
-    .ToList();
+            AllMttRecords = OrderNewestFirst(displayedRecords.Where(r => r.Category == MttCategory));
 
             PopulateAttachmentStatus(LossTimeData.Concat(AllMttRecords), SelectedSource);
         }
 
+
+        // Kejadian terbaru paling atas: tanggal produksi lalu jam mulai (jam 00:00-06:59 = setelah 23:59 hari produksi yang sama)
+        private static List<LossTimeRecord> OrderNewestFirst(IEnumerable<LossTimeRecord> records) => records
+            .OrderByDescending(r => r.Date.Date)
+            .ThenByDescending(r => r.Start < TimeSpan.FromHours(7) ? r.Start + TimeSpan.FromDays(1) : r.Start)
+            .ThenBy(r => r.Location)
+            .ToList();
 
         private bool HasActualsData()
         {
@@ -532,17 +532,11 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
 
             TotalRecords = displayedRecords.Count;
             EnsureValidCurrentPage();
-            LossTimeData = displayedRecords
-                .OrderByDescending(r => r.Date)
-                .ToList();
+            LossTimeData = OrderNewestFirst(displayedRecords);
 
             Console.WriteLine($"? LoadDataFromMachine: {LossTimeData.Count} records in {sw.ElapsedMilliseconds}ms");
 
-            AllMttRecords = displayedRecords
-    .Where(r => r.Category == MttCategory)
-    .OrderByDescending(r => r.Date)
-    .ThenBy(r => r.Location)
-    .ToList();
+            AllMttRecords = OrderNewestFirst(displayedRecords.Where(r => r.Category == MttCategory));
 
             PopulateAttachmentStatus(LossTimeData.Concat(AllMttRecords), SelectedSource);
         }
@@ -1358,16 +1352,15 @@ WHERE Date >= @StartDate AND Date <= DATEADD(day, 1, @EndDate)";
             NormalizeDateRange();
             List<LossTimeRecord> exportData;
             if (SelectedSource == "Machine")
-                exportData = GetMachineRecords(StartSelectedDate, EndSelectedDate).OrderByDescending(x => x.Date).ToList();
+                exportData = OrderNewestFirst(GetMachineRecords(StartSelectedDate, EndSelectedDate));
             else
             {
                 if (HasActualsData())
-                    exportData = GetActualsAsLossRecords().OrderByDescending(x => x.Date).ToList();
+                    exportData = OrderNewestFirst(GetActualsAsLossRecords());
                 else
                 {
                     var breakTimes = GetAllBreakTimes();
-                    exportData = GetCombinedRecords(StartSelectedDate, StartSelectedDate, StartSelectedDate, EndSelectedDate, breakTimes)
-                        .OrderByDescending(x => x.Date).ToList();
+                    exportData = OrderNewestFirst(GetCombinedRecords(StartSelectedDate, StartSelectedDate, StartSelectedDate, EndSelectedDate, breakTimes));
                 }
             }
             exportData = ApplyDisplayDateRange(exportData);
