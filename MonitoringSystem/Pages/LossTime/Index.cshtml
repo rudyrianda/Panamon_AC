@@ -947,24 +947,7 @@
     <div class="filter-content">
         <form method="post" asp-page-handler="Filter" class="d-flex flex-wrap align-items-center gap-3">
 
-            <div class="d-flex align-items-center gap-2">
-                <label class="mb-0">Source</label>
-                <select class="form-select" style="width: 110px;" id="SelectedSource"
-                        onchange="onSourceChange(this.value)">
-                    @if (Model.SelectedSource == "Assembly")
-                    {
-                        <option value="Assembly" selected>Assembly</option>
-                        <option value="Machine">Machine</option>
-                    }
-                    else
-                    {
-                        <option value="Assembly">Assembly</option>
-                        <option value="Machine" selected>Machine</option>
-                    }
-                </select>
-            </div>
-
-            <div class="d-flex align-items-center gap-2 @(Model.SelectedSource == "Machine" ? "filter-panel-hidden" : "")" id="lineFilterPanel">
+            <div class="d-flex align-items-center gap-2" id="lineFilterPanel">
                 <label class="mb-0">Line</label>
                 <select class="form-select" style="width: 90px;" id="MachineLine" name="MachineLine" asp-for="MachineLine">
                     <option value="All">All</option>
@@ -973,18 +956,6 @@
                     <!option value="">CB</!option>
                     <!option value="">EVA</!option>
                     <!option value="">COND</!option>
-                </select>
-            </div>
-
-            <div class="d-flex align-items-center gap-2 @(Model.SelectedSource == "Assembly" ? "filter-panel-hidden" : "")" id="machineFilterPanel">
-                <label class="mb-0">Machine</label>
-                <select class="form-select" style="width: 140px;" id="SelectedMachineName" name="SelectedMachineName"
-                        asp-for="SelectedMachineName">
-                    <option value="All">All</option>
-                    @foreach (var machine in Model.MachineNameList)
-                    {
-                        <option value="@machine">@machine</option>
-                    }
                 </select>
             </div>
 
@@ -1043,7 +1014,7 @@
                 </button>
             }
 
-            <input type="hidden" id="hiddenSelectedSource" name="SelectedSource" value="@Model.SelectedSource" />
+            <input type="hidden" id="hiddenSelectedSource" name="SelectedSource" value="Assembly" />
             @if (Model.HasActiveDateRange)
             {
                 <input type="hidden" name="DateRangeStart" value="@Model.DateRangeStart!.Value.ToString("yyyy-MM-dd")" />
@@ -1902,29 +1873,7 @@
         }, 4000);
     }
 
-    function onSourceChange(val) {
-        const linePanel = document.getElementById('lineFilterPanel');
-        const machinePanel = document.getElementById('machineFilterPanel');
-        const hiddenSrc = document.getElementById('hiddenSelectedSource');
-        if (val === 'Machine') {
-            linePanel.classList.add('filter-panel-hidden');
-            machinePanel.classList.remove('filter-panel-hidden');
-        } else {
-            linePanel.classList.remove('filter-panel-hidden');
-            machinePanel.classList.add('filter-panel-hidden');
-        }
-        if (hiddenSrc) hiddenSrc.value = val;
-    }
-
     document.addEventListener('DOMContentLoaded', function () {
-        const form = document.querySelector('form[method="post"]');
-        if (form) {
-            form.addEventListener('submit', function () {
-                const hidden = document.getElementById('hiddenSelectedSource');
-                const select = document.getElementById('SelectedSource');
-                if (hidden && select) hidden.value = select.value;
-            });
-        }
 
         document.querySelectorAll('.calendar-only-input').forEach(input => {
             input.addEventListener('click', function () {
@@ -2239,10 +2188,6 @@
             document.querySelectorAll('.filter-content .form-select').forEach(d => d.addEventListener('change', updateDropdownStyle));
         } catch (e) { console.error("❌ Dropdown error:", e); }
 
-        try {
-            const src = document.getElementById('SelectedSource');
-            if (src) onSourceChange(src.value);
-        } catch (e) { console.error("❌ Source init error:", e); }
 
         try {
             const detailedReasonModal = document.getElementById('detailedReasonModal');

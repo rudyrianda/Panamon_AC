@@ -41,6 +41,15 @@
             <div class="col-auto">
                 <form method="get" class="d-flex flex-wrap align-items-center gap-3">
                     <div class="d-flex align-items-center gap-2">
+                        <label class="mb-0">Machine Line</label>
+                        <select class="form-select" style="width: 150px;" name="FilterMachineLine">
+                            <option value="CAC-ALL" selected="@(Model.FilterMachineLine == "CAC-ALL")">All</option>
+                            <option value="CAC" selected="@(Model.FilterMachineLine == "CAC")">CAC</option>
+                            <option value="SKD" selected="@(Model.FilterMachineLine == "SKD")">SKD</option>
+                            <option value="STANDING FLOOR" selected="@(Model.FilterMachineLine == "STANDING FLOOR")">Standing Floor</option>
+                        </select>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
                         <label class="mb-0">Bulan</label>
                         <select class="form-select" style="width: 130px;" name="FilterBulan">
                             @for (int b = 1; b <= 12; b++)
@@ -53,15 +62,6 @@
                         <label class="mb-0">Tahun</label>
                         <input type="number" class="form-control" style="width: 90px;"
                                name="FilterTahun" value="@Model.ActiveYear" min="2000" max="2100" />
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <label class="mb-0">Machine Line</label>
-                        <select class="form-select" style="width: 150px;" name="FilterMachineLine">
-                            <option value="CAC-ALL" selected="@(Model.FilterMachineLine == "CAC-ALL")">All</option>
-                            <option value="CAC" selected="@(Model.FilterMachineLine == "CAC")">CAC</option>
-                            <option value="SKD" selected="@(Model.FilterMachineLine == "SKD")">SKD</option>
-                            <option value="STANDING FLOOR" selected="@(Model.FilterMachineLine == "STANDING FLOOR")">Standing Floor</option>
-                        </select>
                     </div>
                     <button type="submit" class="btn btn-primary">Search</button>
                     <a href="/CAC/Inventory/Index" class="btn btn-danger">Reset</a>

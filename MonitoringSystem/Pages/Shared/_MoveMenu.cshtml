@@ -1,0 +1,167 @@
+@*
+    Tombol "Move" di sidebar untuk pindah antar modul (RAC / CAC / MACHINE).
+    Modul aktif dideteksi dari URL, popup hanya menampilkan 2 modul lainnya.
+    CSS & JS dibuat mandiri karena dipakai juga oleh ACOEE Dashboard (Layout = null).
+*@
+@{
+    var movePath = (Context.Request.Path.Value ?? string.Empty).ToLowerInvariant();
+    string currentModule =
+        movePath.StartsWith("/cac") ? "CAC" :
+        (movePath.StartsWith("/acoee") || movePath.StartsWith("/planmachine")) ? "MACHINE" :
+        "RAC";
+
+    var moveTargets = new[]
+    {
+        new { Key = "RAC", Href = "/ProductionReport/index", Icon = "fa-snowflake", Desc = "Production Monitoring", Css = "move-card-rac" },
+        new { Key = "CAC", Href = "/CAC/ProductionReport/index", Icon = "fa-wind", Desc = "Production Monitoring CAC", Css = "move-card-cac" },
+        new { Key = "MACHINE", Href = "/ACOEE/dashboard", Icon = "fa-gears", Desc = "AC OEE Machine", Css = "move-card-machine" }
+    }.Where(t => t.Key != currentModule);
+}
+
+<li class="nav-item" id="moveNavItem" style="position: relative;">
+    <a href="#" id="moveMenuBtn" title="Pindah ke modul lain">
+        <i class="fa-solid fa-right-left"></i>
+        <span class="nav-label">Move</span>
+    </a>
+    <div id="moveMenuPopup" class="sidebar-move-popup" role="menu">
+        @foreach (var t in moveTargets)
+        {
+            <a class="move-card @t.Css" href="@t.Href" role="menuitem">
+                <i class="fa-solid @t.Icon"></i>
+                <span class="move-card-name">@t.Key</span>
+                <span class="move-card-desc">@t.Desc</span>
+            </a>
+        }
+    </div>
+</li>
+
+<style>
+    #bdSidebar .sidebar-move-popup {
+        display: none;
+        flex-direction: column;
+        gap: 8px;
+        position: absolute;
+        left: 100%;
+        top: 0;
+        margin-left: 8px;
+        padding: 8px;
+        min-width: 170px;
+        background: #1c2440 !important;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+        z-index: 9999;
+    }
+
+        #bdSidebar .sidebar-move-popup.open {
+            display: flex;
+        }
+
+    #bdSidebar .nav-item .sidebar-move-popup a.move-card {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 4px;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 84px;
+        padding: 12px 10px !important;
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 2px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 10px !important;
+        color: #ffffff !important;
+        opacity: 1 !important;
+        text-decoration: none !important;
+        transition: border-color .15s ease, background .15s ease, transform .15s ease !important;
+    }
+
+        #bdSidebar .nav-item .sidebar-move-popup a.move-card:hover {
+            transform: translateX(2px);
+        }
+
+        #bdSidebar .nav-item .sidebar-move-popup a.move-card i {
+            font-size: 24px;
+            margin: 0;
+        }
+
+    #bdSidebar .sidebar-move-popup .move-card-name {
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 1.5px;
+        line-height: 1.1;
+    }
+
+    #bdSidebar .sidebar-move-popup .move-card-desc {
+        font-size: 9.5px;
+        font-weight: 500;
+        line-height: 1.2;
+        text-align: center;
+        opacity: .65;
+    }
+
+    #bdSidebar .sidebar-move-popup .move-card-rac i { color: #4fc3f7 !important; }
+    #bdSidebar .sidebar-move-popup .move-card-cac i { color: #f39c12 !important; }
+    #bdSidebar .sidebar-move-popup .move-card-machine i { color: #2ecc71 !important; }
+
+    #bdSidebar .nav-item .sidebar-move-popup a.move-card-rac:hover {
+        border-color: #4fc3f7 !important;
+        background: rgba(79, 195, 247, 0.15) !important;
+    }
+
+    #bdSidebar .nav-item .sidebar-move-popup a.move-card-cac:hover {
+        border-color: #f39c12 !important;
+        background: rgba(243, 156, 18, 0.15) !important;
+    }
+
+    #bdSidebar .nav-item .sidebar-move-popup a.move-card-machine:hover {
+        border-color: #2ecc71 !important;
+        background: rgba(46, 204, 113, 0.15) !important;
+    }
+
+    body.light-mode #bdSidebar .sidebar-move-popup,
+    body.light-theme #bdSidebar .sidebar-move-popup {
+        background: #ffffff !important;
+        border-color: rgba(26, 26, 46, 0.2);
+        box-shadow: 0 8px 24px rgba(26, 26, 46, 0.25);
+    }
+
+    body.light-mode #bdSidebar .nav-item .sidebar-move-popup a.move-card,
+    body.light-theme #bdSidebar .nav-item .sidebar-move-popup a.move-card {
+        color: #1a1a2e !important;
+        background: rgba(26, 26, 46, 0.03) !important;
+        border-color: rgba(26, 26, 46, 0.15) !important;
+    }
+</style>
+
+<script>
+    (function () {
+        var btn = document.getElementById('moveMenuBtn');
+        var popup = document.getElementById('moveMenuPopup');
+        if (!btn || !popup) return;
+
+        function close() {
+            popup.classList.remove('open');
+            popup.style.top = '';
+        }
+
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (popup.classList.contains('open')) { close(); return; }
+
+            popup.classList.add('open');
+            // Geser ke atas kalau popup terpotong di bawah layar.
+            var overflow = popup.getBoundingClientRect().bottom - (window.innerHeight - 8);
+            if (overflow > 0) popup.style.top = (-overflow) + 'px';
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!btn.contains(e.target) && !popup.contains(e.target)) close();
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') close();
+        });
+    })();
+</script>
