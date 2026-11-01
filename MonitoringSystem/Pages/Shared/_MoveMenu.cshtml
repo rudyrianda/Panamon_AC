@@ -7,7 +7,7 @@
     var movePath = (Context.Request.Path.Value ?? string.Empty).ToLowerInvariant();
     string currentModule =
         movePath.StartsWith("/cac") ? "CAC" :
-        (movePath.StartsWith("/acoee") || movePath.StartsWith("/planmachine") || movePath.StartsWith("/planbrazing") || movePath.StartsWith("/planfinpress")) ? "MACHINE" :
+        (movePath.StartsWith("/acoee") || movePath.StartsWith("/planmachine") || movePath.StartsWith("/planbrazing") || movePath.StartsWith("/planfinpress") || movePath.StartsWith("/planpressshop")) ? "MACHINE" :
         "RAC";
 
     // Ikon RAC & CAC sebagai SVG langsung (tanpa library/internet):

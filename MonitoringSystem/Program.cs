@@ -38,7 +38,10 @@ builder.Services.AddHostedService<PlanUpdaterService>()
 builder.Services.AddSignalR();
 
 // PLC ROHIB (Plclogger): dijalankan bersama Panamon & diakses lewat /plcrohib-app/ (menu More > PLC ROHIB)
-builder.Services.AddHttpClient("PlcRohib");
+// PLC ROHIB jalan di server yang sama (localhost:5000): jangan lewat proxy kantor (squid), kalau lewat proxy
+// squid mencoba localhost miliknya sendiri dan halaman Plan Machine gagal "Connection refused".
+builder.Services.AddHttpClient("PlcRohib")
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { UseProxy = false });
 builder.Services.AddHostedService<MonitoringSystem.Services.PlcRohibLauncher>();
 
 // Import SAP Plan otomatis dari "Daily prod plan" (setiap 3 jam, default DryRun) - lihat Services/SapPlanImport

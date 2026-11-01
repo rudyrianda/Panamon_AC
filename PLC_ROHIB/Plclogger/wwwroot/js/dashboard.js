@@ -192,10 +192,11 @@ const PAGE_MACHINE = (new URLSearchParams(window.location.search).get('machine')
 const OFFLINE_MODE = PAGE_MACHINE !== '' && PAGE_MACHINE !== PLC_MACHINE_CODE;
 // Source = mesin halaman (mis. Brazing); line-nya dipilih di LINE MESIN (?line=EVA / CON), isi editor per line terpisah
 const PAGE_SOURCE_LABEL = !OFFLINE_MODE ? ''
-  : ({ FINPRESS: 'Fin Press' }[PAGE_MACHINE] || (PAGE_MACHINE.charAt(0) + PAGE_MACHINE.slice(1).toLowerCase()));
+  : ({ FINPRESS: 'Fin Press', PRESSSHOP: 'Press Shop' }[PAGE_MACHINE] || (PAGE_MACHINE.charAt(0) + PAGE_MACHINE.slice(1).toLowerCase()));
 const PAGE_LINES = {
   BRAZING: [{ code: 'EVA', label: 'Evaporator' }, { code: 'CON', label: 'Condenser' }],
-  FINPRESS: [{ code: 'FX80', label: 'FX80' }, { code: 'FIX36', label: 'FIX36' }, { code: 'SF250', label: 'SF250' }, { code: 'FIX12', label: 'FIX12' }]
+  FINPRESS: [{ code: 'FX80', label: 'FX80' }, { code: 'FIX36', label: 'FIX36' }, { code: 'SF250', label: 'SF250' }, { code: 'FIX12', label: 'FIX12' }],
+  PRESSSHOP: [{ code: '200T', label: '200T' }, { code: '110TA', label: '110T Amada' }, { code: '110TK', label: '110T Komatsu' }]
 }[PAGE_MACHINE] || [];
 const PAGE_LINE = (() => {
   const wanted = (new URLSearchParams(window.location.search).get('line') || '').trim().toUpperCase();
@@ -261,7 +262,8 @@ function renderPageMachineSelect(sel) {
 const PAGE_SOURCES = [
   { code: 'EXPANDER', label: 'Expander', panamonPath: '/planmachine' },
   { code: 'BRAZING', label: 'Brazing', panamonPath: '/planbrazing' },
-  { code: 'FINPRESS', label: 'Fin Press', panamonPath: '/planfinpress' }
+  { code: 'FINPRESS', label: 'Fin Press', panamonPath: '/planfinpress' },
+  { code: 'PRESSSHOP', label: 'Press Shop', panamonPath: '/planpressshop' }
 ];
 function renderPageSourceSelect() {
   const lineSelect = document.getElementById('machineSelectFilter');
@@ -358,16 +360,33 @@ document.addEventListener('DOMContentLoaded', () => {
 // Plan Brazing (Condenser / Evaporator): kirim plan & baca Live Preview / Actual dari PLC Brazing (192.168.1.10:5010)
 const BRAZING_SEND = OFFLINE_MODE && PAGE_MACHINE === 'BRAZING';
 
-// Plan Fin Press (FX80 / FIX36 / SF250 / FIX12): address plan sudah disiapkan dari file "addres Machine Fin press.xlsx"
-// (D300 - D6449), PLC, master data & sumber rencana belum ada -> mode tanpa PLC.
-// Tiap kolom satu blok register D berurutan (baris n = offset n-1). TANG & BULAN = dua word angka (tanggal, bulan).
+// Plan Fin Press (FX80 / FIX36 / SF250 / FIX12): satu PLC 192.168.1.100:5010 (appsettings FinPressPlc), address dari file
+// "addres Machine Fin press.xlsx" (tabel plan D300 - D6449 + halaman PLAN GOT register R baris 1-8).
+// Tiap kolom satu blok register D berurutan (baris n = offset n-1). TANG & BULAN = dua word angka (tanggal, bulan), tanpa tahun.
+// Master data & sumber rencana belum ada: SUT diisi manual, tombol "Isi dari Rencana Database" mati.
 // Harus sama dengan FinPressLines di Program.cs.
-const FIN_PRESS_PAGE = OFFLINE_MODE && PAGE_MACHINE === 'FINPRESS';
+// Press Shop (200T / 110T Amada / 110T Komatsu, file "addres Machine prsss shop (version 1).xlsx"): susunan address sama
+// dengan Fin Press tapi PLC sendiri (appsettings PressShopPlc) -> halaman Press Shop memakai alur Fin Press yang sama.
+const PRESS_SHOP_PAGE = OFFLINE_MODE && PAGE_MACHINE === 'PRESSSHOP';
+const FIN_PRESS_PAGE = OFFLINE_MODE && (PAGE_MACHINE === 'FINPRESS' || PRESS_SHOP_PAGE);
+// master = nama mesin di Master Data Produk (MachineList); model plan Fin Press = KODE PART (mis. ACXB32-19410-1)
+// home = layar HOME (D200 - D295, nama & model 10 word, lainnya 1 word); extra = D296..D299 (fungsi belum diketahui)
 const FIN_PRESS_LINES = {
-  'FINPRESS-FX80':  { rows: 120, model: 300,  sut: 1500, plan: 1620, actual: 1740, day: 1860, month: 1980 },
-  'FINPRESS-FIX36': { rows: 120, model: 2100, sut: 3300, plan: 3420, actual: 3540, day: 3660, month: 3780 },
-  'FINPRESS-SF250': { rows: 120, model: 3900, sut: 5100, plan: 5220, actual: 5340, day: 5460, month: 5580 },
-  'FINPRESS-FIX12': { rows: 50,  model: 5700, sut: 6200, plan: 6250, actual: 6300, day: 6350, month: 6400 }
+  'FINPRESS-FX80':  { master: 'Fix 80', rows: 120, model: 300,  sut: 1500, plan: 1620, actual: 1740, day: 1860, month: 1980,
+                      home: { name: 200, model: 210, prodPlan: 280, sut: 281, actual: 282, planSut: 283, extra: 296 } },
+  'FINPRESS-FIX36': { master: 'Fix 36', rows: 120, model: 2100, sut: 3300, plan: 3420, actual: 3540, day: 3660, month: 3780,
+                      home: { name: 220, model: 230, prodPlan: 284, sut: 285, actual: 286, planSut: 287, extra: 297 } },
+  'FINPRESS-SF250': { master: 'SF-250', rows: 120, model: 3900, sut: 5100, plan: 5220, actual: 5340, day: 5460, month: 5580,
+                      home: { name: 240, model: 250, prodPlan: 288, sut: 289, actual: 290, planSut: 291, extra: 298 } },
+  'FINPRESS-FIX12': { master: 'Fix 12', rows: 50,  model: 5700, sut: 6200, plan: 6250, actual: 6300, day: 6350, month: 6400,
+                      home: { name: 260, model: 270, prodPlan: 292, sut: 293, actual: 294, planSut: 295, extra: 299 } },
+  // Press Shop: extra = timer LOSS TIME (D296 / D297 / D298), belum dipakai
+  'PRESSSHOP-200T':  { master: '200 Ton', rows: 120, model: 300,  sut: 1500, plan: 1620, actual: 1740, day: 1860, month: 1980,
+                       home: { name: 200, model: 210, prodPlan: 280, sut: 281, actual: 282, planSut: 283, extra: 296 } },
+  'PRESSSHOP-110TA': { master: '110 Ton Amada', rows: 120, model: 2100, sut: 3300, plan: 3420, actual: 3540, day: 3660, month: 3780,
+                       home: { name: 220, model: 230, prodPlan: 284, sut: 285, actual: 286, planSut: 287, extra: 297 } },
+  'PRESSSHOP-110TK': { master: '110 Ton Komatsu', rows: 120, model: 3900, sut: 5100, plan: 5220, actual: 5340, day: 5460, month: 5580,
+                       home: { name: 240, model: 250, prodPlan: 288, sut: 289, actual: 290, planSut: 291, extra: 298 } }
 };
 function finPressRegMap(i) {
   const m = FIN_PRESS_LINES[currentMachine];
@@ -387,6 +406,13 @@ function finPressRegMap(i) {
     noAddr: `ROW ${i + 1}`
   };
 }
+
+// PLC milik halaman tanpa PLC Expander yang sudah tersambung (Brazing / Fin Press): kirim plan, cek koneksi & Live Preview
+// memakai alur yang sama (fungsi *BrazingPlc*), bedanya alamat API & nama di pesan. null = mesin belum terhubung PLC.
+const PLC_LINE = BRAZING_SEND ? { api: 'api/brazing/plc', name: 'Brazing', config: 'BrazingPlc' }
+  : PRESS_SHOP_PAGE ? { api: 'api/pressshop/plc', name: 'Press Shop', config: 'PressShopPlc' }
+  : FIN_PRESS_PAGE ? { api: 'api/finpress/plc', name: 'Fin Press', config: 'FinPressPlc' }
+  : null;
 
 // Peta register per baris (0-based idx) untuk PLC Brazing (Condenser vs Evaporator)
 function brazingRegMap(i) {
@@ -418,7 +444,7 @@ function brazingRegMap(i) {
 }
 
 function applyOfflineMode() {
-  document.title = BRAZING_SEND
+  document.title = PLC_LINE
     ? `Plan ${PAGE_MACHINE_LABEL} - Production Plan`
     : `Plan ${PAGE_MACHINE_LABEL} - Production Plan (belum terhubung PLC)`;
 
@@ -428,13 +454,13 @@ function applyOfflineMode() {
 
   }
 
-  // Brazing: kirim semua baris boleh; kirim Row 1 saja (P1) belum ada untuk PLC Brazing
-  (BRAZING_SEND ? ['btnConfirmDispatchP1'] : ['btnConfirmDispatchAll', 'btnConfirmDispatchP1', 'btnSubmitDispatch']).forEach(id => {
+  // Brazing / Fin Press: kirim semua baris boleh; kirim Row 1 saja (P1) tidak ada
+  (PLC_LINE ? ['btnConfirmDispatchP1'] : ['btnConfirmDispatchAll', 'btnConfirmDispatchP1', 'btnSubmitDispatch']).forEach(id => {
     const btn = document.getElementById(id);
     if (!btn) return;
     btn.disabled = true;
-    btn.title = BRAZING_SEND
-      ? 'Plan Brazing: kirim Row 1 saja belum tersedia, pakai kirim semua baris'
+    btn.title = PLC_LINE
+      ? `Plan ${PLC_LINE.name}: kirim Row 1 saja tidak tersedia, pakai kirim semua baris`
       : `${PAGE_MACHINE_LABEL} belum terhubung ke PLC: data tidak bisa dikirim`;
     btn.style.opacity = '0.45';
     btn.style.cursor = 'not-allowed';
@@ -451,9 +477,9 @@ function applyOfflineMode() {
     }
   }
 
-  // Baca Actual dari PLC aktif untuk Brazing, dimatikan hanya untuk mesin offline lain
+  // Baca Actual dari PLC aktif untuk Brazing / Fin Press, dimatikan hanya untuk mesin offline lain
   const btnRead = document.getElementById('btnReadPlcNow');
-  if (btnRead && !BRAZING_SEND) {
+  if (btnRead && !PLC_LINE) {
     btnRead.disabled = true;
     btnRead.title = `Baca nilai Actual dari PLC ${PAGE_MACHINE_LABEL} belum tersedia`;
     btnRead.style.opacity = '0.45';
@@ -465,22 +491,24 @@ function applyOfflineMode() {
   banner.style.cssText = 'margin:0 0 12px; padding:10px 14px; border-radius:8px; background:#fff7ed; border:1.5px solid #fb923c; color:#9a3412; font-weight:700; font-size:13px;';
   banner.innerHTML = BRAZING_SEND
     ? `ℹ Plan <strong>${escapeHtml(PAGE_MACHINE_LABEL)}</strong>: terhubung ke PLC Brazing (Model, SUT, Prod Plan, Actual, Plan SUT, Defect, Date PSI).`
-    : `⚠ Plan <strong>${escapeHtml(PAGE_MACHINE_LABEL)}</strong> belum terhubung ke PLC. ` +
-      (FIN_PRESS_PAGE
-        ? `Address plan sudah disiapkan (${FIN_PRESS_LINES[currentMachine] ? FIN_PRESS_LINES[currentMachine].rows : 0} baris); editor & simpan ke database bisa dipakai, kirim ke PLC menunggu IP PLC.`
-        : 'Editor, master data, dan simpan ke database bisa dipakai; kirim ke PLC & Live Preview dimatikan.');
+    : FIN_PRESS_PAGE
+      ? `ℹ Plan <strong>${escapeHtml(PAGE_MACHINE_LABEL)}</strong>: terhubung ke PLC ${escapeHtml(PLC_LINE.name)} ` +
+        `(${FIN_PRESS_LINES[currentMachine] ? FIN_PRESS_LINES[currentMachine].rows : 0} baris: Model, SUT, Prod Plan, Tanggal & Bulan; baris 1-8 juga ke halaman PLAN di GOT). ` +
+        `Model diisi ${PRESS_SHOP_PAGE ? '' : '<strong>kode part</strong> '}dari Master Data Produk "${escapeHtml(FIN_PRESS_LINES[currentMachine] ? FIN_PRESS_LINES[currentMachine].master : '')}".`
+      : `⚠ Plan <strong>${escapeHtml(PAGE_MACHINE_LABEL)}</strong> belum terhubung ke PLC. ` +
+        'Editor, master data, dan simpan ke database bisa dipakai; kirim ke PLC & Live Preview dimatikan.';
   const main = document.querySelector('main');
   if (main && main.parentNode) main.parentNode.insertBefore(banner, main); else document.body.insertBefore(banner, document.body.firstChild);
 
   setPlcMirrorStatus('nolink');
-  if (BRAZING_SEND) {
+  if (PLC_LINE) {
     const status = document.getElementById('hmiMirrorStatus');
     if (status && !document.getElementById('btnCheckBrazingPlc')) {
       const btn = document.createElement('button');
       btn.id = 'btnCheckBrazingPlc';
       btn.type = 'button';
       btn.textContent = '🔌 Cek Koneksi PLC';
-      btn.title = 'Coba hubungkan & muat ulang register dari PLC Brazing (hanya membaca, tidak menulis apa pun)';
+      btn.title = `Coba hubungkan & muat ulang register dari PLC ${PLC_LINE.name} (hanya membaca, tidak menulis apa pun)`;
       btn.style.cssText = 'margin-left:8px; white-space:nowrap; font-size:12px; font-weight:700; padding:4px 12px; border-radius:999px; border:1.5px solid #2563eb; background:#eff6ff; color:#1d4ed8; cursor:pointer;';
       btn.addEventListener('click', checkBrazingPlc);
       const wrap = document.createElement('div');
@@ -497,24 +525,26 @@ function applyOfflineMode() {
   addLog(`[MODE] Plan ${PAGE_MACHINE_LABEL}: tidak terhubung ke PLC (salinan halaman Expander 6.35).`, 'info');
 }
 
-// Plan Brazing: cek koneksi ke PLC Brazing lewat api/brazing/plc/status lalu muat isi register ke Live Preview
+// Plan Brazing / Fin Press: cek koneksi PLC lewat <PLC_LINE.api>/status lalu muat isi register ke Live Preview
 async function checkBrazingPlc() {
+  if (!PLC_LINE) return;
   const btn = document.getElementById('btnCheckBrazingPlc');
   const status = document.getElementById('hmiMirrorStatus');
+  const tag = `[PLC ${PLC_LINE.name.toUpperCase()}]`;
   if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.textContent = '⏳ Mengecek...'; }
   setPlcMirrorStatus('brzwait');
   try {
-    const res = await fetch(`api/brazing/plc/status?machine=${encodeURIComponent(currentMachine)}`, { cache: 'no-store' });
+    const res = await fetch(`${PLC_LINE.api}/status?machine=${encodeURIComponent(currentMachine)}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     setPlcMirrorStatus(data.success ? 'brzok' : 'brzfail', data.checkedAt);
     if (status) status.title = data.message || '';
-    addLog(`[PLC BRAZING] ${data.message}`, data.success ? 'success' : 'error');
+    addLog(`${tag} ${data.message}`, data.success ? 'success' : 'error');
     if (data.success) await readBrazingPlcRegisters(true);
   } catch (e) {
     setPlcMirrorStatus('brzfail', new Date().toLocaleTimeString('id-ID'));
     if (status) status.title = `Server PLC Dispatcher tidak merespons (${e.message})`;
-    addLog(`[PLC BRAZING] Server tidak merespons: ${e.message}`, 'error');
+    addLog(`${tag} Server tidak merespons: ${e.message}`, 'error');
   } finally {
     if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '🔌 Cek Koneksi PLC'; }
   }
@@ -713,7 +743,7 @@ function setupActionButtons() {
 
   const btnReadPlc = document.getElementById('btnReadPlcNow');
   if (btnReadPlc) {
-    btnReadPlc.addEventListener('click', () => BRAZING_SEND ? readBrazingPlcRegisters(false) : readPlcRegisters(false));
+    btnReadPlc.addEventListener('click', () => PLC_LINE ? readBrazingPlcRegisters(false) : readPlcRegisters(false));
   }
 }
 
@@ -737,7 +767,7 @@ async function loadPlanData(date) {
     // Brazing Evaporator (CS) tidak memakai saran ini; sarannya dari Master Data Produk "Evaporator".
     rawSapPlanItems = (data.sapPlan || []).filter(x => {
       const p = (x.productName || '').trim().toUpperCase();
-      return p.startsWith(planModelPrefix());
+      return !FIN_PRESS_PAGE && p.startsWith(planModelPrefix()); // Fin Press: belum ada sumber rencana
     });
 
     // Tampilkan PlanId
@@ -756,6 +786,8 @@ async function loadPlanData(date) {
       addLog(`[DATABASE] Database tidak dapat diakses (${data.dbStatus}). Saran model dari rencana tidak tersedia.`, 'error');
     } else if (!currentProductionPlan) {
       addLog(`[DATABASE] Tidak ada rencana produksi (ProductionPlan) untuk tanggal ${date}.`, 'info');
+    } else if (FIN_PRESS_PAGE) {
+      addLog(`[DATABASE] Sumber rencana ${PAGE_SOURCE_LABEL} belum ada: model & SUT diisi manual.`, 'info');
     } else if (currentMachine === 'BRAZING-EVA') {
       addLog('[DATABASE] Saran model Evaporator diambil dari Master Data Produk (mesin Evaporator).', 'info');
     } else {
@@ -772,17 +804,20 @@ async function loadPlanData(date) {
 //   Expander: hanya baris mesin "Expander Kyoshin 6.35".
 //   Brazing : hanya baris mesin line-nya ("Condenser" / "Evaporator"), lewat api/brazing-sut.
 // Model Brazing yang belum terdaftar memakai SUT default line (Condenser 35 detik).
-const BRAZING_DEFAULT_SUT = { 'BRAZING-CON': 35, 'BRAZING-EVA': 35 };
+// SUT cadangan model yang belum ada di master (mesin tanpa PLC Expander): Brazing 35 dtk, Fin Press FX80 20 dtk (sementara)
+const BRAZING_DEFAULT_SUT = { 'BRAZING-CON': 35, 'BRAZING-EVA': 35, 'FINPRESS-FX80': 20 };
 let masterSutMap = {};
 let masterModelList = []; // [{ model, sut }] untuk saran model
 
 async function loadMasterSutMap() {
   try {
     const brazing = OFFLINE_MODE && PAGE_MACHINE === 'BRAZING';
-    // Expander hanya baris mesinnya sendiri: model CU yang sama juga terdaftar untuk Condenser dengan SUT berbeda
+    // Expander hanya baris mesinnya sendiri: model CU yang sama juga terdaftar untuk Condenser dengan SUT berbeda.
+    // Fin Press: master per mesin (mis. "Fix 80"), isinya kode part.
+    const finPressMaster = FIN_PRESS_PAGE && FIN_PRESS_LINES[currentMachine] ? FIN_PRESS_LINES[currentMachine].master : null;
     const res = await fetch(brazing
       ? `api/brazing-sut?machine=${encodeURIComponent(currentMachine)}`
-      : `api/masterproduct?machine=${encodeURIComponent(PAGE_MACHINE_LABEL)}`);
+      : `api/masterproduct?machine=${encodeURIComponent(finPressMaster || PAGE_MACHINE_LABEL)}`);
     if (!res.ok) throw await masterApiError(res);
     const data = await res.json();
     masterSutMap = {};
@@ -1490,7 +1525,7 @@ function buildModelOptionsHtml(idx) {
   // Brazing: master sudah per mesin (Condenser / Evaporator), jadi semua modelnya ditawarkan (termasuk EU-/EP-)
   masterModelList.forEach(m => {
     const key = m.model.toUpperCase();
-    if ((!BRAZING_SEND && !key.startsWith('CU')) || seen.has(key)) return;
+    if ((!PLC_LINE && !key.startsWith('CU')) || seen.has(key)) return;
     seen.add(key);
     options.push(`<option value="${escapeHtml(m.model)}">${escapeHtml(m.model)} - Master Data | SUT: ${m.sut}s</option>`);
   });
@@ -1556,9 +1591,9 @@ function setPlcMirrorStatus(state, readAt) {
     server:  ['#fef3c7', '#92400e', '● Server PLC Dispatcher tidak merespons'],
     wait:    ['#e2e8f0', '#334155', '● Menghubungkan ke PLC...'],
     nolink:  ['#ffedd5', '#9a3412', `● ${PAGE_MACHINE_LABEL} belum terhubung ke PLC`],
-    brzwait: ['#e2e8f0', '#334155', '● Mengecek koneksi PLC Brazing...'],
-    brzok:   ['#dcfce7', '#166534', `● PLC Brazing TERHUBUNG${readAt ? ' — cek ' + readAt : ''}`],
-    brzfail: ['#fee2e2', '#991b1b', `● PLC Brazing TIDAK TERHUBUNG${readAt ? ' — cek ' + readAt : ''}`]
+    brzwait: ['#e2e8f0', '#334155', `● Mengecek koneksi PLC ${PLC_LINE ? PLC_LINE.name : ''}...`],
+    brzok:   ['#dcfce7', '#166534', `● PLC ${PLC_LINE ? PLC_LINE.name : ""} TERHUBUNG${readAt ? ' — cek ' + readAt : ''}`],
+    brzfail: ['#fee2e2', '#991b1b', `● PLC ${PLC_LINE ? PLC_LINE.name : ""} TIDAK TERHUBUNG${readAt ? ' — cek ' + readAt : ''}`]
   };
   const [bg, fg, text] = styles[state] || styles.wait;
   el.style.background = bg;
@@ -1586,6 +1621,19 @@ function renderHmiPreview() {
         <th style="width: 100px;">DEFECT</th>
         <th style="width: 150px;">KET DEFECT</th>
         <th style="width: 135px;">DATE PSI</th>
+      `;
+    }
+  } else if (FIN_PRESS_PAGE) {
+    const theadTr = tbody.closest('table')?.querySelector('thead tr');
+    if (theadTr && !theadTr.dataset.finPressHead) {
+      theadTr.dataset.finPressHead = '1';
+      theadTr.innerHTML = `
+        <th style="width: 58px;">NO</th>
+        <th>MODEL</th>
+        <th style="width: 95px;">SUT</th>
+        <th style="width: 110px;">P. PLAN</th>
+        <th style="width: 110px;">ACTUAL</th>
+        <th style="width: 150px;">TGL - BLN</th>
       `;
     }
   }
@@ -1656,6 +1704,46 @@ function renderHmiPreview() {
           <div class="hmi-cell-lcd model-cell">
             <span class="hmi-cell-lcd-tag">${row.dateAddr || ''}</span>
             <span class="hmi-cell-lcd-val" id="hmiDateText_${idx}" title="${escapeHtml(dateDisplay)}">${escapeHtml(dateDisplay)}</span>
+          </div>
+        </td>
+      `;
+    } else if (FIN_PRESS_PAGE) {
+      const dateDisplay = row.planDate || '-'; // "12-10" = tanggal 12 bulan 10 (dari PLC)
+      tr.innerHTML = `
+        <td style="padding: 2px;">
+          <div class="hmi-cell-lcd no-cell">
+            <span class="hmi-cell-lcd-tag">${row.noAddr || ('ROW ' + row.rowNo)}</span>
+            <span class="hmi-cell-lcd-val">${row.rowNo}</span>
+          </div>
+        </td>
+        <td style="padding: 2px;">
+          <div class="hmi-cell-lcd model-cell">
+            <span class="hmi-cell-lcd-tag">${row.modelAddr}</span>
+            <span class="hmi-cell-lcd-val" id="hmiModelText_${idx}" title="${escapeHtml(modelDisplay)}">${escapeHtml(modelDisplay)}</span>
+          </div>
+        </td>
+        <td style="padding: 2px;">
+          <div class="hmi-cell-lcd num-right">
+            <span class="hmi-cell-lcd-tag">${row.sutAddr}</span>
+            <span class="hmi-cell-lcd-val" id="hmiSutText_${idx}">${row.sut > 0 ? row.sut + ' s' : '-'}</span>
+          </div>
+        </td>
+        <td style="padding: 2px;">
+          <div class="hmi-cell-lcd num-right">
+            <span class="hmi-cell-lcd-tag">${row.planAddr}</span>
+            <span class="hmi-cell-lcd-val" id="hmiQtyText_${idx}" title="Nilai P. PLAN di PLC">${row.prodPlan}</span>
+          </div>
+        </td>
+        <td style="padding: 2px;">
+          <div class="hmi-cell-lcd num-right">
+            <span class="hmi-cell-lcd-tag">${row.actAddr}</span>
+            <span class="hmi-cell-lcd-val" id="hmiActText_${idx}" title="Nilai ACTUAL ditarik dari PLC">${row.actual}</span>
+          </div>
+        </td>
+        <td style="padding: 2px;">
+          <div class="hmi-cell-lcd model-cell">
+            <span class="hmi-cell-lcd-tag">${row.dateAddr || ''}</span>
+            <span class="hmi-cell-lcd-val" id="hmiDateText_${idx}" title="Tanggal - bulan">${escapeHtml(dateDisplay)}</span>
           </div>
         </td>
       `;
@@ -1785,7 +1873,7 @@ function renderBrazingHomePreview() {
 // Tombol "Submit & Kirim ke PLC" (header): simpan isi editor ke database sekarang juga (tanpa menunggu simpan
 // otomatis), lalu kirim ke PLC dengan fungsi yang sama seperti tombol "KONFIRMASI & KIRIM KE PLC".
 window.submitAndDispatch = async function() {
-  if (OFFLINE_MODE && !BRAZING_SEND) return; // mesin tanpa PLC
+  if (OFFLINE_MODE && !PLC_LINE) return; // mesin tanpa PLC
   const filled = editorDraftRows().length;
   if (filled === 0) {
     showAppModal({
@@ -1829,11 +1917,29 @@ window.submitAndDispatch = async function() {
 
 // Fitur HOME (tulis D1000 = 0 ke PLC) DINONAKTIFKAN: tombol tetap tampil tapi disabled, endpoint backend sudah dihapus.
 
-// Plan Brazing: kirim 120 baris editor (Model, SUT, Prod Plan, Date PSI) ke PLC Brazing lewat api/brazing/plc/send.
-// Baris kosong ikut dikirim supaya sisa plan lama di PLC terhapus.
+// Plan Brazing / Fin Press: kirim baris editor ke PLC lewat <PLC_LINE.api>/send.
+// Brazing: 120 baris (Model, SUT, Prod Plan, Date PSI). Fin Press: baris mesin itu (FIX12 50) - Model, SUT, Prod Plan,
+// Tanggal & Bulan - dan baris 1-8 juga ke halaman PLAN di GOT. Baris kosong ikut dikirim supaya sisa plan lama terhapus.
 async function sendBrazingToPlc() {
+  if (!PLC_LINE) return;
   const btnAll = document.getElementById('btnConfirmDispatchAll');
   const targetRows = current9Rows.slice(0, TOTAL_PLC_ROWS);
+
+  // Fin Press FIX12 hanya 50 baris di PLC: model di baris setelahnya tidak bisa dikirim
+  const capacity = FIN_PRESS_PAGE && FIN_PRESS_LINES[currentMachine] ? FIN_PRESS_LINES[currentMachine].rows : TOTAL_PLC_ROWS;
+  const overflow = targetRows.filter(r => r.rowNo > capacity && r.modelName);
+  if (overflow.length > 0) {
+    showAppModal({
+      type: 'warning',
+      title: 'Baris Melebihi Kapasitas PLC',
+      badge: 'Belum Dikirim',
+      message: `PLC ${escapeHtml(PAGE_MACHINE_LABEL)} hanya punya <strong>${capacity} baris</strong>, tapi baris ` +
+        `<strong>${overflow.map(r => r.rowNo).join(', ')}</strong> berisi model.`,
+      tip: `Pindahkan model tersebut ke baris 1 - ${capacity} lalu kirim lagi.`,
+      buttonText: 'Mengerti'
+    });
+    return;
+  }
 
   const noSut = targetRows.filter(r => r.modelName && !(parseInt(r.sut) > 0));
   if (noSut.length > 0) {
@@ -1852,8 +1958,8 @@ async function sendBrazingToPlc() {
 
   if (btnAll) btnAll.disabled = true;
   try {
-    addLog(`[KONFIRMASI] Mengirim plan ${PAGE_MACHINE_LABEL} (${targetRows.filter(r => r.modelName).length} model) ke PLC Brazing...`, 'info');
-    const res = await fetch('api/brazing/plc/send', {
+    addLog(`[KONFIRMASI] Mengirim plan ${PAGE_MACHINE_LABEL} (${targetRows.filter(r => r.modelName).length} model) ke PLC ${PLC_LINE.name}...`, 'info');
+    const res = await fetch(`${PLC_LINE.api}/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1877,15 +1983,15 @@ async function sendBrazingToPlc() {
       addLog(`[GAGAL] ${result.message || 'Pengiriman gagal.'}`, 'error');
       showAppModal({
         type: 'error',
-        title: 'Gagal Kirim ke PLC Brazing',
+        title: `Gagal Kirim ke PLC ${PLC_LINE.name}`,
         message: escapeHtml(result.message || 'Pengiriman gagal.'),
-        tip: 'Pastikan PC ini terhubung ke jaringan PLC Brazing dan IP / port di appsettings (BrazingPlc) benar.',
+        tip: `Pastikan PC ini terhubung ke jaringan PLC ${PLC_LINE.name} dan IP / port di appsettings (${PLC_LINE.config}) benar.`,
         buttonText: 'Tutup'
       });
     }
   } catch (err) {
-    addLog(`[GAGAL] Kirim ke PLC Brazing: ${err.message}`, 'error');
-    showAppModal({ type: 'error', title: 'Gagal Kirim ke PLC Brazing', message: escapeHtml(err.message), buttonText: 'Tutup' });
+    addLog(`[GAGAL] Kirim ke PLC ${PLC_LINE.name}: ${err.message}`, 'error');
+    showAppModal({ type: 'error', title: `Gagal Kirim ke PLC ${PLC_LINE.name}`, message: escapeHtml(err.message), buttonText: 'Tutup' });
   } finally {
     if (btnAll) btnAll.disabled = false;
   }
@@ -1900,14 +2006,16 @@ function startBrazingPlcPolling() {
   _brazingPlcPollingInterval = setInterval(() => readBrazingPlcRegisters(true), 3000);
 }
 
-// Baca 120 baris register Plan Brazing (Model, SUT, Prod Plan, Actual, Plan SUT, Defect, Date PSI) dari PLC Brazing
+// Baca register plan dari PLC (Brazing: Model, SUT, Prod Plan, Actual, Plan SUT, Defect, Date PSI;
+// Fin Press: Model, SUT, Prod Plan, Actual, Tanggal-Bulan) untuk Live Preview & kolom ACTUAL editor
 async function readBrazingPlcRegisters(silent = false) {
-  if (!BRAZING_SEND) return;
+  if (!PLC_LINE) return;
   if (_isPollingBrazingPlc && silent) return;
   _isPollingBrazingPlc = true;
+  const tag = `[PLC ${PLC_LINE.name.toUpperCase()}]`;
   try {
-    if (!silent) addLog(`[PLC BRAZING] Menarik data register (${PAGE_MACHINE_LABEL}) dari PLC Brazing...`, 'info');
-    const res = await fetch(`api/brazing/plc/read?machine=${encodeURIComponent(currentMachine)}`, { cache: 'no-store' });
+    if (!silent) addLog(`${tag} Menarik data register (${PAGE_MACHINE_LABEL}) dari PLC ${PLC_LINE.name}...`, 'info');
+    const res = await fetch(`${PLC_LINE.api}/read?machine=${encodeURIComponent(currentMachine)}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     setPlcMirrorStatus(data.readLive ? 'live' : 'brzfail', data.readAt);
@@ -1943,6 +2051,7 @@ async function readBrazingPlcRegisters(silent = false) {
         const found = current9Rows[fIdx];
         if (!found) return;
         found.actual = r.actual || 0;
+        if (!BRAZING_SEND) return; // Defect & Ket Defect hanya ada di PLC Brazing
         const sameModel = !!found.modelName && plcModelKey(r.modelName) === plcModelKey(found.modelName);
         if (!sameModel) return;
         // Defect & Ket Defect di PLC milik model yang sedang berjalan di baris itu
@@ -1956,15 +2065,15 @@ async function readBrazingPlcRegisters(silent = false) {
           ketEl.title = `Ket Defect ${found.ketDefectAddr || ''}: ${found.ketDefect}`;
         }
       });
-      if (data.ketDefectError && !silent) addLog(`[PLC BRAZING] ${data.ketDefectError}`, 'error');
+      if (data.ketDefectError && !silent) addLog(`${tag} ${data.ketDefectError}`, 'error');
     }
 
     if (!silent) {
-      if (data.readLive) addLog(`[PLC BRAZING] ${data.message}`, 'success');
-      else addLog(`[PLC BRAZING] ${data.message || 'PLC Brazing tidak terbaca.'}`, 'error');
+      if (data.readLive) addLog(`${tag} ${data.message}`, 'success');
+      else addLog(`${tag} ${data.message || `PLC ${PLC_LINE.name} tidak terbaca.`}`, 'error');
     }
   } catch (err) {
-    if (!silent) addLog(`[PLC BRAZING] Gagal membaca PLC Brazing: ${err.message}`, 'error');
+    if (!silent) addLog(`${tag} Gagal membaca PLC ${PLC_LINE.name}: ${err.message}`, 'error');
   } finally {
     _isPollingBrazingPlc = false;
   }
@@ -1972,7 +2081,7 @@ async function readBrazingPlcRegisters(silent = false) {
 
 // Konfirmasi & Kirim ke PLC Mitsubishi MC Protocol (16 Baris: Plan 1 & Plan 2)
 async function dispatchToPlc(row1Only = false) {
-  if (BRAZING_SEND) {
+  if (PLC_LINE) {
     if (!row1Only) await sendBrazingToPlc();
     return;
   }

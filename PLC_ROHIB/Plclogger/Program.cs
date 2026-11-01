@@ -183,12 +183,12 @@ namespace Plclogger
         public string? ModelName { get; set; }
         public int ProdPlan { get; set; }
         public int Sut { get; set; }
-        public string? PlanDate { get; set; } // yyyy-MM-dd dari editor; ke PLC ditulis dd-MM-yyyy (BrazingPlcDate)
+        public string? PlanDate { get; set; } // yyyy-MM-dd dari editor; Brazing ditulis dd-MM-yyyy (BrazingPlcDate), Fin Press tanggal & bulan (FinPressDayMonth)
     }
 
     public class BrazingSendRequest
     {
-        public string? Machine { get; set; } // BRAZING-CON / BRAZING-EVA
+        public string? Machine { get; set; } // BRAZING-CON / BRAZING-EVA, atau FINPRESS-FX80 / -FIX36 / -SF250 / -FIX12
         public List<BrazingSendRow> Rows { get; set; } = new();
     }
 
@@ -378,14 +378,35 @@ namespace Plclogger
         public string LastSentTime { get; set; } = "-";
         public string LastSentSummary { get; set; } = "-";
 
+        // Koneksi database disamakan dengan Panamon: batas waktu sambung minimal 15 detik (appsettings lama berisi 3-5 detik,
+        // terlalu pendek saat SQL Server sibuk -> "Connection Timeout Expired ... pre-login handshake", simpan draft editor &
+        // muat master data gagal) dan tanpa enkripsi kalau tidak ditulis di connection string.
+        private const int MinDbConnectTimeoutSeconds = 15;
+
+        public static string NormalizeDbConnectionString(string connStr)
+        {
+            try
+            {
+                var b = new SqlConnectionStringBuilder(connStr);
+                if (b.ConnectTimeout < MinDbConnectTimeoutSeconds) b.ConnectTimeout = MinDbConnectTimeoutSeconds;
+                if (connStr.IndexOf("Encrypt", StringComparison.OrdinalIgnoreCase) < 0) b.Encrypt = false;
+                return b.ConnectionString;
+            }
+            catch (ArgumentException)
+            {
+                return connStr; // format tidak dikenal: dipakai apa adanya
+            }
+        }
+
         public FactoryDataService(IConfiguration? config = null)
         {
+            DbConnectionString = NormalizeDbConnectionString(DbConnectionString);
             if (config != null)
             {
                 var connStr = config.GetConnectionString("PromosysDb");
                 if (!string.IsNullOrWhiteSpace(connStr))
                 {
-                    DbConnectionString = connStr;
+                    DbConnectionString = NormalizeDbConnectionString(connStr);
                 }
                 var plcIp = config["PlcConfig:Ip"];
                 if (!string.IsNullOrWhiteSpace(plcIp)) PlcIp = plcIp;
@@ -395,6 +416,12 @@ namespace Plclogger
                 var brazingIp = config["BrazingPlc:Ip"];
                 if (!string.IsNullOrWhiteSpace(brazingIp)) BrazingPlcIp = brazingIp.Trim();
                 if (int.TryParse(config["BrazingPlc:Port"], out int brazingPort)) BrazingPlcPort = brazingPort;
+                var finPressIp = config["FinPressPlc:Ip"];
+                if (!string.IsNullOrWhiteSpace(finPressIp)) FinPressPlcIp = finPressIp.Trim();
+                if (int.TryParse(config["FinPressPlc:Port"], out int finPressPort)) FinPressPlcPort = finPressPort;
+                var pressShopIp = config["PressShopPlc:Ip"];
+                if (!string.IsNullOrWhiteSpace(pressShopIp)) PressShopPlcIp = pressShopIp.Trim();
+                if (int.TryParse(config["PressShopPlc:Port"], out int pressShopPort)) PressShopPlcPort = pressShopPort;
 
                 var loggerHost = config["BackgroundJobs:ServerMachineName"];
                 if (loggerHost != null) LoggerMachineName = loggerHost.Trim();
@@ -529,27 +556,332 @@ namespace Plclogger
         // KetDefectBase = register R (bukan D), 10 word ASCII per baris.
         // HomeBase = blok layar HOME (nama mesin +0, model +10, prod plan +20, SUT +21, actual +22, plan SUT +23, defect +24),
         // HomeDiffAddr = DIFFERENCE di HOME. Layar HOME = "layar utama" Brazing (padanan R10..R24 Expander) untuk logger.
-        // LossTimerAddr / LossReasonFirstReg = address timer & reason loss: BELUM ADA dari PLC (null = loss belum dicatat).
+        // LossTimerReg = register D timer loss (menit, sama dengan R103 Expander: bukan 0 = loss berjalan, 0 = selesai).
+        //   Evaporator D6810, Condenser D6811 (dari user 22-10). Reason loss TIDAK dari GOT: di-assign di aplikasi Scanner AC
+        //   (halaman Loss Time Evaporator / Condenser); belum di-assign = OTHER. LossReasonFirstReg = tidak dipakai (null).
         public record BrazingLineMap(string Label, int ModelBase, int SutBase, int PlanBase, int ActualBase, int PlanSutBase, int DefectBase, int DateBase,
-            int KetDefectBase, int HomeBase, int HomeDiffAddr, string? LossTimerAddr = null, int? LossReasonFirstReg = null);
+            int KetDefectBase, int HomeBase, int HomeDiffAddr, int? LossTimerReg = null, int? LossReasonFirstReg = null);
         public static readonly Dictionary<string, BrazingLineMap> BrazingLines = new(StringComparer.OrdinalIgnoreCase)
         {
-            // Sesuai file Excel address: Condenser = D300.. / R2821 / HOME D200, Evaporator = D3300.. / R5821 / HOME D240
-            ["BRAZING-CON"] = new BrazingLineMap("Condenser", 300, 1500, 1620, 1740, 1860, 1980, 2100, 2821, 200, 198),
-            ["BRAZING-EVA"] = new BrazingLineMap("Evaporator", 3300, 4500, 4620, 4740, 4860, 4980, 5100, 5821, 240, 199)
+            // Tabel plan sesuai file Excel address: Condenser = D300.. / R2821, Evaporator = D3300.. / R5821.
+            // HOME TERTUKAR dari Excel (dicek 31-10-2026 dari log PLC 10 hari): HOME D200 (+ D198) selalu menjalankan model master
+            // Evaporator (CS-.., EP-..) dan HOME D240 (+ D199) model master Condenser (CU-.., EU-..), jadi Condenser = HOME D240,
+            // Evaporator = HOME D200.
+            ["BRAZING-CON"] = new BrazingLineMap("Condenser", 300, 1500, 1620, 1740, 1860, 1980, 2100, 2821, 240, 199, LossTimerReg: 6811),
+            ["BRAZING-EVA"] = new BrazingLineMap("Evaporator", 3300, 4500, 4620, 4740, 4860, 4980, 5100, 5821, 200, 198, LossTimerReg: 6810)
         };
 
-        // PLAN FIN PRESS (file "addres Machine Fin press.xlsx", D300 - D6449). IP PLC, HOME & plan "bayangan" (R...) menyusul.
-        // Tiap kolom satu blok register D berurutan (baris n = offset n-1); model 10 word ASCII; TANG & BULAN = dua word angka.
+        // FIN PRESS (file "addres Machine Fin press.xlsx", update 27-10-2026). IP PLC belum ada.
+        // Plan editor (D300 - D6449): tiap kolom satu blok register D berurutan (baris n = offset n-1); model 10 word ASCII;
+        //   TANG & BULAN = dua word (tanggal, bulan).
+        // HOME (D200 - D295): nama mesin & model 10 word ASCII, Prod Plan / SUT / Actual / Plan SUT 1 word.
+        // ExtraReg = D296 / D297 / D298 / D299 (kolom tanpa judul "KOSONG" di Excel, fungsi belum diketahui).
+        // Halaman PLAN di GOT (8 baris, register R): model 10 word (R0.., R120.., R240.., R360..), SUT/plan/actual/tanggal/bulan
+        //   tiap 8 word berurutan mulai ScreenSutBase; "bayangan" (R500.., R600.., R700.., R800..): model 10 word lalu SUT & plan.
         // Harus sama dengan FIN_PRESS_LINES di wwwroot/js/dashboard.js.
-        public record FinPressLineMap(string Label, int Rows, int ModelBase, int SutBase, int PlanBase, int ActualBase, int DayBase, int MonthBase);
+        public record FinPressHomeMap(int NameBase, int ModelBase, int ProdPlan, int Sut, int Actual, int PlanSut, int ExtraReg);
+        public record FinPressScreenMap(int ModelBase, int SutBase, int PlanBase, int ActualBase, int DayBase, int MonthBase,
+            int ShadowModelBase, int ShadowSutBase, int ShadowPlanBase); // register R, 8 baris
+        public record FinPressLineMap(string Label, int Rows, int ModelBase, int SutBase, int PlanBase, int ActualBase, int DayBase, int MonthBase,
+            FinPressHomeMap Home, FinPressScreenMap Screen);
         public static readonly Dictionary<string, FinPressLineMap> FinPressLines = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["FINPRESS-FX80"] = new FinPressLineMap("FX80", 120, 300, 1500, 1620, 1740, 1860, 1980),
-            ["FINPRESS-FIX36"] = new FinPressLineMap("FIX36", 120, 2100, 3300, 3420, 3540, 3660, 3780),
-            ["FINPRESS-SF250"] = new FinPressLineMap("SF250", 120, 3900, 5100, 5220, 5340, 5460, 5580),
-            ["FINPRESS-FIX12"] = new FinPressLineMap("FIX12", 50, 5700, 6200, 6250, 6300, 6350, 6400) // hanya 50 baris
+            ["FINPRESS-FX80"] = new FinPressLineMap("FX80", 120, 300, 1500, 1620, 1740, 1860, 1980,
+                new FinPressHomeMap(200, 210, 280, 281, 282, 283, 296),
+                new FinPressScreenMap(0, 80, 88, 96, 104, 112, 500, 580, 588)),
+            ["FINPRESS-FIX36"] = new FinPressLineMap("FIX36", 120, 2100, 3300, 3420, 3540, 3660, 3780,
+                new FinPressHomeMap(220, 230, 284, 285, 286, 287, 297),
+                new FinPressScreenMap(120, 200, 208, 216, 224, 232, 600, 680, 688)),
+            ["FINPRESS-SF250"] = new FinPressLineMap("SF250", 120, 3900, 5100, 5220, 5340, 5460, 5580,
+                new FinPressHomeMap(240, 250, 288, 289, 290, 291, 298),
+                new FinPressScreenMap(240, 320, 328, 336, 344, 352, 700, 780, 788)),
+            ["FINPRESS-FIX12"] = new FinPressLineMap("FIX12", 50, 5700, 6200, 6250, 6300, 6350, 6400, // hanya 50 baris
+                new FinPressHomeMap(260, 270, 292, 293, 294, 295, 299),
+                new FinPressScreenMap(360, 440, 448, 456, 464, 472, 800, 880, 888))
         };
+
+        // PLC FIN PRESS: satu PLC untuk FX80 / FIX36 / SF250 / FIX12. IP/port dari appsettings FinPressPlc:Ip / FinPressPlc:Port.
+        public string FinPressPlcIp = "192.168.1.100";
+        public int FinPressPlcPort = 5010;
+        public const int FinPressScreenRows = 8; // halaman PLAN di GOT (register R) = baris 1-8 plan
+
+        // Cek / baca / kirim ke PLC Fin Press antre satu per satu (seperti Brazing); hasil baca dibagi ke semua browser.
+        private readonly object _finPressPlcLock = new();
+        private readonly Dictionary<string, (DateTime At, object Result)> _finPressReadCache = new(StringComparer.OrdinalIgnoreCase);
+
+        // PRESS SHOP (file "addres Machine prsss shop (version 1).xlsx", 30-10-2026): satu PLC untuk 200T / 110T Amada / 110T Komatsu,
+        // susunan address sama persis dengan Fin Press (tabel plan D300.., D2100.., D3900..; HOME D200..D291; GOT PLAN R0.., R120.., R240..).
+        // ExtraReg = timer LOSS TIME tiap mesin (D296 200T, D297 110T Amada, D298 110T Komatsu) (menit, sama dengan timer loss Brazing; dari user 01-11-2026), dicatat PressShopLossLogger.
+        // ACTUAL2 (D7242 / D7243 / D7244) tidak dipakai: output dari ACTUAL HOME (D282 / D286 / D290).
+        // IP PLC belum ada: appsettings PressShopPlc:Ip / PressShopPlc:Port. Harus sama dengan FIN_PRESS_LINES (PRESSSHOP-*) di dashboard.js.
+        public static readonly Dictionary<string, FinPressLineMap> PressShopLines = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PRESSSHOP-200T"] = new FinPressLineMap("200T", 120, 300, 1500, 1620, 1740, 1860, 1980,
+                new FinPressHomeMap(200, 210, 280, 281, 282, 283, 296),
+                new FinPressScreenMap(0, 80, 88, 96, 104, 112, 500, 580, 588)),
+            ["PRESSSHOP-110TA"] = new FinPressLineMap("110T Amada", 120, 2100, 3300, 3420, 3540, 3660, 3780,
+                new FinPressHomeMap(220, 230, 284, 285, 286, 287, 297),
+                new FinPressScreenMap(120, 200, 208, 216, 224, 232, 600, 680, 688)),
+            ["PRESSSHOP-110TK"] = new FinPressLineMap("110T Komatsu", 120, 3900, 5100, 5220, 5340, 5460, 5580,
+                new FinPressHomeMap(240, 250, 288, 289, 290, 291, 298),
+                new FinPressScreenMap(240, 320, 328, 336, 344, 352, 700, 780, 788))
+        };
+        // Nama mesin di Master Data Produk / MachineList (SUT per model)
+        public static readonly Dictionary<string, string> PressShopMasterNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PRESSSHOP-200T"] = "200 Ton",
+            ["PRESSSHOP-110TA"] = "110 Ton Amada",
+            ["PRESSSHOP-110TK"] = "110 Ton Komatsu"
+        };
+        public string PressShopPlcIp = "";
+        public int PressShopPlcPort = 5010;
+        private readonly object _pressShopPlcLock = new();
+        private readonly Dictionary<string, (DateTime At, object Result)> _pressShopReadCache = new(StringComparer.OrdinalIgnoreCase);
+
+        // PLC jenis press (tabel plan model/SUT/plan/actual/tanggal/bulan): Fin Press atau Press Shop menurut kode mesin.
+        // Tiap PLC punya antrean (lock) & cache baca sendiri. Map null = kode mesin bukan milik PLC itu.
+        private (string Name, string Ip, int Port, object Lock, Dictionary<string, (DateTime At, object Result)> Cache, FinPressLineMap? Map) PressPlcOf(string machine)
+        {
+            if (PressShopLines.TryGetValue(machine, out var ps) || machine.StartsWith("PRESSSHOP", StringComparison.OrdinalIgnoreCase))
+                return ("Press Shop", PressShopPlcIp, PressShopPlcPort, _pressShopPlcLock, _pressShopReadCache, ps);
+            FinPressLines.TryGetValue(machine, out var fp);
+            return ("Fin Press", FinPressPlcIp, FinPressPlcPort, _finPressPlcLock, _finPressReadCache, fp);
+        }
+
+        // Tanggal plan editor (yyyy-MM-dd) -> (tanggal, bulan) untuk kolom TANG & BULAN; kosong / tidak valid = (0, 0)
+        private static (short Day, short Month) FinPressDayMonth(string? planDate) =>
+            DateTime.TryParseExact((planDate ?? "").Trim(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var d) ? ((short)d.Day, (short)d.Month) : ((short)0, (short)0);
+
+        // Cek koneksi PLC Fin Press / Press Shop (menurut kode mesin): buka koneksi MC lalu baca 1 word. Tidak menulis apa pun.
+        public object CheckFinPressPlc(string? machine)
+        {
+            var g = PressPlcOf((machine ?? "").Trim());
+            int probe = g.Map?.ModelBase ?? 300;
+            if (string.IsNullOrWhiteSpace(g.Ip))
+                return new { Success = false, Ip = g.Ip, Port = g.Port, Ms = 0L, CheckedAt = DateTime.Now.ToString("HH:mm:ss"),
+                             Message = $"IP PLC {g.Name} belum diisi (appsettings {PressPlcConfigKey(g.Name)}:Ip)." };
+            lock (g.Lock)
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var plc = new MelsecMcNet(g.Ip, g.Port) { ConnectTimeOut = 3000, ReceiveTimeOut = 3000 };
+                try
+                {
+                    var conn = plc.ConnectServer();
+                    if (!conn.IsSuccess)
+                        return new { Success = false, Ip = g.Ip, Port = g.Port, Ms = sw.ElapsedMilliseconds, CheckedAt = DateTime.Now.ToString("HH:mm:ss"),
+                                     Message = $"Tidak bisa terhubung ke PLC {g.Name} {g.Ip}:{g.Port} ({conn.Message})" };
+                    var read = plc.ReadInt16($"D{probe}", 1);
+                    return new { Success = read.IsSuccess, Ip = g.Ip, Port = g.Port, Ms = sw.ElapsedMilliseconds, CheckedAt = DateTime.Now.ToString("HH:mm:ss"),
+                                 Message = read.IsSuccess
+                                     ? $"PLC {g.Name} {g.Ip}:{g.Port} terhubung (baca D{probe} OK, {sw.ElapsedMilliseconds} ms)"
+                                     : $"Port {g.Port} terbuka tapi baca D{probe} gagal ({read.Message}). Cek port/protokol MC (3E binary) di PLC." };
+                }
+                catch (Exception ex)
+                {
+                    return new { Success = false, Ip = g.Ip, Port = g.Port, Ms = sw.ElapsedMilliseconds, CheckedAt = DateTime.Now.ToString("HH:mm:ss"), Message = ex.Message };
+                }
+                finally { try { plc.ConnectClose(); } catch { } }
+            }
+        }
+
+        private static string PressPlcConfigKey(string name) => name == "Press Shop" ? "PressShopPlc" : "FinPressPlc";
+
+        // Baca tabel plan D satu mesin (Model, SUT, Prod Plan, Actual, Tanggal, Bulan) + layar HOME-nya (read-only, cache 2,5 dtk)
+        public object ReadFinPressPlan(string? machine)
+        {
+            var m = (machine ?? "").Trim();
+            var g = PressPlcOf(m);
+            if (g.Map == null)
+                return new { ReadLive = false, ReadAt = DateTime.Now.ToString("HH:mm:ss"), Message = $"Mesin {m} bukan mesin Fin Press / Press Shop.", Rows = Array.Empty<object>() };
+            if (string.IsNullOrWhiteSpace(g.Ip))
+                return new { ReadLive = false, ReadAt = DateTime.Now.ToString("HH:mm:ss"), Message = $"IP PLC {g.Name} belum diisi (appsettings {PressPlcConfigKey(g.Name)}:Ip).", Rows = Array.Empty<object>() };
+            lock (g.Lock)
+            {
+                if (g.Cache.TryGetValue(m, out var cached) && DateTime.Now - cached.At < BrazingReadCacheAge)
+                    return cached.Result;
+                var result = ReadFinPressPlanFromPlc(m, g.Map, g.Name, g.Ip, g.Port);
+                g.Cache[m] = (DateTime.Now, result);
+                return result;
+            }
+        }
+
+        private object ReadFinPressPlanFromPlc(string m, FinPressLineMap map, string plcName, string ip, int port)
+        {
+            var plc = new MelsecMcNet(ip, port) { ConnectTimeOut = 3000, ReceiveTimeOut = 3000 };
+            try
+            {
+                var conn = plc.ConnectServer();
+                if (!conn.IsSuccess)
+                    return new { ReadLive = false, ReadAt = DateTime.Now.ToString("HH:mm:ss"), Message = $"Tidak bisa terhubung ke PLC {plcName} {ip}:{port} ({conn.Message})", Rows = Array.Empty<object>() };
+
+                int n = map.Rows;
+                var models = ReadWords(plc, map.ModelBase, n * 10);
+                var suts = ReadWords(plc, map.SutBase, n);
+                var plans = ReadWords(plc, map.PlanBase, n);
+                var actuals = ReadWords(plc, map.ActualBase, n);
+                var days = ReadWords(plc, map.DayBase, n);
+                var months = ReadWords(plc, map.MonthBase, n);
+                var home = ReadWords(plc, 200, 100); // HOME semua mesin D200..D299
+                var failed = new[] { models, suts, plans, actuals, days, months }.FirstOrDefault(r => !r.IsSuccess);
+                if (failed != null)
+                    return new { ReadLive = false, ReadAt = DateTime.Now.ToString("HH:mm:ss"), Message = $"Gagal membaca register PLC {plcName}: {failed.Message}", Rows = Array.Empty<object>() };
+
+                object? homeData = null;
+                if (home.IsSuccess && home.Content.Length >= 100)
+                {
+                    var h = map.Home;
+                    homeData = new
+                    {
+                        Name = WordsToAscii(home.Content, h.NameBase - 200, 10),
+                        Model = WordsToAscii(home.Content, h.ModelBase - 200, 10),
+                        ProdPlan = (int)home.Content[h.ProdPlan - 200],
+                        Sut = (int)home.Content[h.Sut - 200],
+                        Actual = (int)home.Content[h.Actual - 200],
+                        PlanSut = (int)home.Content[h.PlanSut - 200]
+                    };
+                }
+
+                var rows = new object[n];
+                for (int i = 0; i < n; i++)
+                {
+                    int mStart = map.ModelBase + i * 10;
+                    int day = days.Content[i], month = months.Content[i];
+                    rows[i] = new
+                    {
+                        RowNo = i + 1,
+                        ModelName = WordsToAscii(models.Content, i * 10, 10),
+                        Sut = (int)suts.Content[i],
+                        ProdPlan = (int)plans.Content[i],
+                        Actual = (int)actuals.Content[i],
+                        Day = day,
+                        Month = month,
+                        PlanDate = day > 0 && month > 0 ? $"{day:00}-{month:00}" : "", // tanggal-bulan, tanpa tahun
+                        ModelAddr = $"D{mStart}-D{mStart + 9}",
+                        SutAddr = $"D{map.SutBase + i}",
+                        PlanAddr = $"D{map.PlanBase + i}",
+                        ActAddr = $"D{map.ActualBase + i}",
+                        DateAddr = $"D{map.DayBase + i} / D{map.MonthBase + i}"
+                    };
+                }
+                return new
+                {
+                    ReadLive = true,
+                    ReadAt = DateTime.Now.ToString("HH:mm:ss"),
+                    Machine = m,
+                    Label = map.Label,
+                    Message = $"PLC {plcName} {ip}:{port} ({map.Label}) terbaca ({n} baris).",
+                    Home = homeData,
+                    Rows = rows
+                };
+            }
+            catch (Exception ex)
+            {
+                return new { ReadLive = false, ReadAt = DateTime.Now.ToString("HH:mm:ss"), Message = ex.Message, Rows = Array.Empty<object>() };
+            }
+            finally { try { plc.ConnectClose(); } catch { } }
+        }
+
+        // Kirim plan satu mesin Fin Press:
+        //   tabel D  : semua baris mesin itu (FX80/FIX36/SF250 120, FIX12 50) - Model, SUT, Prod Plan, Tanggal, Bulan;
+        //   tabel R  : halaman PLAN di GOT = baris 1-8 (kolom sama).
+        // Baris kosong dikosongkan supaya sisa plan lama terhapus. Actual diisi PLC: tidak ditulis. Lalu dibaca ulang untuk verifikasi.
+        public (bool success, string message, List<string> logs) SendFinPressPlan(string? machine, List<BrazingSendRow> rows)
+        {
+            var logs = new List<string>();
+            var m = (machine ?? "").Trim();
+            var g = PressPlcOf(m);
+            if (g.Map is not { } map)
+                return (false, $"Mesin {m} bukan mesin Fin Press / Press Shop.", logs);
+            if (string.IsNullOrWhiteSpace(g.Ip))
+                return (false, $"IP PLC {g.Name} belum diisi (appsettings {PressPlcConfigKey(g.Name)}:Ip). Data belum dikirim.", logs);
+
+            int n = map.Rows;
+            var models = new short[n * 10];
+            var suts = new short[n];
+            var plans = new short[n];
+            var days = new short[n];
+            var months = new short[n];
+            var futureRow = new bool[n];
+            var productionDate = DateTime.Now.TimeOfDay < new TimeSpan(7, 0, 0) ? DateTime.Today.AddDays(-1) : DateTime.Today;
+            int filled = 0;
+            var overflow = new List<int>();
+            foreach (var r in rows)
+            {
+                var model = (r.ModelName ?? "").Trim();
+                if (r.RowNo < 1) continue;
+                if (r.RowNo > n) { if (model.Length > 0) overflow.Add(r.RowNo); continue; }
+                int i = r.RowNo - 1;
+                Array.Copy(AsciiWords(model, 10), 0, models, i * 10, 10);
+                suts[i] = (short)Math.Clamp(r.Sut, 0, short.MaxValue);
+                plans[i] = (short)Math.Clamp(r.ProdPlan, 0, short.MaxValue);
+                futureRow[i] = PlanDateAfter(r.PlanDate, productionDate);
+                if (model.Length > 0)
+                {
+                    (days[i], months[i]) = FinPressDayMonth(r.PlanDate);
+                    filled++;
+                }
+            }
+            if (overflow.Count > 0)
+                return (false, $"PLC {map.Label} hanya {n} baris, tapi baris {string.Join(", ", overflow)} berisi model. Pindahkan ke baris 1-{n} dulu.", logs);
+
+            // Tabel plan D (semua baris mesin) & halaman PLAN di GOT (R, 8 baris pertama). Identitas baris = Model + Tanggal + Bulan.
+            // Actual diisi PLC: ikut pindah bersama modelnya kalau urutan berubah (lihat WritePlanTableDiff).
+            int s = FinPressScreenRows;
+            var tableCols = new[]
+            {
+                new PlcPlanColumn("Model", "D", map.ModelBase, 10),
+                new PlcPlanColumn("SUT", "D", map.SutBase, 1),
+                new PlcPlanColumn("Prod Plan", "D", map.PlanBase, 1),
+                new PlcPlanColumn("Tanggal", "D", map.DayBase, 1),
+                new PlcPlanColumn("Bulan", "D", map.MonthBase, 1)
+            };
+            var tableResult = new[] { new PlcPlanColumn("Actual", "D", map.ActualBase, 1) };
+            var screenCols = new[]
+            {
+                new PlcPlanColumn("Model GOT", "R", map.Screen.ModelBase, 10),
+                new PlcPlanColumn("SUT GOT", "R", map.Screen.SutBase, 1),
+                new PlcPlanColumn("Prod Plan GOT", "R", map.Screen.PlanBase, 1),
+                new PlcPlanColumn("Tanggal GOT", "R", map.Screen.DayBase, 1),
+                new PlcPlanColumn("Bulan GOT", "R", map.Screen.MonthBase, 1)
+            };
+            var screenResult = new[] { new PlcPlanColumn("Actual GOT", "R", map.Screen.ActualBase, 1) };
+            var keyCols = new[] { 0, 3, 4 };
+
+            lock (g.Lock)
+            {
+                var plc = new MelsecMcNet(g.Ip, g.Port) { ConnectTimeOut = 3000 };
+                logs.Add($"[CONNECT] Menghubungkan ke PLC {g.Name} {g.Ip}:{g.Port} ({map.Label})...");
+                var conn = plc.ConnectServer();
+                if (!conn.IsSuccess)
+                {
+                    logs.Add($"[GAGAL] PLC {g.Name} tidak terhubung: {conn.Message}");
+                    return (false, $"PLC {g.Name} {g.Ip}:{g.Port} tidak terhubung ({conn.Message}). Data belum dikirim.", logs);
+                }
+                try
+                {
+                    logs.Add("[TABEL PLAN D]");
+                    var table = WritePlanTableDiff(plc, n, tableCols, new[] { models, suts, plans, days, months }, tableResult, keyCols, futureRow, logs);
+                    if (table.Error != null) return (false, $"{table.Error} (PLC {g.Name}).", logs);
+                    logs.Add("[HALAMAN PLAN GOT, baris 1-8]");
+                    var screen = WritePlanTableDiff(plc, s, screenCols,
+                        new[] { models.Take(s * 10).ToArray(), suts.Take(s).ToArray(), plans.Take(s).ToArray(), days.Take(s).ToArray(), months.Take(s).ToArray() },
+                        screenResult, keyCols, futureRow.Take(s).ToArray(), logs);
+                    if (screen.Error != null) return (false, $"Tabel plan terkirim, tapi halaman PLAN GOT gagal: {screen.Error}.", logs);
+
+                    int mismatch = table.Mismatch + screen.Mismatch;
+                    PlcStatusMessage = $"{g.Name} {map.Label}: terkirim ke {g.Ip}:{g.Port}";
+                    return mismatch == 0
+                        ? (true, $"Plan {g.Name} {map.Label} ({filled} model) terkirim ke PLC {g.Ip}: {table.Summary}.", logs)
+                        : (false, $"Plan {g.Name} {map.Label} terkirim, tapi {mismatch} kolom tidak cocok saat diverifikasi.", logs);
+                }
+                finally
+                {
+                    plc.ConnectClose();
+                    g.Cache.Clear(); // Live Preview langsung membaca isi baru
+                }
+            }
+        }
 
         private static string WordsToAscii(short[] words, int start, int wordCount)
         {
@@ -582,12 +914,12 @@ namespace Plclogger
         }
 
         // Tulis blok word berurutan, dipecah per 480 word (batas aman satu perintah MC)
-        private static OperateResult WriteWords(MelsecMcNet plc, int dStart, short[] values)
+        private static OperateResult WriteWords(MelsecMcNet plc, int dStart, short[] values, string device = "D")
         {
             for (int off = 0; off < values.Length; off += 480)
             {
                 var chunk = values.Skip(off).Take(480).ToArray();
-                var res = plc.Write($"D{dStart + off}", chunk);
+                var res = plc.Write($"{device}{dStart + off}", chunk);
                 if (!res.IsSuccess) return res;
             }
             return OperateResult.CreateSuccessResult();
@@ -651,7 +983,8 @@ namespace Plclogger
             lock (_brazingPlcLock) _brazingReadCache.Clear();
         }
 
-        // Layar HOME kedua line Brazing (D198..D264) sebagai "layar utama" seperti R10..R24 Expander, untuk BrazingTrendLogger.
+        // Layar HOME kedua line Brazing (D198..D264) sebagai "layar utama" seperti R10..R24 Expander + timer loss (D6810/D6811),
+        // untuk BrazingTrendLogger & BrazingLossLogger.
         // Hasil per kode mesin (BRAZING-CON / BRAZING-EVA); kosong = PLC tidak terbaca. Hanya membaca.
         public Dictionary<string, PlcMainScreen> ReadBrazingHomeScreens()
         {
@@ -681,6 +1014,82 @@ namespace Plclogger
                             Defect = hw[b + 24],
                             Difference = hw[map.HomeDiffAddr - first],
                             Source = $"BRAZING HOME {map.Label}"
+                        };
+                    }
+
+                    // Timer loss tiap line (D6810 / D6811) -> LossRunning; satu blok baca. Gagal = semua dianggap tidak terbaca.
+                    var timerRegs = BrazingLines.Values.Where(m => m.LossTimerReg.HasValue).Select(m => m.LossTimerReg!.Value).ToList();
+                    if (timerRegs.Count > 0)
+                    {
+                        int tFirst = timerRegs.Min(), tCount = timerRegs.Max() - tFirst + 1;
+                        var timers = ReadWords(plc, tFirst, tCount);
+                        if (!timers.IsSuccess || timers.Content.Length < tCount) { result.Clear(); return result; }
+                        foreach (var (code, map) in BrazingLines)
+                            if (map.LossTimerReg.HasValue && result.TryGetValue(code, out var s))
+                                s.LossRunning = timers.Content[map.LossTimerReg.Value - tFirst];
+                    }
+                }
+                catch { result.Clear(); }
+                finally { try { plc.ConnectClose(); } catch { } }
+            }
+            if (result.Count > 0)
+                _brazingHomeLast = new BrazingHomeSnapshot(DateTime.Now, result.ToDictionary(
+                    x => x.Key, x => new BrazingHomeLive((x.Value.Model ?? "").Trim(), x.Value.ProdPlan, x.Value.Actual, x.Value.Plan), StringComparer.OrdinalIgnoreCase));
+            return result;
+        }
+
+        // Nilai HOME Brazing terbaru untuk layar TV Dashboard AC (/evaporator, /condenser): dipakai bersama dengan pembacaan
+        // logger loss (tiap 5 detik di server); lebih tua dari 3 detik = baca PLC lagi. Hanya membaca.
+        public sealed record BrazingHomeLive(string Model, int ProdPlan, int Actual, int PlanBySut);
+        private sealed record BrazingHomeSnapshot(DateTime At, Dictionary<string, BrazingHomeLive> Lines);
+        private volatile BrazingHomeSnapshot? _brazingHomeLast;
+
+        public object ReadBrazingHomeLive()
+        {
+            var snap = _brazingHomeLast;
+            if (snap == null || DateTime.Now - snap.At > TimeSpan.FromSeconds(3))
+            {
+                ReadBrazingHomeScreens();
+                snap = _brazingHomeLast;
+            }
+            bool live = snap != null && DateTime.Now - snap.At <= TimeSpan.FromSeconds(10);
+            return new { Live = live, ReadAt = snap?.At.ToString("yyyy-MM-ddTHH:mm:ss"), Lines = live ? snap!.Lines : new Dictionary<string, BrazingHomeLive>() };
+        }
+
+        // Layar HOME tiap mesin Press Shop (D200..D291) sebagai "layar utama" (padanan R10..R24 Expander) untuk PressShopTrendLogger.
+        // Model, Prod Plan, Actual, Plan SUT dari HOME; tidak ada defect & DIFFERENCE di PLC (Defect 0, Difference = Actual - Plan SUT).
+        // Hasil per kode mesin (PRESSSHOP-200T / -110TA / -110TK); kosong = PLC tidak terbaca / IP belum diisi. Hanya membaca.
+        public Dictionary<string, PlcMainScreen> ReadPressShopHomeScreens()
+        {
+            var result = new Dictionary<string, PlcMainScreen>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(PressShopPlcIp)) return result;
+            const int first = 200, count = 100; // D200..D299
+            lock (_pressShopPlcLock)
+            {
+                var plc = new MelsecMcNet(PressShopPlcIp, PressShopPlcPort) { ConnectTimeOut = 3000, ReceiveTimeOut = 3000 };
+                try
+                {
+                    if (!plc.ConnectServer().IsSuccess) return result;
+                    var res = ReadWords(plc, first, count);
+                    if (!res.IsSuccess || res.Content.Length < count) return result;
+                    var hw = res.Content;
+                    var at = DateTime.Now;
+                    foreach (var (code, map) in PressShopLines)
+                    {
+                        var h = map.Home;
+                        short actual = hw[h.Actual - first], plan = hw[h.PlanSut - first];
+                        result[code] = new PlcMainScreen
+                        {
+                            Live = true,
+                            ReadAtTime = at,
+                            Model = WordsToAscii(hw, h.ModelBase - first, 10),
+                            ProdPlan = hw[h.ProdPlan - first],
+                            Actual = actual,
+                            Plan = plan,
+                            Defect = 0,
+                            Difference = (short)(actual - plan),
+                            LossRunning = hw[h.ExtraReg - first], // timer LOSS TIME (D296 / D297 / D298), menit
+                            Source = $"PRESS SHOP HOME {map.Label}"
                         };
                     }
                 }
@@ -733,7 +1142,7 @@ namespace Plclogger
                     return new { ReadLive = false, ReadAt = DateTime.Now.ToString("HH:mm:ss"), Message = $"Gagal membaca register PLC Brazing: {err}", Rows = Array.Empty<object>() };
                 }
 
-                // HOME tiap line dari BrazingLines (HomeBase / HomeDiffAddr): Condenser D200 + D198, Evaporator D240 + D199.
+                // HOME tiap line dari BrazingLines (HomeBase / HomeDiffAddr): Condenser D240 + D199, Evaporator D200 + D198 (tertukar dari Excel).
                 object? homeData = null;
                 if (homeRes.IsSuccess && homeRes.Content.Length >= 67)
                 {
@@ -819,6 +1228,9 @@ namespace Plclogger
             var dates = new short[BrazingRows * 10];
             var suts = new short[BrazingRows];
             var plans = new short[BrazingRows];
+            var futureRow = new bool[BrazingRows];
+            var now = DateTime.Now;
+            var productionDate = now.TimeOfDay < new TimeSpan(7, 0, 0) ? now.Date.AddDays(-1) : now.Date;
             int filled = 0;
             foreach (var r in rows)
             {
@@ -829,15 +1241,16 @@ namespace Plclogger
                 Array.Copy(AsciiWords(model.Length > 0 ? BrazingPlcDate(r.PlanDate) : "", 10), 0, dates, i * 10, 10);
                 suts[i] = (short)Math.Clamp(r.Sut, 0, short.MaxValue);
                 plans[i] = (short)Math.Clamp(r.ProdPlan, 0, short.MaxValue);
+                futureRow[i] = PlanDateAfter(r.PlanDate, productionDate);
                 if (model.Length > 0) filled++;
             }
 
             // Antre dengan baca Live Preview & cek koneksi (lihat _brazingPlcLock)
-            lock (_brazingPlcLock) return SendBrazingPlanLocked(map, models, suts, plans, dates, filled, logs);
+            lock (_brazingPlcLock) return SendBrazingPlanLocked(map, models, suts, plans, dates, futureRow, filled, logs);
         }
 
         private (bool success, string message, List<string> logs) SendBrazingPlanLocked(
-            BrazingLineMap map, short[] models, short[] suts, short[] plans, short[] dates, int filled, List<string> logs)
+            BrazingLineMap map, short[] models, short[] suts, short[] plans, short[] dates, bool[] futureRow, int filled, List<string> logs)
         {
             var plc = new MelsecMcNet(BrazingPlcIp, BrazingPlcPort) { ConnectTimeOut = 3000 };
             logs.Add($"[CONNECT] Menghubungkan ke PLC Brazing {BrazingPlcIp}:{BrazingPlcPort} ({map.Label})...");
@@ -850,49 +1263,162 @@ namespace Plclogger
 
             try
             {
-                foreach (var (name, start, values) in new[]
-                {
-                    ("Model", map.ModelBase, models),
-                    ("SUT", map.SutBase, suts),
-                    ("Prod Plan", map.PlanBase, plans),
-                    ("Date PSI", map.DateBase, dates)
-                })
-                {
-                    var res = WriteWords(plc, start, values);
-                    if (!res.IsSuccess)
+                // Identitas baris = Model + Date PSI. Actual, Plan SUT, Defect & Ket Defect diisi PLC: ikut pindah bersama modelnya
+                // kalau urutan berubah, 0 untuk plan baru (lihat WritePlanTableDiff).
+                var diff = WritePlanTableDiff(plc, BrazingRows,
+                    new[]
                     {
-                        logs.Add($"[GAGAL] Tulis {name} (D{start}-D{start + values.Length - 1}) gagal: {res.Message}");
-                        return (false, $"Gagal menulis {name} ke PLC Brazing: {res.Message}", logs);
-                    }
-                    logs.Add($"[SUKSES] {name} ditulis ke D{start}-D{start + values.Length - 1}.");
-                }
-
-                // Verifikasi: baca kembali keempat blok
-                int mismatch = 0;
-                foreach (var (name, start, values) in new[]
-                {
-                    ("Model", map.ModelBase, models),
-                    ("SUT", map.SutBase, suts),
-                    ("Prod Plan", map.PlanBase, plans),
-                    ("Date PSI", map.DateBase, dates)
-                })
-                {
-                    var back = ReadWords(plc, start, values.Length);
-                    if (!back.IsSuccess) { logs.Add($"[VALIDASI PERINGATAN] {name} tidak bisa dibaca kembali: {back.Message}"); mismatch++; continue; }
-                    int diff = values.Where((v, k) => back.Content[k] != v).Count();
-                    if (diff > 0) { logs.Add($"[VALIDASI PERINGATAN] {name}: {diff} word berbeda setelah dibaca kembali."); mismatch++; }
-                    else logs.Add($"[VALIDASI OK] {name} sesuai.");
-                }
+                        new PlcPlanColumn("Model", "D", map.ModelBase, 10),
+                        new PlcPlanColumn("SUT", "D", map.SutBase, 1),
+                        new PlcPlanColumn("Prod Plan", "D", map.PlanBase, 1),
+                        new PlcPlanColumn("Date PSI", "D", map.DateBase, 10)
+                    },
+                    new[] { models, suts, plans, dates },
+                    new[]
+                    {
+                        new PlcPlanColumn("Actual", "D", map.ActualBase, 1),
+                        new PlcPlanColumn("Plan SUT", "D", map.PlanSutBase, 1),
+                        new PlcPlanColumn("Defect", "D", map.DefectBase, 1),
+                        new PlcPlanColumn("Ket Defect", "R", map.KetDefectBase, 10)
+                    },
+                    new[] { 0, 3 }, futureRow, logs);
+                if (diff.Error != null) return (false, $"{diff.Error} (PLC Brazing).", logs);
 
                 PlcStatusMessage = $"Brazing {map.Label}: terkirim ke {BrazingPlcIp}:{BrazingPlcPort}";
-                return mismatch == 0
-                    ? (true, $"Plan Brazing {map.Label} ({filled} model, {BrazingRows} baris) terkirim ke PLC {BrazingPlcIp}.", logs)
-                    : (false, $"Plan Brazing {map.Label} terkirim, tapi {mismatch} blok tidak cocok saat diverifikasi.", logs);
+                return diff.Mismatch == 0
+                    ? (true, $"Plan Brazing {map.Label} ({filled} model) terkirim ke PLC {BrazingPlcIp}: {diff.Summary}.", logs)
+                    : (false, $"Plan Brazing {map.Label} terkirim, tapi {diff.Mismatch} kolom tidak cocok saat diverifikasi.", logs);
             }
             finally
             {
                 plc.ConnectClose();
                 InvalidateBrazingReadCache(); // Live Preview langsung membaca isi baru, bukan cache sebelum kirim
+            }
+        }
+
+        // Tanggal plan editor (yyyy-MM-dd) setelah hari produksi ini? Kosong / tidak valid = tidak.
+        private static bool PlanDateAfter(string? planDate, DateTime productionDate) =>
+            DateTime.TryParseExact((planDate ?? "").Trim(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var d) && d.Date > productionDate;
+
+        // Satu kolom tabel plan di PLC: Words word per baris, baris n (1-based) di Base + (n-1) * Words
+        private sealed record PlcPlanColumn(string Name, string Device, int Base, int Words);
+
+        // Kirim plan ke PLC HANYA di bagian yang berubah (permintaan user 31-10: operator mengedit lalu kirim ulang ->
+        // yang diedit saja yang berubah, entah model, qty, SUT atau urutannya; Actual ikut modelnya).
+        //   1. Isi tabel lama dibaca dulu: kolom plan + kolom hasil yang diisi PLC (Actual, Plan SUT, Defect, ...).
+        //   2. Tiap baris baru dicocokkan ke baris lama ber-identitas sama (keyCols, mis. Model + tanggal plan): nomor baris yang
+        //      sama didahulukan, lalu baris lain yang belum terpakai (urutan dipindah -> hasilnya ikut pindah). Tidak ketemu = plan
+        //      baru, hasil 0. Tanggal plan setelah hari produksi ini (futureRow) juga hasil 0: plan yang belum mulai tidak punya hasil.
+        //   3. Tiap kolom hanya ditulis di rentang baris yang nilainya berbeda dari isi lama; baris yang tidak berubah tidak disentuh.
+        //   4. Kolom plan dibaca ulang untuk verifikasi (kolom hasil tidak, karena PLC terus menghitung).
+        // Hasil yang dipindahkan dibaca sesaat sebelum ditulis: kenaikan counter di sela itu (milidetik) bisa hilang.
+        private (string? Error, int Mismatch, string Summary) WritePlanTableDiff(MelsecMcNet plc, int rows,
+            PlcPlanColumn[] planCols, short[][] newPlan, PlcPlanColumn[] resultCols, int[] keyCols, bool[]? futureRow, List<string> logs)
+        {
+            short[][]? ReadCols(PlcPlanColumn[] cols, out string err)
+            {
+                err = "";
+                var t = new short[cols.Length][];
+                for (int c = 0; c < cols.Length; c++)
+                {
+                    var res = ReadWords(plc, cols[c].Base, rows * cols[c].Words, cols[c].Device);
+                    if (!res.IsSuccess || res.Content.Length < rows * cols[c].Words) { err = $"{cols[c].Name}: {res.Message}"; return null; }
+                    t[c] = res.Content;
+                }
+                return t;
+            }
+            string readErr = "";
+            var oldPlan = ReadCols(planCols, out readErr);
+            var oldRes = oldPlan == null ? null : ReadCols(resultCols, out readErr);
+            if (oldPlan == null || oldRes == null)
+            {
+                logs.Add($"[GAGAL] Isi plan lama di PLC tidak bisa dibaca ({readErr}). Data belum dikirim.");
+                return ($"Isi plan lama tidak bisa dibaca ({readErr}). Data belum dikirim", 0, "");
+            }
+
+            // Identitas baris: teks (kolom lebih dari 1 word, tanpa beda huruf besar/kecil & spasi) atau angka
+            string Key(short[][] t, int i) => string.Join("|", keyCols.Select(c => planCols[c].Words > 1
+                ? WordsToAscii(t[c], i * planCols[c].Words, planCols[c].Words).ToUpperInvariant()
+                : t[c][i].ToString()));
+            bool Empty(short[][] t, int i) => WordsToAscii(t[0], i * planCols[0].Words, planCols[0].Words).Length == 0;
+            bool Future(int i) => futureRow != null && i < futureRow.Length && futureRow[i];
+
+            var src = Enumerable.Repeat(-1, rows).ToArray(); // baris lama asal hasil tiap baris baru
+            var used = new bool[rows];
+            for (int i = 0; i < rows; i++)
+                if (!Empty(newPlan, i) && !Empty(oldPlan, i) && Key(newPlan, i) == Key(oldPlan, i)) { src[i] = i; used[i] = true; }
+            var oldByKey = Enumerable.Range(0, rows).Where(j => !used[j] && !Empty(oldPlan, j)).ToLookup(j => Key(oldPlan, j));
+            for (int i = 0; i < rows; i++)
+            {
+                if (src[i] >= 0 || Empty(newPlan, i)) continue;
+                int j = oldByKey[Key(newPlan, i)].FirstOrDefault(j => !used[j], -1);
+                if (j >= 0) { src[i] = j; used[j] = true; }
+            }
+
+            var newRes = new short[resultCols.Length][];
+            for (int c = 0; c < resultCols.Length; c++)
+            {
+                int w = resultCols[c].Words;
+                newRes[c] = new short[rows * w];
+                for (int i = 0; i < rows; i++)
+                    if (src[i] >= 0 && !Future(i)) Array.Copy(oldRes[c], src[i] * w, newRes[c], i * w, w);
+            }
+
+            var touched = new SortedSet<int>();
+            string? WriteChanged(PlcPlanColumn col, short[] oldV, short[] newV)
+            {
+                int w = col.Words;
+                var changed = Enumerable.Range(0, rows).Where(i => !oldV.AsSpan(i * w, w).SequenceEqual(newV.AsSpan(i * w, w))).ToList();
+                foreach (var (first, count) in ConsecutiveRuns(changed))
+                {
+                    var res = WriteWords(plc, col.Base + first * w, newV.Skip(first * w).Take(count * w).ToArray(), col.Device);
+                    if (!res.IsSuccess)
+                    {
+                        logs.Add($"[GAGAL] Tulis {col.Name} baris {first + 1}-{first + count} ({col.Device}{col.Base + first * w}) gagal: {res.Message}");
+                        return $"Gagal menulis {col.Name} baris {first + 1}-{first + count}: {res.Message}";
+                    }
+                }
+                foreach (var i in changed) touched.Add(i);
+                return null;
+            }
+            for (int c = 0; c < planCols.Length; c++)
+                if (WriteChanged(planCols[c], oldPlan[c], newPlan[c]) is { } err) return (err, 0, "");
+            for (int c = 0; c < resultCols.Length; c++)
+                if (WriteChanged(resultCols[c], oldRes[c], newRes[c]) is { } err) return (err, 0, "");
+
+            string RowList(IEnumerable<int> idx) => string.Join(", ", ConsecutiveRuns(idx.ToList())
+                .Select(r => r.Count == 1 ? $"{r.First + 1}" : $"{r.First + 1}-{r.First + r.Count}"));
+            var moved = Enumerable.Range(0, rows).Where(i => src[i] >= 0 && src[i] != i).ToList();
+            var fresh = Enumerable.Range(0, rows).Where(i => !Empty(newPlan, i) && src[i] < 0).ToList();
+            var futureCleared = Enumerable.Range(0, rows).Where(i => src[i] >= 0 && Future(i) && touched.Contains(i)).ToList();
+            if (touched.Count == 0) logs.Add("[TIDAK BERUBAH] Isi PLC sudah sama dengan editor: tidak ada yang ditulis.");
+            else logs.Add($"[DITULIS] Baris {RowList(touched)} ({touched.Count} baris). Baris lain tidak disentuh.");
+            if (moved.Count > 0)
+                logs.Add($"[PINDAH URUTAN] {string.Join(", ", moved.Take(15).Select(i => $"{src[i] + 1}→{i + 1}"))}{(moved.Count > 15 ? $" (+{moved.Count - 15} lagi)" : "")}: {string.Join(", ", resultCols.Select(c => c.Name))} ikut pindah.");
+            if (fresh.Count > 0) logs.Add($"[PLAN BARU] Baris {RowList(fresh)}: {string.Join(", ", resultCols.Select(c => c.Name))} mulai 0.");
+            if (futureCleared.Count > 0) logs.Add($"[TANGGAL BELUM MULAI] Baris {RowList(futureCleared)}: hasil lama dinolkan.");
+
+            int mismatch = 0;
+            for (int c = 0; c < planCols.Length; c++)
+            {
+                var back = ReadWords(plc, planCols[c].Base, newPlan[c].Length, planCols[c].Device);
+                if (!back.IsSuccess) { logs.Add($"[VALIDASI PERINGATAN] {planCols[c].Name} tidak bisa dibaca kembali: {back.Message}"); mismatch++; continue; }
+                if (!back.Content.AsSpan(0, newPlan[c].Length).SequenceEqual(newPlan[c])) { logs.Add($"[VALIDASI PERINGATAN] {planCols[c].Name} berbeda setelah dibaca kembali."); mismatch++; }
+            }
+            if (mismatch == 0 && touched.Count > 0) logs.Add("[VALIDASI OK] Isi plan di PLC sesuai editor.");
+            return (null, mismatch, touched.Count == 0 ? "tidak ada perubahan" : $"{touched.Count} baris diperbarui");
+        }
+
+        // Indeks baris urut naik -> rentang berurutan (awal, jumlah), mis. 0,1,2,5 -> (0,3), (5,1)
+        private static IEnumerable<(int First, int Count)> ConsecutiveRuns(List<int> sorted)
+        {
+            for (int k = 0; k < sorted.Count;)
+            {
+                int first = sorted[k], count = 1;
+                while (k + count < sorted.Count && sorted[k + count] == first + count) count++;
+                yield return (first, count);
+                k += count;
             }
         }
 
@@ -1455,11 +1981,25 @@ namespace Plclogger
         // Counter PLAN BY SUT (R23), ACTUAL (R22) & DEFECT (R24) di PLC milik BARIS plan: operator pindah ke model lain lalu
         // kembali ke baris lama = counter melanjutkan nilai lamanya (contoh 04/10: UN9AKJ 100 -> UN12AKJ 0 -> UN9AKJ 100).
         // Patokan kenaikan = nilai terakhir baris yang sama (model + PROD. PLAN R20); belum ada = nilai terakhir model itu;
-        // belum ada juga = 0. Nilai turun dari patokan = counter di-reset / baris baru (dihitung dari 0).
+        // belum ada juga = 0. Lihat CounterIncrease untuk nilai yang turun.
+        // PLAN BY SUT tertahan: PLC berhenti menambah R23 begitu sama dengan PROD. PLAN, padahal mesin masih produksi
+        // (contoh 27/10 Expander CU-YN18AKJ R23 825 seharian, actual 738 -> 1064). Selama itu & ACTUAL naik, target dihitung dari
+        // waktu jalan / SUT model (sutOf, detik; 0 = tidak diketahui -> tidak ditambah). Waktu jalan = sejak ACTUAL terakhir naik,
+        // maks. 3 menit (berhenti lebih lama = hanya 1 menit dihitung).
+        public const int PlanCapMaxGapMinutes = 3;
+
+        // Kenaikan counter dibanding patokan. Turun sedikit (masih >= separuh patokan, mis. 656 -> 646) = koreksi operator,
+        // tidak menambah (27/10 Condenser: tanpa aturan ini 646 dihitung ulang dari 0, actual 1508 jadi 2582).
+        // Turun drastis (mis. 203 -> 4) = counter di-reset / baris baru, dihitung dari 0.
+        public static int CounterIncrease(int cur, int prev) => cur >= prev ? cur - prev : cur * 2 >= prev ? 0 : cur;
+
         public static List<KyoshinStep> BuildKyoshinSteps(
             IEnumerable<(DateTime At, string Model, int R20, int R23, int R22, int R24)> samples,
-            IEnumerable<KyoshinCounterSeed>? seeds)
+            IEnumerable<KyoshinCounterSeed>? seeds,
+            Func<string, double>? sutOf = null)
         {
+            var lastAt = new Dictionary<(string, int), DateTime>(); // sampel terakhir ACTUAL naik, per baris
+            var capCarry = new Dictionary<(string, int), double>(); // pecahan target waktu jalan / SUT yang belum jadi 1 unit
             var byRow = new Dictionary<(string, int), (int R23, int R22, int R24)>();
             var byModel = new Dictionary<string, (int R23, int R22, int R24)>();
             foreach (var s in seeds ?? Enumerable.Empty<KyoshinCounterSeed>())
@@ -1479,11 +2019,48 @@ namespace Plclogger
                 var key = model.ToUpperInvariant();
                 int r23 = Math.Max(0, s.R23), r22 = Math.Max(0, s.R22), r24 = Math.Max(0, s.R24);
                 (int R23, int R22, int R24) last = byRow.TryGetValue((key, s.R20), out var rv) ? rv : byModel.TryGetValue(key, out var mv) ? mv : (0, 0, 0);
-                static int Up(int cur, int prev) => cur >= prev ? cur - prev : cur;
-                steps.Add(new KyoshinStep(s.At, model, Math.Max(0, s.R20), Up(r23, last.R23), Up(r22, last.R22), Up(r24, last.R24)));
-                byRow[(key, s.R20)] = byModel[key] = (r23, r22, r24);
+                int d23 = CounterIncrease(r23, last.R23), d22 = CounterIncrease(r22, last.R22), d24 = CounterIncrease(r24, last.R24);
+
+                var row = (key, s.R20);
+                if (d22 > 0)
+                {
+                    // Waktu jalan = sejak ACTUAL terakhir naik (maks. 3 menit; lebih lama = mesin sempat berhenti, dihitung 1 menit)
+                    if (d23 == 0 && s.R20 > 0 && r23 >= s.R20 && sutOf != null && sutOf(model) is var sut && sut > 0)
+                    {
+                        double minutes = lastAt.TryGetValue(row, out var prevAt) ? (s.At - prevAt).TotalMinutes : 1;
+                        if (minutes <= 0 || minutes > PlanCapMaxGapMinutes) minutes = 1;
+                        double carry = (capCarry.TryGetValue(row, out var c) ? c : 0) + minutes * 60 / sut;
+                        d23 = (int)carry;
+                        capCarry[row] = carry - d23;
+                    }
+                    lastAt[row] = s.At;
+                }
+
+                steps.Add(new KyoshinStep(s.At, model, Math.Max(0, s.R20), d23, d22, d24));
+                byRow[row] = byModel[key] = (r23, r22, r24);
             }
             return steps;
+        }
+
+        // SUT (detik) per model dari Master Data Produk untuk target PLAN BY SUT yang tertahan (lihat BuildKyoshinSteps).
+        // Brazing: master Condenser & Evaporator digabung (model line sendiri didahulukan) supaya tetap ketemu walau line tertukar.
+        public static Dictionary<string, double> LoadMasterSutForMachine(SqlConnection conn, SqlTransaction? tx, string machineCode)
+        {
+            var names = machineCode.Equals(TrendMachineCode, StringComparison.OrdinalIgnoreCase) ? new[] { "Expander Kyoshin 6.35" }
+                : machineCode.Equals("BRAZING-CON", StringComparison.OrdinalIgnoreCase) ? new[] { "Condenser", "Evaporator" }
+                : machineCode.Equals("BRAZING-EVA", StringComparison.OrdinalIgnoreCase) ? new[] { "Evaporator", "Condenser" }
+                : PressShopMasterNames.TryGetValue(machineCode, out var pressMaster) ? new[] { pressMaster }
+                : Array.Empty<string>();
+            var sut = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            foreach (var name in names)
+            {
+                using var cmd = new SqlCommand("SELECT LTRIM(RTRIM(Model)), Sut FROM dbo.MasterProduct WHERE Machine = @m AND Sut > 0", conn, tx);
+                cmd.Parameters.Add("@m", SqlDbType.NVarChar, 100).Value = name;
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                    if (!r.IsDBNull(0)) sut.TryAdd(r.GetString(0), Convert.ToDouble(r.GetValue(1)));
+            }
+            return sut;
         }
 
         // Kali jalan model (ganti model = kali jalan baru) dari kenaikan counter satu hari produksi
@@ -1617,7 +2194,9 @@ namespace Plclogger
                 while (r.Read())
                     samples.Add((r.GetDateTime(0), r.GetString(1), r.GetInt32(2), r.GetInt32(3), r.GetInt32(4), r.GetInt32(5)));
             }
-            var steps = BuildKyoshinSteps(samples, seeds);
+            // SUT model untuk target PLAN BY SUT yang tertahan di PROD. PLAN (lihat BuildKyoshinSteps)
+            var masterSut = LoadMasterSutForMachine(conn, null, machineCode);
+            var steps = BuildKyoshinSteps(samples, seeds, m => masterSut.TryGetValue(m, out var v) ? v : 0);
             var runs = BuildKyoshinRuns(steps);
             var shifts = BuildKyoshinShiftOutput(steps);
 
@@ -2076,8 +2655,8 @@ namespace Plclogger
             Math.Max(0, durationMin - (int)Math.Round(MonitoringSystem.Services.BreakSchedule.OverlapMinutes(startAt, endAt, breaks)));
 
         // Isi / perbarui kolom NetDurationMin: kejadian 7 hari produksi terakhir (jadwal istirahat custom bisa diubah belakangan)
-        // dan semua kejadian lama yang belum punya nilainya. Kolom belum dibuat = dilewati.
-        public int RefreshLossNetDurations(DateTime now)
+        // dan semua kejadian lama yang belum punya nilainya. Kolom belum dibuat = dilewati. machineCode: MCH1-01 / BRAZING-EVA / BRAZING-CON.
+        public int RefreshLossNetDurations(DateTime now, string machineCode = TrendMachineCode)
         {
             var (currentDate, _, _) = ShiftOf(now);
             using var conn = new SqlConnection(DbConnectionString);
@@ -2089,7 +2668,7 @@ namespace Plclogger
                 SELECT Id, ProductionDate, StartAt, EndAt, DurationMin, NetDurationMin FROM dbo.{LossEventTable}
                 WHERE MachineCode = @mc AND (ProductionDate >= DATEADD(DAY, -7, @cur) OR NetDurationMin IS NULL)", conn))
             {
-                cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = TrendMachineCode;
+                cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = machineCode;
                 cmd.Parameters.Add("@cur", SqlDbType.Date).Value = currentDate;
                 using var r = cmd.ExecuteReader();
                 while (r.Read())
@@ -3368,7 +3947,7 @@ namespace Plclogger
     // Logger Brazing (Condenser & Evaporator), struktur sama dengan MainScreenTrendLogger Expander:
     // tiap menit layar HOME tiap line dicatat ke dbo.PlcKyoshinTrend (MachineCode BRAZING-CON / BRAZING-EVA), lalu
     // Change Plan, output harian & output per shift dihitung ulang dari riwayat itu (tabel yang sama dengan Expander).
-    // Loss time Brazing belum dicatat: address timer & reason loss belum ada (BrazingLineMap.LossTimerAddr = null).
+    // Loss time Brazing dicatat BrazingLossLogger (timer D6810 / D6811); di sini durasi bersih tanpa jam istirahat tiap menit.
     public class BrazingTrendLogger : BackgroundService
     {
         private readonly FactoryDataService _svc;
@@ -3382,10 +3961,6 @@ namespace Plclogger
                 Console.WriteLine($"[TREND BRAZING] PC ini ({Environment.MachineName}) bukan server logger ({_svc.LoggerMachineName}); riwayat PLC Brazing tidak dicatat dari sini.");
                 return;
             }
-            foreach (var (code, map) in FactoryDataService.BrazingLines)
-                if (string.IsNullOrWhiteSpace(map.LossTimerAddr))
-                    Console.WriteLine($"[LOSS BRAZING] {map.Label} ({code}): address timer loss belum diisi, loss time belum dicatat.");
-
             bool offlineReported = false;
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -3426,6 +4001,326 @@ namespace Plclogger
                     {
                         Console.WriteLine($"[CHANGE PLAN BRAZING] {code}: {ex.Message.Split('\n')[0]}");
                     }
+
+                    // Durasi loss tanpa jam istirahat (NetDurationMin), dicatat BrazingLossLogger
+                    try { await Task.Run(() => _svc.RefreshLossNetDurations(DateTime.Now, code), stoppingToken); }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        Console.WriteLine($"[LOSS BRAZING] {code}: gagal menghitung durasi loss tanpa jam istirahat: {ex.Message.Split('\n')[0]}");
+                    }
+                }
+            }
+        }
+    }
+
+    // Logger Press Shop (200T, 110T Amada, 110T Komatsu), sama dengan BrazingTrendLogger: tiap menit layar HOME tiap mesin
+    // dicatat ke dbo.PlcKyoshinTrend (MachineCode PRESSSHOP-200T / -110TA / -110TK), lalu Change Plan, output harian & per shift
+    // dihitung ulang. Loss time Press Shop dicatat PressShopLossLogger (timer D296 / D297 / D298); di sini durasi bersih tanpa jam istirahat tiap menit.
+    // IP PLC kosong (appsettings PressShopPlc:Ip) = logger diam.
+    public class PressShopTrendLogger : BackgroundService
+    {
+        private readonly FactoryDataService _svc;
+
+        public PressShopTrendLogger(FactoryDataService svc) => _svc = svc;
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            if (!_svc.IsLoggerHost)
+            {
+                Console.WriteLine($"[TREND PRESS SHOP] PC ini ({Environment.MachineName}) bukan server logger ({_svc.LoggerMachineName}); riwayat PLC Press Shop tidak dicatat dari sini.");
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(_svc.PressShopPlcIp))
+            {
+                Console.WriteLine("[TREND PRESS SHOP] IP PLC Press Shop belum diisi (appsettings PressShopPlc:Ip); riwayat tidak dicatat.");
+                return;
+            }
+            bool offlineReported = false;
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var now = DateTime.Now;
+                var nextMinute = now.Date.AddHours(now.Hour).AddMinutes(now.Minute + 1);
+                try { await Task.Delay(nextMinute - now, stoppingToken); }
+                catch (TaskCanceledException) { break; }
+
+                try
+                {
+                    var homes = await Task.Run(() => _svc.ReadPressShopHomeScreens(), stoppingToken);
+                    if (homes.Count == 0)
+                    {
+                        if (!offlineReported) Console.WriteLine($"[TREND PRESS SHOP] PLC Press Shop {_svc.PressShopPlcIp}:{_svc.PressShopPlcPort} tidak terbaca; riwayat menit ini dilewati.");
+                        offlineReported = true;
+                    }
+                    else
+                    {
+                        offlineReported = false;
+                        foreach (var (code, sample) in homes)
+                        {
+                            if ((DateTime.Now - sample.ReadAtTime).TotalSeconds >= 10) continue;
+                            sample.ReadAtTime = nextMinute; // dicatat tepat di menit itu (detik 00)
+                            _svc.SaveTrendSample(sample, code);
+                        }
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    Console.WriteLine($"[TREND PRESS SHOP] Gagal mencatat riwayat layar HOME: {ex.Message.Split('\n')[0]}");
+                }
+
+                // Change Plan, output harian & per shift tiap mesin (juga saat PLC offline, supaya hari kemarin difinalkan jam 07:00)
+                foreach (var code in FactoryDataService.PressShopLines.Keys)
+                {
+                    try { await Task.Run(() => _svc.RefreshKyoshinChangePlan(DateTime.Now, code), stoppingToken); }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        Console.WriteLine($"[CHANGE PLAN PRESS SHOP] {code}: {ex.Message.Split('\n')[0]}");
+                    }
+
+                    // Durasi loss tanpa jam istirahat (NetDurationMin), dicatat PressShopLossLogger
+                    try { await Task.Run(() => _svc.RefreshLossNetDurations(DateTime.Now, code), stoppingToken); }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        Console.WriteLine($"[LOSS PRESS SHOP] {code}: gagal menghitung durasi loss tanpa jam istirahat: {ex.Message.Split('\n')[0]}");
+                    }
+                }
+            }
+        }
+    }
+
+    // Kejadian loss satu line Brazing (dbo.PlcKyoshinLossEvent, MachineCode BRAZING-EVA / BRAZING-CON).
+    // Logika sama dengan loss Expander (FactoryDataService.ProcessLossSample): timer loss PLC (D6810 / D6811, menit)
+    // bukan 0 = loss mulai (mulai = sekarang - timer), kembali 0 / turun = selesai; dipotong per shift
+    // (07:00 / 15:45 / 23:15) dengan GroupId sama; satu loss terbuka per mesin (index UX_PlcKyoshinLossEvent_Open).
+    // Bedanya: Brazing tidak punya kotak reason di GOT -> ReasonName dibiarkan NULL, di-assign di aplikasi Scanner AC
+    // (halaman Loss Time Evaporator / Condenser). Belum di-assign = OTHER di AC OEE.
+    public sealed class BrazingLossTracker
+    {
+        private readonly FactoryDataService _svc;
+        private readonly string _machineCode;
+        private Open? _open;
+        private bool _loaded;
+
+        private sealed class Open
+        {
+            public long Id, GroupId;
+            public DateTime StartAt;
+            public int Offset, DurationMin;
+            public string Model = "";
+        }
+
+        public BrazingLossTracker(FactoryDataService svc, string machineCode)
+        {
+            _svc = svc;
+            _machineCode = machineCode;
+        }
+
+        // Dipanggil tiap 5 detik dengan pembacaan HOME + timer loss terbaru (PLC live), hanya di PC server logger
+        public void Process(PlcMainScreen s, DateTime now)
+        {
+            using var conn = new SqlConnection(_svc.DbConnectionString);
+            conn.Open();
+            if (!_loaded) Load(conn);
+
+            int timer = Math.Max(0, (int)s.LossRunning);
+            if (_open != null && (timer == 0 || timer < _open.Offset + _open.DurationMin))
+                Close(conn, now);
+
+            if (_open == null && timer > 0)
+            {
+                var startAt = now.AddMinutes(-timer);
+                startAt = startAt.AddTicks(-(startAt.Ticks % TimeSpan.TicksPerSecond));
+                if (!Insert(conn, new Open { StartAt = startAt, Model = (s.Model ?? "").Trim() })) return;
+                Update(conn, timer, now);
+            }
+            else if (_open != null)
+                Update(conn, timer, now);
+        }
+
+        // Plclogger baru jalan: lanjutkan loss yang masih terbuka di database
+        private void Load(SqlConnection conn)
+        {
+            _open = null;
+            using var cmd = new SqlCommand($@"
+                SELECT TOP 1 Id, ISNULL(GroupId, Id), StartAt, R103Offset, DurationMin, Model
+                FROM dbo.{FactoryDataService.LossEventTable} WHERE MachineCode = @mc AND EndAt IS NULL ORDER BY Id DESC", conn);
+            cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = _machineCode;
+            using var r = cmd.ExecuteReader();
+            if (r.Read())
+                _open = new Open { Id = r.GetInt64(0), GroupId = r.GetInt64(1), StartAt = r.GetDateTime(2), Offset = r.GetInt32(3), DurationMin = r.GetInt32(4), Model = r.GetString(5) };
+            _loaded = true;
+        }
+
+        // Tambah potongan loss (baru / lanjutan shift berikutnya). false = sudah ada loss terbuka (Plclogger lain): tidak dobel.
+        private bool Insert(SqlConnection conn, Open seg)
+        {
+            var (productionDate, shiftNo, _) = FactoryDataService.ShiftOf(seg.StartAt);
+            using var cmd = new SqlCommand($@"
+                INSERT INTO dbo.{FactoryDataService.LossEventTable} (MachineCode, ProductionDate, ShiftNo, Model, StartAt, EndAt, DurationMin, R103Offset, GroupId, UpdatedAt)
+                OUTPUT INSERTED.Id
+                VALUES (@mc, @pd, @shift, @model, @start, NULL, @dur, @offset, @group, SYSDATETIME())", conn);
+            cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = _machineCode;
+            cmd.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate;
+            cmd.Parameters.Add("@shift", SqlDbType.TinyInt).Value = shiftNo;
+            cmd.Parameters.Add("@model", SqlDbType.NVarChar, 50).Value = seg.Model;
+            cmd.Parameters.Add("@start", SqlDbType.DateTime2).Value = seg.StartAt;
+            cmd.Parameters.Add("@dur", SqlDbType.Int).Value = seg.DurationMin;
+            cmd.Parameters.Add("@offset", SqlDbType.Int).Value = seg.Offset;
+            cmd.Parameters.Add("@group", SqlDbType.BigInt).Value = seg.GroupId > 0 ? seg.GroupId : DBNull.Value;
+            try
+            {
+                seg.Id = (long)cmd.ExecuteScalar()!;
+            }
+            catch (SqlException ex) when (ex.Number == 2601 || ex.Number == 2627)
+            {
+                Console.WriteLine($"[LOSS] {_machineCode}: sudah ada loss terbuka di database (Plclogger lain?), tidak dicatat dobel.");
+                _open = null;
+                _loaded = false;
+                return false;
+            }
+            if (seg.GroupId <= 0)
+            {
+                seg.GroupId = seg.Id;
+                using var upd = new SqlCommand($"UPDATE dbo.{FactoryDataService.LossEventTable} SET GroupId = Id WHERE Id = @id", conn);
+                upd.Parameters.Add("@id", SqlDbType.BigInt).Value = seg.Id;
+                upd.ExecuteNonQuery();
+            }
+            _open = seg;
+            return true;
+        }
+
+        // Perbarui durasi loss terbuka; lewat akhir shift = tutup potongan di akhir shift & lanjut di shift berikutnya
+        private void Update(SqlConnection conn, int timer, DateTime now)
+        {
+            var open = _open!;
+            var plan = FactoryDataService.PlanLossSegments(open.StartAt, open.Offset, timer, now);
+            for (int i = 0; i < plan.Count - 1; i++)
+            {
+                using (var cmd = new SqlCommand($@"
+                    UPDATE dbo.{FactoryDataService.LossEventTable} SET EndAt = @end, DurationMin = @dur, UpdatedAt = SYSDATETIME() WHERE Id = @id", conn))
+                {
+                    cmd.Parameters.Add("@end", SqlDbType.DateTime2).Value = plan[i].End!.Value;
+                    cmd.Parameters.Add("@dur", SqlDbType.Int).Value = plan[i].Minutes;
+                    cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = open.Id;
+                    cmd.ExecuteNonQuery();
+                }
+                var next = new Open { GroupId = open.GroupId, StartAt = plan[i + 1].Start, Offset = plan[i + 1].Offset, Model = open.Model };
+                if (!Insert(conn, next)) return;
+                open = next;
+            }
+
+            int duration = plan[^1].Minutes;
+            if (duration != open.DurationMin)
+            {
+                using var upd = new SqlCommand($"UPDATE dbo.{FactoryDataService.LossEventTable} SET DurationMin = @dur, UpdatedAt = SYSDATETIME() WHERE Id = @id", conn);
+                upd.Parameters.Add("@dur", SqlDbType.Int).Value = duration;
+                upd.Parameters.Add("@id", SqlDbType.BigInt).Value = open.Id;
+                upd.ExecuteNonQuery();
+                open.DurationMin = duration;
+            }
+        }
+
+        private void Close(SqlConnection conn, DateTime now)
+        {
+            var open = _open!;
+            using var cmd = new SqlCommand($"UPDATE dbo.{FactoryDataService.LossEventTable} SET EndAt = @end, UpdatedAt = SYSDATETIME() WHERE Id = @id", conn);
+            cmd.Parameters.Add("@end", SqlDbType.DateTime2).Value = FactoryDataService.LossEndAt(open.StartAt, open.DurationMin, now);
+            cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = open.Id;
+            cmd.ExecuteNonQuery();
+            _open = null;
+        }
+    }
+
+    // Pantau timer loss Brazing (D6810 Evaporator, D6811 Condenser) tiap 5 detik, seperti KyoshinLossLogger untuk R103.
+    // Hanya di PC server logger. Hanya membaca PLC; durasi tanpa jam istirahat dihitung BrazingTrendLogger tiap menit.
+    public class BrazingLossLogger : BackgroundService
+    {
+        private static readonly TimeSpan Interval = TimeSpan.FromSeconds(5);
+        private readonly FactoryDataService _svc;
+        private readonly Dictionary<string, BrazingLossTracker> _trackers = new(StringComparer.OrdinalIgnoreCase);
+
+        public BrazingLossLogger(FactoryDataService svc)
+        {
+            _svc = svc;
+            foreach (var (code, map) in FactoryDataService.BrazingLines)
+                if (map.LossTimerReg.HasValue) _trackers[code] = new BrazingLossTracker(svc, code);
+        }
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            if (!_svc.IsLoggerHost || _trackers.Count == 0) return; // pesan "bukan server logger" sudah dari BrazingTrendLogger
+            bool missingTableReported = false;
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try { await Task.Delay(Interval, stoppingToken); }
+                catch (TaskCanceledException) { break; }
+
+                try
+                {
+                    var now = DateTime.Now;
+                    var homes = await Task.Run(() => _svc.ReadBrazingHomeScreens(), stoppingToken);
+                    // PLC offline: loss yang terbuka dibiarkan terbuka sampai PLC terbaca lagi
+                    foreach (var (code, tracker) in _trackers)
+                        if (homes.TryGetValue(code, out var s) && (now - s.ReadAtTime).TotalSeconds < 10)
+                            await Task.Run(() => tracker.Process(s, now), stoppingToken);
+                    missingTableReported = false;
+                }
+                catch (SqlException ex) when (ex.Number == 208)
+                {
+                    if (!missingTableReported)
+                        Console.WriteLine("[LOSS BRAZING] Tabel dbo.PlcKyoshinLossEvent belum ada (jalankan database_plc_kyoshin_loss_event.sql).");
+                    missingTableReported = true;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    Console.WriteLine($"[LOSS BRAZING] Gagal memproses loss time Brazing: {ex.Message.Split('\n')[0]}");
+                }
+            }
+        }
+    }
+
+    // Pantau timer loss Press Shop (D296 200T, D297 110T Amada, D298 110T Komatsu) tiap 5 detik, logika sama dengan Brazing
+    // (BrazingLossTracker per kode mesin, reason NULL = OTHER). Hanya di PC server logger, hanya membaca PLC.
+    public class PressShopLossLogger : BackgroundService
+    {
+        private static readonly TimeSpan Interval = TimeSpan.FromSeconds(5);
+        private readonly FactoryDataService _svc;
+        private readonly Dictionary<string, BrazingLossTracker> _trackers = new(StringComparer.OrdinalIgnoreCase);
+
+        public PressShopLossLogger(FactoryDataService svc)
+        {
+            _svc = svc;
+            foreach (var code in FactoryDataService.PressShopLines.Keys) _trackers[code] = new BrazingLossTracker(svc, code);
+        }
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            // pesan "bukan server logger" / IP kosong sudah dari PressShopTrendLogger
+            if (!_svc.IsLoggerHost || string.IsNullOrWhiteSpace(_svc.PressShopPlcIp)) return;
+            bool missingTableReported = false;
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try { await Task.Delay(Interval, stoppingToken); }
+                catch (TaskCanceledException) { break; }
+
+                try
+                {
+                    var now = DateTime.Now;
+                    var homes = await Task.Run(() => _svc.ReadPressShopHomeScreens(), stoppingToken);
+                    // PLC offline: loss yang terbuka dibiarkan terbuka sampai PLC terbaca lagi
+                    foreach (var (code, tracker) in _trackers)
+                        if (homes.TryGetValue(code, out var s) && (now - s.ReadAtTime).TotalSeconds < 10)
+                            await Task.Run(() => tracker.Process(s, now), stoppingToken);
+                    missingTableReported = false;
+                }
+                catch (SqlException ex) when (ex.Number == 208)
+                {
+                    if (!missingTableReported)
+                        Console.WriteLine("[LOSS PRESS SHOP] Tabel dbo.PlcKyoshinLossEvent belum ada (jalankan database_plc_kyoshin_loss_event.sql).");
+                    missingTableReported = true;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    Console.WriteLine($"[LOSS PRESS SHOP] Gagal memproses loss time Press Shop: {ex.Message.Split('\n')[0]}");
                 }
             }
         }
@@ -3564,6 +4459,9 @@ namespace Plclogger
             builder.Services.AddHostedService<MainScreenTrendLogger>();
             builder.Services.AddHostedService<KyoshinLossLogger>();
             builder.Services.AddHostedService<BrazingTrendLogger>(); // riwayat HOME Brazing (Condenser & Evaporator) tiap menit
+            builder.Services.AddHostedService<BrazingLossLogger>();  // kejadian loss Brazing (timer D6810 / D6811) tiap 5 detik
+            builder.Services.AddHostedService<PressShopTrendLogger>(); // riwayat HOME Press Shop (200T / 110T Amada / 110T Komatsu) tiap menit
+            builder.Services.AddHostedService<PressShopLossLogger>();  // kejadian loss Press Shop (timer D296 / D297 / D298) tiap 5 detik
             builder.Services.AddSingleton<LossTimeService>();
             // builder.Services.AddHostedService<LossTimeBackgroundService>();
 
@@ -3678,6 +4576,33 @@ namespace Plclogger
 
             // 5a''. Baca 120 baris register Plan Brazing (Model, SUT, Prod Plan, Actual, Plan SUT, Defect, Date PSI) untuk Live Preview HMI
             app.MapGet("/api/brazing/plc/read", (FactoryDataService svc, string? machine) => Results.Ok(svc.ReadBrazingPlan(machine)));
+            // Layar HOME kedua line Brazing (model, prod plan, actual, plan by SUT) untuk layar TV Dashboard AC; cache 3 detik
+            app.MapGet("/api/brazing/plc/home", (FactoryDataService svc) => Results.Ok(svc.ReadBrazingHomeLive()));
+
+            // 5c. Plan Fin Press (FX80 / FIX36 / SF250 / FIX12): kirim, cek koneksi & baca PLC Fin Press (FinPressPlc)
+            app.MapPost("/api/finpress/plc/send", (FactoryDataService svc, [Microsoft.AspNetCore.Mvc.FromBody] BrazingSendRequest? req) =>
+            {
+                if (req == null || req.Rows == null || req.Rows.Count == 0)
+                    return Results.BadRequest(new { Success = false, Message = "Data baris tidak boleh kosong!" });
+                var (success, msg, logs) = svc.SendFinPressPlan(req.Machine, req.Rows);
+                return Results.Ok(new { Success = success, Message = msg, Logs = logs });
+            });
+            app.MapGet("/api/finpress/plc/status", (FactoryDataService svc, string? machine) => Results.Ok(svc.CheckFinPressPlc(machine)));
+            app.MapGet("/api/finpress/plc/read", (FactoryDataService svc, string? machine) => Results.Ok(svc.ReadFinPressPlan(machine)));
+
+            // 5d. Plan Press Shop (200T / 110T Amada / 110T Komatsu): susunan sama dengan Fin Press, PLC sendiri (PressShopPlc).
+            //     Fungsinya sama, PLC dipilih dari kode mesin (PRESSSHOP-*).
+            app.MapPost("/api/pressshop/plc/send", (FactoryDataService svc, [Microsoft.AspNetCore.Mvc.FromBody] BrazingSendRequest? req) =>
+            {
+                if (req == null || req.Rows == null || req.Rows.Count == 0)
+                    return Results.BadRequest(new { Success = false, Message = "Data baris tidak boleh kosong!" });
+                if (!FactoryDataService.PressShopLines.ContainsKey((req.Machine ?? "").Trim()))
+                    return Results.BadRequest(new { Success = false, Message = $"Mesin {req.Machine} bukan mesin Press Shop." });
+                var (success, msg, logs) = svc.SendFinPressPlan(req.Machine, req.Rows);
+                return Results.Ok(new { Success = success, Message = msg, Logs = logs });
+            });
+            app.MapGet("/api/pressshop/plc/status", (FactoryDataService svc, string? machine) => Results.Ok(svc.CheckFinPressPlc(machine)));
+            app.MapGet("/api/pressshop/plc/read", (FactoryDataService svc, string? machine) => Results.Ok(svc.ReadFinPressPlan(machine)));
 
             // 5b. Layar utama GOT (B-1): Model, Prod. Plan, Actual, Plan, Difference, Defect, Loss Time (hanya baca)
             app.MapGet("/api/plc/main", (FactoryDataService svc) =>

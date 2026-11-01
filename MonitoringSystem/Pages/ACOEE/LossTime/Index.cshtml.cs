@@ -336,14 +336,27 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
             return Page();
         }
 
-        // Detail Loss Time AC OEE hanya untuk Expander Kyoshin 6.35: dropdown berisi mesin itu saja dan filter selalu ke mesin itu
+        // Detail Loss Time AC OEE: mesin dengan loss dari PLC (Plclogger, dbo.PlcKyoshinLossEvent):
+        // Expander Kyoshin 6.35 (MCH1-01, reason dari GOT) dan line Brazing Evaporator / Condenser (BRAZING-EVA / -CON,
+        // timer D6810 / D6811, reason di-assign di aplikasi Scanner AC). Pilihan lain = Expander.
+        private static readonly (string Name, string Code)[] BrazingPlcMachines = { ("Evaporator", "BRAZING-EVA"), ("Condenser", "BRAZING-CON") };
+
+        // Kode mesin PLC untuk nama mesin terpilih; null = bukan mesin PLC
+        private string? PlcMachineCode(string? machineName)
+        {
+            var name = (machineName ?? "").Trim();
+            if (name.StartsWith("Expander Kyoshin 6", StringComparison.OrdinalIgnoreCase)) return "MCH1-01";
+            return BrazingPlcMachines.FirstOrDefault(m => m.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).Code;
+        }
+
         private void LoadMachineNameList()
         {
             LoadAllMachineNames();
             var kyoshin = DefaultMachineName();
             MachineNameList.Clear();
             MachineNameList.Add(kyoshin);
-            SelectedMachineName = kyoshin;
+            MachineNameList.AddRange(BrazingPlcMachines.Select(m => m.Name));
+            SelectedMachineName = MachineNameList.FirstOrDefault(n => n.Equals((SelectedMachineName ?? "").Trim(), StringComparison.OrdinalIgnoreCase)) ?? kyoshin;
         }
 
         private void LoadAllMachineNames()
@@ -608,14 +621,20 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
             return records;
         }
 
-        // Kejadian loss Expander Kyoshin 6.35 dari PLC (timer R103, dicatat Plclogger ke PROMOSYS.dbo.PlcKyoshinLossEvent).
-        // Reason = kotak reason layar GOT LOSS TIME yang durasinya bertambah selama loss; kategori dari ForPlcReason.
+        // Kejadian loss mesin PLC terpilih (dicatat Plclogger ke PROMOSYS.dbo.PlcKyoshinLossEvent): Expander Kyoshin 6.35
+        // (timer R103, MCH1-01) atau Brazing Evaporator / Condenser (timer D6810 / D6811, BRAZING-EVA / BRAZING-CON).
+        // Reason Expander = kotak reason GOT LOSS TIME yang durasinya bertambah; reason Brazing = di-assign di Scanner AC.
+        // Kategori dari ForPlcReason (reason kosong = OTHER).
         // Detail: nama reason; untuk MODEL CHANGE "Model change loss dari <model sebelumnya> ke <model sesudahnya>"
         // (dari riwayat model PLC per menit di PlcKyoshinTrend sekitar awal & akhir loss).
         private List<LossTimeRecord> GetKyoshinPlcLossRecords(DateTime start, DateTime end)
         {
             var records = new List<LossTimeRecord>();
-            if (!SelectedMachineName.Trim().StartsWith("Expander Kyoshin 6", StringComparison.OrdinalIgnoreCase)) return records;
+            var plcCode = PlcMachineCode(SelectedMachineName);
+            if (plcCode == null) return records;
+            bool isBrazing = plcCode != "MCH1-01";
+            // Expander: reason dari kotak GOT; Brazing: reason di-assign di aplikasi Scanner AC (belum = OTHER)
+            string noReason = isBrazing ? "Reason belum di-assign" : "Reason belum diisi di GOT";
             try
             {
                 using var conn = new SqlConnection(connectionString);
@@ -631,11 +650,12 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
                                CASE WHEN COUNT(*) = COUNT(x.EndAt) THEN MAX(x.EndAt) END AS GroupEnd -- NULL = loss masih berjalan
                         FROM dbo.PlcKyoshinLossEvent x
                         WHERE ISNULL(x.GroupId, x.Id) = ISNULL(e.GroupId, e.Id)) g
-                    WHERE e.MachineCode = 'MCH1-01' AND e.ProductionDate BETWEEN @StartDate AND @EndDate AND {dur} > 0
+                    WHERE e.MachineCode = @mc AND e.ProductionDate BETWEEN @StartDate AND @EndDate AND {dur} > 0
                     ORDER BY e.StartAt", conn))
                 {
                     cmd.Parameters.AddWithValue("@StartDate", start.Date);
                     cmd.Parameters.AddWithValue("@EndDate", end.Date);
+                    cmd.Parameters.AddWithValue("@mc", plcCode);
                     using var reader = cmd.ExecuteReader();
                     while (reader.Read())
                     {
@@ -651,7 +671,7 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
                             RecordId = Convert.ToInt32(reader.GetInt64(8)), // PlcKyoshinLossEvent.Id, untuk lampiran file
                             RecordSource = PlcLossRecordSource,
                             Date = reader.GetDateTime(0),
-                            LossTime = reason.Length > 0 ? reason : "Reason belum diisi di GOT",
+                            LossTime = reason.Length > 0 ? reason : noReason,
                             Start = startAt.TimeOfDay,
                             End = (endAt ?? DateTime.Now).TimeOfDay,
                             Duration = reader.GetInt32(5) * 60,
@@ -673,7 +693,7 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
                     if (row.Record.Category.Contains("MODEL CHANGE", StringComparison.OrdinalIgnoreCase))
                     {
                         if (!modelChanges.TryGetValue(row.GroupStart, out var change))
-                            modelChanges[row.GroupStart] = change = GetKyoshinModelChange(conn, row.GroupStart, row.GroupEnd);
+                            modelChanges[row.GroupStart] = change = GetKyoshinModelChange(conn, row.GroupStart, row.GroupEnd, plcCode);
                         parts.Add(change.From != null && change.To != null ? $"Model change loss dari {change.From} ke {change.To}"
                                 : change.To != null ? $"Model change loss ke {change.To}"
                                 : "Model change loss");
@@ -682,7 +702,7 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
                     {
                         parts.Add(row.ReasonDetail.Length > 0
                             ? string.Join("; ", row.ReasonDetail.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(AcOeeLossCategories.DisplayName))
-                            : "Reason belum diisi di GOT");
+                            : noReason);
                     }
                     row.Record.DetailedReason = string.Join(" | ", parts);
                     records.Add(row.Record);
@@ -694,7 +714,7 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
 
         // Model sesudah = model pertama yang terbaca setelah loss selesai (maks. 30 menit; loss berjalan = model terakhir),
         // model sebelum = model terakhir sebelum loss mulai (maks. 2 jam) yang berbeda dari model sesudah.
-        private static (string? From, string? To) GetKyoshinModelChange(SqlConnection conn, DateTime lossStart, DateTime? lossEnd)
+        private static (string? From, string? To) GetKyoshinModelChange(SqlConnection conn, DateTime lossStart, DateTime? lossEnd, string machineCode)
         {
             string? Scalar(string sql, params (string Name, object Value)[] ps)
             {
@@ -704,7 +724,7 @@ namespace MonitoringSystem.Pages.ACOEE.LossTime
                 return string.IsNullOrEmpty(model) ? null : model;
             }
 
-            const string trend = "dbo.PlcKyoshinTrend WHERE MachineCode = 'MCH1-01' AND LTRIM(RTRIM(Model)) <> ''";
+            string trend = $"dbo.PlcKyoshinTrend WHERE MachineCode = '{machineCode.Replace("'", "''")}' AND LTRIM(RTRIM(Model)) <> ''";
             string? to = lossEnd.HasValue
                 ? Scalar($"SELECT TOP 1 Model FROM {trend} AND SampleAt >= @end AND SampleAt < DATEADD(MINUTE, 30, @end) ORDER BY SampleAt", ("@end", lossEnd.Value))
                   ?? Scalar($"SELECT TOP 1 Model FROM {trend} AND SampleAt <= @end ORDER BY SampleAt DESC", ("@end", lossEnd.Value))

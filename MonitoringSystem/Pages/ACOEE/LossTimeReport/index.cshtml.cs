@@ -70,15 +70,19 @@ namespace MonitoringSystem.Pages.ACOEE.LossTimeReport
         [BindProperty(SupportsGet = true)]
         public int SelectedYear { get; set; } = DateTime.Today.Year;
 
-        // Trend Loss Time AC OEE hanya untuk Expander Kyoshin 635 (MachineLine "Expander"); nilai lain dari URL diabaikan
-        private const string OnlyMachineLine = "Expander";
+        // Trend Loss Time AC OEE: mesin dengan loss dari PLC, daftar sama dengan Production Achievement
+        // (Expander = MCH1-01, Evaporator = BRAZING-EVA, Condenser = BRAZING-CON). Nilai lain dari URL = Expander.
+        private const string DefaultMachineLine = "Expander";
+        public static (string Line, string Code, string Label)[] Machines => MonitoringSystem.Pages.ACOEE.ProductionReport.IndexModel.Machines;
+        public string MachineLabel => Machines.First(m => m.Line == MachineLine).Label;
+        private string PlcMachineCode => Machines.First(m => m.Line == MachineLine).Code;
 
         [BindProperty(SupportsGet = true)]
-        public string MachineLine { get; set; } = OnlyMachineLine;
+        public string MachineLine { get; set; } = DefaultMachineLine;
 
         public override void OnPageHandlerExecuting(Microsoft.AspNetCore.Mvc.Filters.PageHandlerExecutingContext context)
         {
-            MachineLine = OnlyMachineLine;
+            MachineLine = Machines.FirstOrDefault(m => string.Equals(m.Line, MachineLine, StringComparison.OrdinalIgnoreCase)).Line ?? DefaultMachineLine;
             base.OnPageHandlerExecuting(context);
         }
 
@@ -122,7 +126,7 @@ namespace MonitoringSystem.Pages.ACOEE.LossTimeReport
         {
             string[] months = { "April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March" };
 
-            // Actual = loss time Expander Kyoshin 635 dari PLC (kejadian loss timer R103, sama dengan Detail Loss Time),
+            // Actual = loss time mesin terpilih dari PLC (kejadian loss, sama dengan Detail Loss Time),
             // dijumlah per bulan per kategori reason GOT.
             var actualsRaw = GetKyoshinPlcMonthlyLoss(SelectedYear);
 
@@ -285,7 +289,7 @@ namespace MonitoringSystem.Pages.ACOEE.LossTimeReport
         private List<AcOeeLossCategories.Slot>? _gotSlots;
         private List<AcOeeLossCategories.Slot> GotSlots => _gotSlots ??= AcOeeLossCategories.LoadCurrentSlots(_connectionString);
 
-        // Loss time PLC Kyoshin (tabel PlcKyoshinLossEvent) per bulan fiscal year (April - Maret), menit.
+        // Loss time PLC mesin terpilih (tabel PlcKyoshinLossEvent, MachineCode dari Machines) per bulan fiscal year (April - Maret), menit.
         // Kategori = nama kotak reason GOT saat ini; nama lama tetap jadi kategorinya sendiri; reason kosong masuk OTHER.
         private List<MonthlyCategoryData> GetKyoshinPlcMonthlyLoss(int fiscalYear)
         {
@@ -298,10 +302,11 @@ namespace MonitoringSystem.Pages.ACOEE.LossTimeReport
                 using var cmd = new SqlCommand($@"
                     SELECT MONTH(ProductionDate) AS Month, ISNULL(ReasonName, '') AS Reason, SUM({dur}) AS TotalMinutes
                     FROM dbo.PlcKyoshinLossEvent
-                    WHERE MachineCode = 'MCH1-01' AND {dur} > 0
+                    WHERE MachineCode = @mc AND {dur} > 0
                       AND ProductionDate >= @start AND ProductionDate < @end
                     GROUP BY MONTH(ProductionDate), ISNULL(ReasonName, '')", conn);
                 cmd.Parameters.AddWithValue("@start", new DateTime(fiscalYear, 4, 1));
+                cmd.Parameters.AddWithValue("@mc", PlcMachineCode);
                 cmd.Parameters.AddWithValue("@end", new DateTime(fiscalYear + 1, 4, 1));
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())

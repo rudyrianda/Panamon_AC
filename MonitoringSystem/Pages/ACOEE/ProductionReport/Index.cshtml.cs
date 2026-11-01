@@ -93,15 +93,24 @@ namespace MonitoringSystem.Pages.ACOEE.ProductionReport
 
         [BindProperty(SupportsGet = true)] public int SelectedMonth { get; set; } = DateTime.Now.Month;
         [BindProperty(SupportsGet = true)] public int SelectedYear { get; set; } = DateTime.Now.Year;
-        // Production Achievement AC OEE hanya untuk Expander Kyoshin 635 (MachineLine "Expander"); nilai lain dari URL diabaikan
-        private const string OnlyMachineLine = "Expander";
-        private const string EditorMachineCode = "MCH1-01"; // kode mesin editor PLC ROHIB untuk Expander Kyoshin 6.35
-        [BindProperty(SupportsGet = true)] public string MachineLine { get; set; } = OnlyMachineLine;
+        // Production Achievement AC OEE: mesin dengan data PLC (Plclogger). MachineLine -> kode mesin di tabel PLC & editor
+        // Plan Machine (PlcKyoshinChangePlan / PlcKyoshinLossEvent / PlcRohibEditorRow). Nilai lain dari URL = Expander.
+        //   Expander   = Expander Kyoshin 6.35 (MCH1-01)
+        //   Evaporator = Brazing Evaporator (BRAZING-EVA), Condenser = Brazing Condenser (BRAZING-CON)
+        private const string DefaultMachineLine = "Expander";
+        public static readonly (string Line, string Code, string Label)[] Machines =
+        {
+            ("Expander", "MCH1-01", "Expander Kyoshin 635"),
+            ("Evaporator", "BRAZING-EVA", "Evaporator"),
+            ("Condenser", "BRAZING-CON", "Condenser")
+        };
+        private string EditorMachineCode => Machines.First(m => m.Line == MachineLine).Code;
+        [BindProperty(SupportsGet = true)] public string MachineLine { get; set; } = DefaultMachineLine;
         [BindProperty(SupportsGet = true)] public List<string> SelectedShifts { get; set; } = new List<string>();
 
         public override void OnPageHandlerExecuting(Microsoft.AspNetCore.Mvc.Filters.PageHandlerExecutingContext context)
         {
-            MachineLine = OnlyMachineLine;
+            MachineLine = Machines.FirstOrDefault(m => string.Equals(m.Line, MachineLine, StringComparison.OrdinalIgnoreCase)).Line ?? DefaultMachineLine;
             SelectedShifts = new List<string> { "All" }; // tanpa filter shift: satu hari produksi = 07:00 - 07:00 besoknya
             base.OnPageHandlerExecuting(context);
         }
@@ -119,7 +128,7 @@ namespace MonitoringSystem.Pages.ACOEE.ProductionReport
         public IActionResult OnPost(string submitButton)
         {
             if (submitButton == "reset")
-                return RedirectToPage(new { SelectedYear = DateTime.Now.Year, SelectedMonth = DateTime.Now.Month, MachineLine = OnlyMachineLine });
+                return RedirectToPage(new { SelectedYear = DateTime.Now.Year, SelectedMonth = DateTime.Now.Month, MachineLine = this.MachineLine });
 
             return RedirectToPage(new
             {

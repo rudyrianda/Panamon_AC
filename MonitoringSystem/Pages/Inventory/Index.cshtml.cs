@@ -33,6 +33,9 @@ namespace MonitoringSystem.Pages.Inventory
 
         public List<InventoryData> listData { get; set; } = new();
 
+        // Kode mesin PLC Brazing (dropdown EVA / COND)
+        private static readonly string[] BrazingMachineCodes = { "BRAZING-EVA", "BRAZING-CON" };
+
         // ─── GET ───────────────────────────────────────────────
         public async Task OnGetAsync()
         {
@@ -56,6 +59,15 @@ namespace MonitoringSystem.Pages.Inventory
                 var conn = _context.Database.GetDbConnection();
                 await conn.OpenAsync();
 
+                // EVA / COND (Brazing) tidak discan ke OEESN; datanya output per model per hari produksi 07:00-07:00
+                // dari PLC Brazing (dbo.PlcKyoshinDailyOutput, diisi Plclogger tiap menit). EVA / COND berdiri sendiri, tidak ikut "All".
+                bool brazingOnly = BrazingMachineCodes.Contains(FilterMachineLine ?? "");
+
+                // ── Group hasil query per Product_Id + MachineCode ──
+                var dataMap = new Dictionary<string, InventoryData>();
+
+                if (!brazingOnly)
+                {
                 using var cmd = conn.CreateCommand();
 
                 var machineFilter = string.IsNullOrEmpty(FilterMachineLine) || FilterMachineLine == "All"
@@ -178,33 +190,41 @@ namespace MonitoringSystem.Pages.Inventory
                     cmd.Parameters.Add(pMachine);
                 }
 
-                // ── Group hasil query per Product_Id + MachineCode ──
-                var dataMap = new Dictionary<string, InventoryData>();
-
-                using var reader = await cmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
+                await ReadInventoryRowsAsync(cmd, dataMap);
+                }
+                else
                 {
-                    var dataId = reader["Data_Id"]?.ToString();
-                    var model = reader["Model"]?.ToString();
-                    var machineLine = reader["MachineCode"]?.ToString();
-                    var dayNum = Convert.ToInt32(reader["DayNum"]);
-                    decimal? actual = reader["Actual"] == DBNull.Value ? null : Convert.ToDecimal(reader["Actual"]);
+                    using var cmdBrazing = conn.CreateCommand();
+                    var pMc = cmdBrazing.CreateParameter();
+                    pMc.ParameterName = "@machineCode";
+                    pMc.Value = FilterMachineLine;
+                    cmdBrazing.Parameters.Add(pMc);
 
-                    var key = $"{dataId}|{machineLine}";
+                    cmdBrazing.CommandText = @"
+                        SELECT
+                            LTRIM(RTRIM(Model)) AS Data_Id,
+                            LTRIM(RTRIM(Model)) AS Model,
+                            MachineCode,
+                            DAY(ProductionDate) AS DayNum,
+                            SUM(Actual) AS Actual
+                        FROM dbo.PlcKyoshinDailyOutput
+                        WHERE MachineCode = @machineCode
+                          AND ProductionDate >= @startDate AND ProductionDate < @endDate
+                        GROUP BY MachineCode, LTRIM(RTRIM(Model)), DAY(ProductionDate)
+                        HAVING SUM(Actual) > 0
+                        ORDER BY Model, DayNum";
 
-                    if (!dataMap.TryGetValue(key, out var invData))
-                    {
-                        invData = new InventoryData
-                        {
-                            Data_Id = dataId,
-                            Model = model,
-                            MachineLine = machineLine,
-                            DailyValues = new Dictionary<int, decimal?>()
-                        };
-                        dataMap[key] = invData;
-                    }
+                    var pbStart = cmdBrazing.CreateParameter();
+                    pbStart.ParameterName = "@startDate";
+                    pbStart.Value = startDate;
+                    cmdBrazing.Parameters.Add(pbStart);
 
-                    invData.DailyValues[dayNum] = actual;
+                    var pbEnd = cmdBrazing.CreateParameter();
+                    pbEnd.ParameterName = "@endDate";
+                    pbEnd.Value = endDate;
+                    cmdBrazing.Parameters.Add(pbEnd);
+
+                    await ReadInventoryRowsAsync(cmdBrazing, dataMap);
                 }
 
                 await conn.CloseAsync();
@@ -220,6 +240,36 @@ namespace MonitoringSystem.Pages.Inventory
                 // Fallback biar view tetap bisa render walau query gagal
                 if (ActiveBulan == 0) ActiveBulan = DateTime.Now.Month;
                 if (ActiveYear == 0) ActiveYear = DateTime.Now.Year;
+            }
+        }
+
+        // Baca hasil query (Data_Id, Model, MachineCode, DayNum, Actual) ke dataMap per Product_Id + MachineCode
+        private static async Task ReadInventoryRowsAsync(System.Data.Common.DbCommand cmd, Dictionary<string, InventoryData> dataMap)
+        {
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var dataId = reader["Data_Id"]?.ToString();
+                var model = reader["Model"]?.ToString();
+                var machineLine = reader["MachineCode"]?.ToString();
+                var dayNum = Convert.ToInt32(reader["DayNum"]);
+                decimal? actual = reader["Actual"] == DBNull.Value ? null : Convert.ToDecimal(reader["Actual"]);
+
+                var key = $"{dataId}|{machineLine}";
+
+                if (!dataMap.TryGetValue(key, out var invData))
+                {
+                    invData = new InventoryData
+                    {
+                        Data_Id = dataId,
+                        Model = model,
+                        MachineLine = machineLine,
+                        DailyValues = new Dictionary<int, decimal?>()
+                    };
+                    dataMap[key] = invData;
+                }
+
+                invData.DailyValues[dayNum] = actual;
             }
         }
     }

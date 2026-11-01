@@ -516,7 +516,10 @@ main.pb-5 {
                 <div class="d-flex align-items-center gap-2">
                     <label class="mb-0 text-white small">Machine</label>
                     <select name="MachineLine" class="form-select form-select-sm" style="width: 200px;" asp-for="MachineLine">
-                        <option value="Expander">Expander Kyoshin 635</option>
+                        @foreach (var m in MonitoringSystem.Pages.ACOEE.LossTimeReport.indexModel.Machines)
+                        {
+                            <option value="@m.Line" selected="@(m.Line == Model.MachineLine)">@m.Label</option>
+                        }
                     </select>
                 </div>
 
@@ -565,7 +568,7 @@ main.pb-5 {
         <div class="chart-box">
             <div class="chart-box-header">
                 <span class="chart-box-title">
-                    Actual vs BP : Expander Kyoshin 635
+                    Actual vs BP : @Model.MachineLabel
                     (Apr @Model.SelectedYear - Mar @(Model.SelectedYear + 1))
                 </span>
                 <div class="chart-box-line"></div>

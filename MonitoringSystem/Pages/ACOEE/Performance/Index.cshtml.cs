@@ -23,7 +23,12 @@ namespace MonitoringSystem.Pages.ACOEE.Performance
         {
             ("MCH1-01", "Expander Kyoshin 6.35", "Expander Kyoshin 6.35"),
             ("BRAZING-EVA", "Evaporator", "Evaporator"),
-            ("BRAZING-CON", "Condenser", "Condenser")
+            ("BRAZING-CON", "Condenser", "Condenser"),
+            // Press Shop: layar HOME PLC Press Shop (model D210/D230/D250, prod. plan D280/D284/D288, actual D282/D286/D290,
+            // plan SUT D283/D287/D291); tidak ada defect, loss belum dicatat
+            ("PRESSSHOP-200T", "200 Ton", "200 Ton"),
+            ("PRESSSHOP-110TA", "110 Ton Amada", "110 Ton Amada"),
+            ("PRESSSHOP-110TK", "110 Ton Komatsu", "110 Ton Komatsu")
         };
 
         private const int CycleWindowMinutes = 5;   // actual cycle = rata-rata 5 menit terakhir (data PLC per menit)
@@ -159,7 +164,9 @@ namespace MonitoringSystem.Pages.ACOEE.Performance
                     ORDER BY SampleAt;
                     SELECT ISNULL(SUM({dur}), 0) FROM dbo.PlcKyoshinLossEvent
                     WHERE MachineCode = @mc AND ProductionDate = @pd AND (@shift = 0 OR ShiftNo = @shift);
-                    SELECT LTRIM(RTRIM(Model)), Sut FROM dbo.MasterProduct WHERE Machine = @machineName AND Sut > 0;", conn))
+                    SELECT LTRIM(RTRIM(Model)), Sut FROM dbo.MasterProduct
+                    WHERE (Machine = @machineName OR Machine = @altMachine) AND Sut > 0
+                    ORDER BY CASE WHEN Machine = @machineName THEN 0 ELSE 1 END;", conn))
                 {
                     cmd.Parameters.Add("@mc", SqlDbType.NVarChar, 20).Value = SelectedMachine.Code;
                     cmd.Parameters.Add("@from", SqlDbType.DateTime2).Value = windowStart;
@@ -167,6 +174,9 @@ namespace MonitoringSystem.Pages.ACOEE.Performance
                     cmd.Parameters.Add("@pd", SqlDbType.Date).Value = productionDate.Date;
                     cmd.Parameters.Add("@shift", SqlDbType.Int).Value = shift;
                     cmd.Parameters.Add("@machineName", SqlDbType.VarChar, 100).Value = SelectedMachine.MasterMachine;
+                    // Brazing: master Condenser & Evaporator digabung (line sendiri didahulukan) supaya SUT tetap ketemu walau line tertukar
+                    cmd.Parameters.Add("@altMachine", SqlDbType.VarChar, 100).Value =
+                        SelectedMachine.Code == "BRAZING-EVA" ? "Condenser" : SelectedMachine.Code == "BRAZING-CON" ? "Evaporator" : "";
                     await using var r = await cmd.ExecuteReaderAsync();
                     Sample Read() => new(r.GetDateTime(0), (r.IsDBNull(1) ? "" : r.GetString(1)).Trim(),
                         r.GetInt32(2), r.GetInt32(3), r.GetInt32(4), r.GetInt32(5));
@@ -211,9 +221,15 @@ namespace MonitoringSystem.Pages.ACOEE.Performance
         {
             double SutOf(string model) => sut.TryGetValue(model, out var v) ? v : 0;
 
-            // Kenaikan counter per sampel, aturan sama dengan Plclogger (BuildKyoshinSteps): counter R22/R23/R24 milik baris plan,
-            // kembali ke baris lama = counter melanjutkan nilainya. Patokan = nilai terakhir model + PROD. PLAN yang sama,
-            // lalu nilai terakhir model itu, lalu 0. Nilai turun = counter di-reset (dihitung dari 0).
+            // Kenaikan counter per sampel, aturan sama dengan Plclogger (BuildKyoshinSteps / CounterIncrease): counter R22/R23/R24
+            // milik baris plan, kembali ke baris lama = counter melanjutkan nilainya. Patokan = nilai terakhir model + PROD. PLAN
+            // yang sama, lalu nilai terakhir model itu, lalu 0. Turun sedikit (>= separuh patokan) = koreksi operator (tidak
+            // menambah); turun drastis = counter di-reset (dihitung dari 0).
+            // PLAN BY SUT tertahan di PROD. PLAN (PLC berhenti menghitung) tapi ACTUAL masih naik: target = waktu jalan / SUT model
+            // (waktu jalan = sejak ACTUAL terakhir naik, maks. 3 menit; SUT tidak diketahui = tidak ditambah).
+            static int Up(int cur, int baseline) => cur >= baseline ? cur - baseline : cur * 2 >= baseline ? 0 : cur;
+            var lastAt = new Dictionary<(string, int), DateTime>();
+            var capCarry = new Dictionary<(string, int), double>();
             var byRow = new Dictionary<(string, int), (int R23, int R22, int R24)>();
             var byModel = new Dictionary<string, (int R23, int R22, int R24)>();
             foreach (var s in seeds)
@@ -231,9 +247,24 @@ namespace MonitoringSystem.Pages.ACOEE.Performance
                 var key = s.Model.ToUpperInvariant();
                 int r23 = Math.Max(0, s.R23), r22 = Math.Max(0, s.R22), r24 = Math.Max(0, s.R24);
                 (int R23, int R22, int R24) prev = byRow.TryGetValue((key, s.R20), out var rv) ? rv : byModel.TryGetValue(key, out var mv) ? mv : (0, 0, 0);
-                static int Up(int cur, int baseline) => cur >= baseline ? cur - baseline : cur;
-                steps.Add((s, Up(r23, prev.R23), Up(r22, prev.R22), Up(r24, prev.R24)));
-                byRow[(key, s.R20)] = byModel[key] = (r23, r22, r24);
+                int d23 = Up(r23, prev.R23), d22 = Up(r22, prev.R22), d24 = Up(r24, prev.R24);
+                var row = (key, s.R20);
+                if (d22 > 0)
+                {
+                    // Waktu jalan = sejak ACTUAL terakhir naik (maks. 3 menit; lebih lama = mesin sempat berhenti, dihitung 1 menit)
+                    double sutSec = SutOf(s.Model);
+                    if (d23 == 0 && s.R20 > 0 && r23 >= s.R20 && sutSec > 0)
+                    {
+                        double minutes = lastAt.TryGetValue(row, out var prevAt) ? (s.At - prevAt).TotalMinutes : 1;
+                        if (minutes <= 0 || minutes > MaxSampleGapMinutes) minutes = 1;
+                        double carry = (capCarry.TryGetValue(row, out var c) ? c : 0) + minutes * 60 / sutSec;
+                        d23 = (int)carry;
+                        capCarry[row] = carry - d23;
+                    }
+                    lastAt[row] = s.At;
+                }
+                steps.Add((s, d23, d22, d24));
+                byRow[row] = byModel[key] = (r23, r22, r24);
             }
 
             result.TargetProd = steps.Sum(x => x.D23);
